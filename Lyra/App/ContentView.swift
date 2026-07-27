@@ -226,9 +226,7 @@ struct ContentView: View {
                 do {
                     try data.write(to: url, options: .atomic)
                 } catch {
-                    Task { @MainActor in
-                        store.errorMessage = error.localizedDescription
-                    }
+                    store.errorMessage = error.localizedDescription
                 }
             }
         } catch {

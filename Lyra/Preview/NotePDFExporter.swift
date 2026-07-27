@@ -125,13 +125,13 @@ enum NotePDFExporter {
             }
         }
 
-        private func drawText(_ text: String, font: NSFont, color: NSColor, indent: CGFloat = 0) {
+        private func drawText(_ text: String, font: NSFont, color: NSColor) {
             let attr = makeAttributed(text, font: font, color: color)
-            let width = NotePDFExporter.contentWidth - indent
+            let width = NotePDFExporter.contentWidth
             let height = measure(attr, width: width)
             ensureSpace(height)
             let rect = CGRect(
-                x: NotePDFExporter.margin + indent,
+                x: NotePDFExporter.margin,
                 y: y,
                 width: width,
                 height: height

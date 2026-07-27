@@ -35,11 +35,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-
         textView.vaultRoot = vaultRoot
-        textView.onImagePasted = { [weak coordinator = context.coordinator] in
-            coordinator?.handleImagePasted()
-        }
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -59,9 +55,6 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? LyraTextView else { return }
         textView.vaultRoot = vaultRoot
-        textView.onImagePasted = { [weak coordinator = context.coordinator] in
-            coordinator?.handleImagePasted()
-        }
         if textView.string != text {
             context.coordinator.applyHighlight(text)
         }
@@ -85,13 +78,6 @@ struct MarkdownTextView: NSViewRepresentable {
             isApplying = false
         }
 
-        func handleImagePasted() {
-            guard !isApplying, let textView else { return }
-            parent.text = textView.string
-            parent.onEdit()
-            applyHighlight(textView.string)
-        }
-
         func textDidChange(_ notification: Notification) {
             guard !isApplying, let textView else { return }
             parent.text = textView.string
@@ -104,7 +90,6 @@ struct MarkdownTextView: NSViewRepresentable {
 /// `NSTextView` that pastes clipboard images into the vault `_attachments` folder.
 final class LyraTextView: NSTextView {
     var vaultRoot: URL?
-    var onImagePasted: (() -> Void)?
 
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
@@ -112,9 +97,7 @@ final class LyraTextView: NSTextView {
            let root = vaultRoot,
            let data = AttachmentStore.pngData(from: img),
            let rel = try? AttachmentStore.savePNG(data: data, vaultRoot: root) {
-            let snippet = "![](\(rel))"
-            insertText(snippet, replacementRange: selectedRange())
-            onImagePasted?()
+            insertText("![](\(rel))", replacementRange: selectedRange())
             return
         }
         super.paste(sender)

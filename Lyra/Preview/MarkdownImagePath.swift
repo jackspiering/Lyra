@@ -41,12 +41,7 @@ enum MarkdownImagePath {
     }
 
     private static func absoluteFileURL(from path: String) -> URL? {
-        if path.hasPrefix("file:") {
-            return URL(string: path)
-        }
-        if (path as NSString).isAbsolutePath {
-            return URL(fileURLWithPath: path)
-        }
-        return nil
+        guard (path as NSString).isAbsolutePath else { return nil }
+        return URL(fileURLWithPath: path)
     }
 }
