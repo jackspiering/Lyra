@@ -7,10 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version label for the DMG (e.g. 0.2.0). Leave empty to use MARKETING_VERSION."
+        description: "Version label for the DMG (e.g. 0.5.0). Leave empty to use MARKETING_VERSION."
         required: false
         default: ""
 
+# Only this workflow needs write (create/update GitHub Release assets).
 permissions:
   contents: write
 
@@ -22,13 +23,15 @@ jobs:
   dmg:
     name: Build DMG
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
+          sw_vers
 
       - name: Resolve version
         id: ver
@@ -50,32 +53,25 @@ jobs:
         run: bash Scripts/package-dmg.sh
 
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Lyra-dmg
           path: build/dist/*.dmg
           if-no-files-found: error
+          retention-days: 14
 
-      - name: Create GitHub Release (tags only)
+      - name: Create GitHub Release
         if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          DMG="$(ls build/dist/*.dmg | head -1)"
-          NOTES="## Lyra ${TAG}
+        uses: softprops/action-gh-release@v3
+        with:
+          files: build/dist/*.dmg
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            Unsigned macOS build for testing (not notarized).
 
-          Unsigned macOS build for testing (not notarized).
+            - Open the DMG and drag **Lyra** to **Applications**.
+            - First launch: right-click → **Open** if Gatekeeper warns (unsigned CI build).
+            - Built by GitHub Actions on `macos-15`.
 
-          - Download the DMG, open it, drag **Lyra** to **Applications**.
-          - First launch: right-click → **Open** if Gatekeeper warns (unsigned CI build).
-          - Built by GitHub Actions on macOS 15.
-
-          Source: \`${{ github.sha }}\`
-          "
-          # Create release if missing, then upload asset (idempotent-ish)
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$DMG" --clobber
-          else
-            gh release create "$TAG" "$DMG" --title "Lyra ${TAG}" --notes "$NOTES"
-          fi
+            Commit: `${{ github.sha }}`

@@ -1,0 +1,11 @@
+# Keep GitHub Actions on supported major tags (Node runtime deprecations, etc.).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
