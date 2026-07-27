@@ -7,6 +7,10 @@ extension Notification.Name {
 
 @main
 struct LyraApp: App {
+    init() {
+        LyraFonts.registerBundledFonts()
+    }
+
     var body: some Scene {
         WindowGroup("Lyra") {
             ContentView()

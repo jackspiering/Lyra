@@ -1,53 +1,85 @@
 # Architecture
 
-Lyra is a single macOS app target with module-shaped source folders. This document records the decisions that keep the app small and local-first.
+Lyra is a single macOS app target with module-shaped folders. This doc is the decision log that keeps the product small and local-first.
 
-## Decision: plain files on disk
+## Invariants
 
-**Choice:** The vault is a normal directory tree. Notes are UTF-8 `.md` files.
+1. **Disk is source of truth** — vault = directory tree; notes = UTF-8 `.md` files. No sidecar database.
+2. **macOS only** — no iOS or multiplatform abstractions “just in case.”
+3. **Native UI** — SwiftUI + AppKit. No Electron. No WebKit for the default path.
+4. **Sandbox-friendly** — security-scoped bookmarks for user-selected vault folders.
+5. **YAGNI** — no plugins, graph, sync, tag index, or theme marketplace unless explicitly requested.
 
-**Why:** Zero lock-in, trivial backup/git, easy for tools and AI agents to read. No SQLite or proprietary package format in v0.1.
+## Layout
 
-**Consequence:** The file tree is refreshed from disk after mutations. There is no separate index DB.
+| Folder | Responsibility |
+|--------|----------------|
+| `App/` | Shell, navigation, open vault, theme, fonts, errors, `NoteViewMode` |
+| `Vault/` | Scan, CRUD, bookmarks, wiki resolve, `_attachments` paste storage |
+| `Editor/` | `NSTextView` source editing, highlight, autosave |
+| `Preview/` | Block parse, Reading / Live Preview, PDF export |
+| `Models/` | Shared types (`VaultNode`) |
 
-## Decision: single Xcode app target + module folders
+One primary type per file when practical.
 
-**Choice:** One `Lyra` app target; code grouped as `App/`, `Vault/`, `Editor/`, `Preview/`, `Models/`.
+## Decisions
 
-**Why:** Real macOS app (sandbox, menus, TextKit) with clear boundaries. Avoids premature SPM split.
+### Plain files on disk
 
-**Consequence:** Later extraction into packages is possible without a rewrite if folders stay clean.
+**Choice:** Notes are normal Markdown files in a folder the user picks.
 
-## Decision: TextKit source editor
+**Why:** Zero lock-in; trivial git/backup; agents and tools can read the vault without an API.
 
-**Choice:** Markdown source editing via AppKit `NSTextView` wrapped in `NSViewRepresentable` (`MarkdownTextView`), with a simple regex-based highlighter (`MarkdownHighlighter`) for v0.1.
+**Consequence:** Refresh the tree from disk after mutations. No separate index DB.
 
-**Why:** Native performance and feel; better long-term control than a WebView editor.
+### Single app target, folder modules
 
-## Decision: native preview first
+**Choice:** One Xcode app target; code grouped by role (not SPM packages yet).
 
-**Choice:** Live preview from the same in-memory string as the editor via SwiftUI `AttributedString(markdown:)` plus a clickable wiki-link list extracted from `[[...]]` patterns.
+**Why:** Real Mac app (sandbox, menus, TextKit) with clear boundaries without package ceremony.
 
-**Why:** Avoid embedding a browser for the default path. No WebKit dependency in v0.1.
+### TextKit source editor
 
-## Decision: sandbox + security-scoped bookmarks
+**Choice:** AppKit `NSTextView` via `NSViewRepresentable` + light regex highlight.
 
-**Choice:** App sandbox enabled; user selects the vault folder; bookmark data stored to reopen the last vault.
+**Why:** Native feel and control; better long-term path than a WebView editor.
 
-**Why:** Mac App Store–friendly defaults while still allowing full access to the chosen tree.
+### Native preview (no WebKit)
 
-## Decision: wiki link resolution
+**Choice:** Block parser + SwiftUI / `AttributedString` for inline Markdown; wiki links listed for navigation.
+
+**Why:** Avoid embedding a browser for the default experience.
+
+### Three note view modes (v0.5)
+
+**Choice:** One detail surface: **Source** | **Live Preview** (hybrid block edit) | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** cycles.
+
+**Why:** Matches vault workflows without a permanent side-by-side split. Live stays hybrid (click block → edit raw MD → commit) so the on-disk string remains simple to splice via UTF-16 ranges from `parseRanged`.
+
+### Inter typeface (v0.5)
+
+**Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced.
+
+**Why:** Readable open-source screen font; registered at launch with `CTFontManagerRegisterFontsForURL`.
+
+### Plain-language errors (v0.5)
+
+**Choice:** `UserFacingError` maps Cocoa/POSIX failures to short titles and actionable tips before alerts.
+
+**Why:** Domain codes and raw `localizedDescription` are hard to act on.
+
+### Wiki links
 
 **Syntax:** `[[Note Name]]` or `[[Note Name.md]]`.
 
-**Rule:** Case-insensitive match on the file stem within the vault; first match wins if duplicates exist. Unresolved links are styled differently and do not navigate in v0.1.
+**Rule:** Case-insensitive stem match in the vault; first match wins. Unresolved links do not navigate.
 
-## Concurrency
+### Concurrency
 
-- UI and stores: `@MainActor`
-- File I/O: async helpers so large scans do not freeze the UI
-- Autosave: ~500ms debounce; also save on note switch and app background/terminate
+- UI / stores: `@MainActor`
+- File I/O: keep large work off the main thread where it matters
+- Autosave: ~500ms debounce; also save on note switch, background, and quit
 
-## Non-goals (architecture)
+## Non-goals
 
-Plugin hosts, CRDT sync, Electron shells, multi-window document architecture beyond a simple primary window, background full-text indexing.
+Plugin hosts, CRDT sync, Electron, multi-window document architecture, background full-text indexing, full WYSIWYG round-trip.

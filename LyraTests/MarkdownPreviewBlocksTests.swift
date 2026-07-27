@@ -61,4 +61,66 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         let blocks = MarkdownPreviewBlocks.parse("Hello ![a](b.png) world\n")
         XCTAssertEqual(blocks, [.paragraph("Hello ![a](b.png) world")])
     }
+
+    func testParseRangedMatchesSubstrings() {
+        let source = "# Title\n\nBody text\n\n- item\n"
+        let ranged = MarkdownPreviewBlocks.parseRanged(source)
+        let ns = source as NSString
+        XCTAssertEqual(ranged.count, 3)
+        for item in ranged {
+            let slice = ns.substring(with: item.range)
+            switch item.block {
+            case .heading(1, "Title"):
+                XCTAssertEqual(slice, "# Title")
+            case .paragraph("Body text"):
+                XCTAssertEqual(slice, "Body text")
+            case .listItem("item"):
+                XCTAssertTrue(slice.hasSuffix("item"))
+            default:
+                XCTFail("Unexpected block \(item.block)")
+            }
+        }
+    }
+
+    func testReplacingBlockRange() {
+        let source = "# Title\n\nBody\n"
+        let ranged = MarkdownPreviewBlocks.parseRanged(source)
+        guard let heading = ranged.first else {
+            return XCTFail("expected blocks")
+        }
+        let next = MarkdownPreviewBlocks.replacing(in: source, range: heading.range, with: "## Renamed")
+        XCTAssertTrue(next.hasPrefix("## Renamed"))
+        XCTAssertTrue(next.contains("Body"))
+        let blocks = MarkdownPreviewBlocks.parse(next)
+        XCTAssertEqual(blocks[0], .heading(level: 2, text: "Renamed"))
+    }
+
+    func testReplacingMiddleBlockKeepsNeighbors() {
+        let source = """
+        One
+
+        Two
+
+        Three
+        """
+        let ranged = MarkdownPreviewBlocks.parseRanged(source)
+        XCTAssertEqual(ranged.count, 3)
+        let next = MarkdownPreviewBlocks.replacing(in: source, range: ranged[1].range, with: "Dos")
+        let blocks = MarkdownPreviewBlocks.parse(next)
+        XCTAssertEqual(blocks, [
+            .paragraph("One"),
+            .paragraph("Dos"),
+            .paragraph("Three"),
+        ])
+    }
+
+    func testCodeFenceRangeIncludesFences() {
+        let source = "```\ncode\n```\n"
+        let ranged = MarkdownPreviewBlocks.parseRanged(source)
+        XCTAssertEqual(ranged.count, 1)
+        let slice = (source as NSString).substring(with: ranged[0].range)
+        XCTAssertTrue(slice.hasPrefix("```"))
+        XCTAssertTrue(slice.contains("code"))
+        XCTAssertTrue(slice.hasSuffix("```") || slice.contains("```"))
+    }
 }
