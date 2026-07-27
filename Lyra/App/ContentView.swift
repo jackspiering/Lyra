@@ -64,20 +64,11 @@ struct ContentView: View {
         } message: {
             Text("This item will be moved to the Trash.")
         }
-        .commands {
-            CommandGroup(replacing: .saveItem) {
-                Button("Save") {
-                    editor.saveIfNeeded()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(editor.fileURL == nil)
-            }
-            CommandGroup(after: .importExport) {
-                Button("Export PDF…") {
-                    exportPDF()
-                }
-                .disabled(editor.fileURL == nil)
-            }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
+            editor.saveIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
+            exportPDF()
         }
     }
 
