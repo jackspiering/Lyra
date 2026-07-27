@@ -22,10 +22,6 @@ echo "-- required paths"
 for path in \
   README.md AGENTS.md CONTRIBUTING.md LICENSE \
   docs/architecture.md \
-  docs/ci.md \
-  .github/workflows/ci.yml \
-  .github/workflows/release.yml \
-  Scripts/package-dmg.sh \
   Lyra.xcodeproj/project.pbxproj \
   Lyra.xcodeproj/xcshareddata/xcschemes/Lyra.xcscheme \
   Lyra/LyraApp.swift \
@@ -39,7 +35,10 @@ for path in \
   Lyra/Editor/MarkdownTextView.swift \
   Lyra/Editor/MarkdownHighlighter.swift \
   Lyra/Preview/MarkdownPreviewView.swift \
+  Lyra/Preview/MarkdownPreviewBlocks.swift \
+  Lyra/App/LyraTheme.swift \
   Lyra/Models/VaultNode.swift \
+  LyraTests/MarkdownPreviewBlocksTests.swift \
   Lyra/Lyra.entitlements \
   Lyra/Info.plist \
   LyraTests/WikiLinkResolverTests.swift \
@@ -65,7 +64,7 @@ for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Edi
 done
 
 echo "-- pbxproj references"
-for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker; do
+for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks; do
   if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
     echo "  ok: pbxproj lists $name.swift"
   else

@@ -32,7 +32,7 @@ Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`
 - PR description: what changed, why, how you verified
 - Do not expand scope into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke checklist (v0.1)
+## Manual smoke checklist (v0.3)
 
 1. Open a folder with nested `.md` files as a vault
 2. Sidebar shows folders and markdown only; ignores `.git` / hidden files
