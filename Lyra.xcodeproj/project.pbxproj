@@ -31,6 +31,8 @@
 		A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* AttachmentStoreTests.swift */; };
 		A1000000000000000000001E /* MarkdownImagePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* MarkdownImagePath.swift */; };
 		A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* MarkdownImagePathTests.swift */; };
+		A10000000000000000000020 /* NotePDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* NotePDFExporter.swift */; };
+		A10000000000000000000021 /* NotePDFExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* NotePDFExporterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,8 @@
 		B1000000000000000000001D /* AttachmentStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentStoreTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000001E /* MarkdownImagePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePath.swift; sourceTree = "<group>"; };
 		B1000000000000000000001F /* MarkdownImagePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePathTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* NotePDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporter.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* NotePDFExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +130,7 @@
 				B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */,
 				B1000000000000000000001D /* AttachmentStoreTests.swift */,
 				B1000000000000000000001F /* MarkdownImagePathTests.swift */,
+				B10000000000000000000021 /* NotePDFExporterTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -186,6 +191,7 @@
 				B1000000000000000000000F /* MarkdownPreviewView.swift */,
 				B1000000000000000000001A /* MarkdownPreviewBlocks.swift */,
 				B1000000000000000000001E /* MarkdownImagePath.swift */,
+				B10000000000000000000020 /* NotePDFExporter.swift */,
 			);
 			path = Preview;
 			sourceTree = "<group>";
@@ -306,6 +312,7 @@
 				A1000000000000000000001A /* MarkdownPreviewBlocks.swift in Sources */,
 				A1000000000000000000001C /* AttachmentStore.swift in Sources */,
 				A1000000000000000000001E /* MarkdownImagePath.swift in Sources */,
+				A10000000000000000000020 /* NotePDFExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -319,6 +326,7 @@
 				A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */,
 				A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */,
 				A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */,
+				A10000000000000000000021 /* NotePDFExporterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
