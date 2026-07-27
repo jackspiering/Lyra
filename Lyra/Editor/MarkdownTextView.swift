@@ -31,7 +31,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.font = LyraFonts.editor(size: 14)
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -127,7 +127,7 @@ final class LyraTextView: NSTextView {
             }
             return true
         } catch {
-            onPasteError?(error.localizedDescription)
+            onPasteError?(UserFacingError.message(for: error, context: .pasteImage))
             return true
         }
     }

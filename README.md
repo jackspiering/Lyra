@@ -58,6 +58,7 @@ Autosave after ~500ms idle; ⌘S saves immediately.
 | Paste images | ⌘V in Source or Live block edit → `_attachments/` + `![](...)` |
 | Export PDF | **File → Export PDF…** for the current note |
 | Native UI | SwiftUI + AppKit; custom app icon |
+| Readable type | [Inter](https://rsms.me/inter/) (SIL Open Font License) for UI, editor, and preview |
 
 **Not in scope:** plugins, graph view, cloud sync, tags index, iOS, full WYSIWYG.
 

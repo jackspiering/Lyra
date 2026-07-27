@@ -40,17 +40,21 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+        .font(LyraFonts.body)
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 liveCommitToken += 1
-                editor.saveIfNeeded()
+                presentSaveFailureIfNeeded(editor.saveIfNeeded())
             }
         }
-        .alert("Error", isPresented: Binding(
-            get: { store.errorMessage != nil },
-            set: { if !$0 { store.errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { store.errorMessage = nil }
+        .alert(
+            store.errorTitle ?? "Something went wrong",
+            isPresented: Binding(
+                get: { store.errorMessage != nil },
+                set: { if !$0 { store.clearError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) { store.clearError() }
         } message: {
             Text(store.errorMessage ?? "")
         }
@@ -78,7 +82,7 @@ struct ContentView: View {
             liveCommitToken += 1
             // Allow Live Preview to commit before save on next run loop.
             DispatchQueue.main.async {
-                editor.saveIfNeeded()
+                presentSaveFailureIfNeeded(editor.saveIfNeeded())
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
@@ -169,7 +173,7 @@ struct ContentView: View {
                     text: $editor.text,
                     vaultRoot: store.rootURL,
                     onEdit: { editor.noteEdited() },
-                    onPasteError: { store.errorMessage = $0 }
+                    onPasteError: { store.presentPrepared(context: .pasteImage, message: $0) }
                 )
             case .livePreview:
                 LivePreviewView(
@@ -178,7 +182,7 @@ struct ContentView: View {
                     vaultRoot: store.rootURL,
                     onWikiLink: { openWikiLink($0) },
                     onEdit: { editor.noteEdited() },
-                    onPasteError: { store.errorMessage = $0 },
+                    onPasteError: { store.presentPrepared(context: .pasteImage, message: $0) },
                     commitToken: liveCommitToken
                 )
             case .reading:
@@ -194,7 +198,7 @@ struct ContentView: View {
 
     private func renameSheet(_ node: VaultNode) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Rename").font(.headline)
+            Text("Rename").font(LyraFonts.headline)
             TextField("Name", text: $renameText)
                 .onAppear { renameText = node.name }
             HStack {
@@ -203,7 +207,7 @@ struct ContentView: View {
                 Button("Rename") {
                     let oldPath = node.url.path
                     liveCommitToken += 1
-                    editor.saveIfNeeded()
+                    presentSaveFailureIfNeeded(editor.saveIfNeeded())
                     store.renameSelected(to: renameText)
                     if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
                         editor.open(url: newURL)
@@ -231,7 +235,15 @@ struct ContentView: View {
             // Commit token already bumped; open after Live Preview can apply on next frame.
             DispatchQueue.main.async {
                 editor.open(url: node.url)
+                presentEditorErrorIfNeeded()
             }
+        }
+    }
+
+    private func presentEditorErrorIfNeeded() {
+        if let last = editor.lastError {
+            store.presentError(last.error, context: last.context)
+            editor.lastError = nil
         }
     }
 
@@ -239,17 +251,22 @@ struct ContentView: View {
         guard let url = store.resolveWikiLink(text) else { return }
         liveCommitToken += 1
         DispatchQueue.main.async {
-            editor.saveIfNeeded()
+            presentSaveFailureIfNeeded(editor.saveIfNeeded())
             store.selection = url.path
             editor.open(url: url)
+            presentEditorErrorIfNeeded()
         }
+    }
+
+    private func presentSaveFailureIfNeeded(_ ok: Bool) {
+        if !ok { presentEditorErrorIfNeeded() }
     }
 
     private func exportPDF() {
         liveCommitToken += 1
         DispatchQueue.main.async {
             guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
-            editor.saveIfNeeded()
+            presentSaveFailureIfNeeded(editor.saveIfNeeded())
             do {
                 let data = try NotePDFExporter.pdfData(
                     markdown: editor.text,
@@ -265,11 +282,11 @@ struct ContentView: View {
                     do {
                         try data.write(to: url, options: .atomic)
                     } catch {
-                        store.errorMessage = error.localizedDescription
+                        store.presentError(error, context: .exportPDF)
                     }
                 }
             } catch {
-                store.errorMessage = error.localizedDescription
+                store.presentError(error, context: .exportPDF)
             }
         }
     }

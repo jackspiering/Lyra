@@ -11,7 +11,9 @@ struct MarkdownPreviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Nothing to preview").foregroundStyle(.secondary)
+                    Text("Nothing to preview")
+                        .font(LyraFonts.body)
+                        .foregroundStyle(.secondary)
                 } else {
                     ForEach(Array(MarkdownPreviewBlocks.parse(text).enumerated()), id: \.offset) { _, block in
                         MarkdownBlockRow(
@@ -36,7 +38,7 @@ struct MarkdownPreviewView: View {
         if !links.isEmpty {
             Divider().padding(.top, 8)
             Text("Wiki links")
-                .font(.caption)
+                .font(LyraFonts.caption)
                 .foregroundStyle(.secondary)
             ForEach(links, id: \.self) { name in
                 Button {

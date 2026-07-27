@@ -46,6 +46,8 @@ Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`
 9. In **Live**, focus a block and paste an image the same way
 10. **File → Export PDF…** from each mode; open the PDF and check content
 11. **⌘S** saves immediately (autosave still works after ~1s without ⌘S)
+12. Force a save failure if you can (e.g. lock the file) — alert title/body should be plain language, not `NSCocoaErrorDomain`
+13. Confirm Source / Live / Reading text uses Inter (not system mono for body text); code fences stay monospaced
 
 ## License
 

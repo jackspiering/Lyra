@@ -11,14 +11,14 @@ struct MarkdownBlockRow: View {
         switch block {
         case .heading(let level, let content):
             Text(inline(content))
-                .font(headingFont(level))
+                .font(LyraFonts.heading(level: level))
                 .foregroundStyle(Color(nsColor: LyraTheme.heading))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, level <= 2 ? 6 : 2)
 
         case .paragraph(let content):
             Text(inline(content))
-                .font(.body)
+                .font(LyraFonts.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .listItem(let content):
@@ -26,7 +26,7 @@ struct MarkdownBlockRow: View {
                 Text("•")
                     .foregroundStyle(Color(nsColor: LyraTheme.listMarker))
                 Text(inline(content))
-                    .font(.body)
+                    .font(LyraFonts.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -36,7 +36,7 @@ struct MarkdownBlockRow: View {
                     .fill(LyraTheme.accentColor)
                     .frame(width: 3)
                 Text(inline(content))
-                    .font(.body)
+                    .font(LyraFonts.body)
                     .foregroundStyle(.secondary)
                     .padding(.leading, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -44,7 +44,7 @@ struct MarkdownBlockRow: View {
 
         case .code(let code):
             Text(code.isEmpty ? " " : code)
-                .font(.system(.callout, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Color(nsColor: LyraTheme.code))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
@@ -66,19 +66,9 @@ struct MarkdownBlockRow: View {
                     .accessibilityLabel(alt.isEmpty ? "Image" : alt)
             } else {
                 Text("Missing image: \(path)")
-                    .font(.caption)
+                    .font(LyraFonts.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private func headingFont(_ level: Int) -> Font {
-        switch level {
-        case 1: return .largeTitle.weight(.bold)
-        case 2: return .title.weight(.semibold)
-        case 3: return .title2.weight(.semibold)
-        case 4: return .title3.weight(.semibold)
-        default: return .headline
         }
     }
 

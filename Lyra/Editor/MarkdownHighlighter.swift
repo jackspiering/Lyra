@@ -1,8 +1,8 @@
 import AppKit
 
 enum MarkdownHighlighter {
-    private static let baseFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-    private static let boldFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .bold)
+    private static let baseFont = LyraFonts.editor(size: 14)
+    private static let boldFont = LyraFonts.editorBold(size: 14)
 
     private static let rules: [(String, [NSAttributedString.Key: Any])] = {
         let heading: [NSAttributedString.Key: Any] = [

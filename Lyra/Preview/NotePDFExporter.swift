@@ -189,7 +189,7 @@ enum NotePDFExporter {
 
         private func drawCode(_ code: String) {
             let display = code.isEmpty ? " " : code
-            let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            let font = LyraFonts.code(size: 11)
             let attr = makeAttributed(display, font: font, color: NotePDFExporter.bodyColor)
             let padding: CGFloat = 8
             let textWidth = NotePDFExporter.contentWidth - padding * 2
@@ -251,13 +251,13 @@ enum NotePDFExporter {
                 y += drawH + NotePDFExporter.blockGap
             } else {
                 let label = alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
-                drawText(label, font: NSFont.systemFont(ofSize: 11), color: NotePDFExporter.secondaryColor)
+                drawText(label, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
             }
         }
 
         // MARK: Typography helpers
 
-        private var bodyFont: NSFont { NSFont.systemFont(ofSize: 12) }
+        private var bodyFont: NSFont { LyraFonts.ui(size: 12) }
 
         private func headingFont(_ level: Int) -> NSFont {
             let size: CGFloat
@@ -266,7 +266,7 @@ enum NotePDFExporter {
             case 2: size = 20
             default: size = 16
             }
-            return NSFont.boldSystemFont(ofSize: size)
+            return LyraFonts.ui(size: size, weight: .bold)
         }
 
         private func makeAttributed(_ text: String, font: NSFont, color: NSColor) -> NSAttributedString {

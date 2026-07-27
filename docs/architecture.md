@@ -38,6 +38,18 @@ Lyra is a single macOS app target with module-shaped source folders. This docume
 
 **Consequence:** Block parse attaches UTF-16 source ranges (`MarkdownPreviewBlocks.parseRanged`) for splice-safe edits.
 
+## Decision: Inter as the UI font (v0.5)
+
+**Choice:** Bundle [Inter](https://rsms.me/inter/) (SIL OFL 1.1) for editor, preview, and chrome. Code blocks stay monospaced (system mono). Registered at launch via `CTFontManagerRegisterFontsForURL`.
+
+**Why:** Clear, free, open-source typeface designed for screens; no proprietary font dependency.
+
+## Decision: plain-language errors (v0.5)
+
+**Choice:** `UserFacingError` maps Cocoa/POSIX failures to short titles and actionable messages (permission, missing file, disk full, etc.) before presenting alerts.
+
+**Why:** Raw `localizedDescription` and domain codes are hard for users to act on.
+
 ## Decision: sandbox + security-scoped bookmarks
 
 **Choice:** App sandbox enabled; user selects the vault folder; bookmark data stored to reopen the last vault.

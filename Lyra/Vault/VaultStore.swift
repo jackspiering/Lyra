@@ -9,6 +9,9 @@ final class VaultStore {
     var rootURL: URL?
     var rootNode: VaultNode?
     var selection: VaultNode.ID?
+    /// Alert title (short).
+    var errorTitle: String?
+    /// Alert body (plain language).
     var errorMessage: String?
     private var isAccessingSecurityScope = false
     private var wikiResolver = WikiLinkResolver(noteURLs: [])
@@ -17,9 +20,31 @@ final class VaultStore {
         restoreLastVaultIfPossible()
     }
 
+    func presentError(_ error: Error, context: UserFacingError.Context) {
+        let pair = UserFacingError.presentable(for: error, context: context)
+        errorTitle = pair.title
+        errorMessage = pair.message
+    }
+
+    func presentError(context: UserFacingError.Context, detail: String) {
+        errorTitle = context.title
+        errorMessage = UserFacingError.message(context: context, detail: detail)
+    }
+
+    /// Present a pre-built body (already includes tips) with a known context title.
+    func presentPrepared(context: UserFacingError.Context, message: String) {
+        errorTitle = context.title
+        errorMessage = message
+    }
+
+    func clearError() {
+        errorTitle = nil
+        errorMessage = nil
+    }
+
     func openVault(at url: URL) {
         stopAccessingIfNeeded()
-        errorMessage = nil
+        clearError()
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
 
         do {
@@ -30,7 +55,7 @@ final class VaultStore {
             )
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
         } catch {
-            errorMessage = "Could not save vault bookmark: \(error.localizedDescription)"
+            presentError(error, context: .rememberVault)
         }
 
         rootURL = url
@@ -44,7 +69,7 @@ final class VaultStore {
             rootNode = node
             wikiResolver = WikiLinkResolver(noteURLs: FileSystemVault.collectNoteURLs(from: node))
         } catch {
-            errorMessage = error.localizedDescription
+            presentError(error, context: .readVault)
         }
     }
 
@@ -66,7 +91,14 @@ final class VaultStore {
         guard let rootURL else { return }
         let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
         let url = parent.appendingPathComponent(UntitledName.next(in: parent))
-        FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
+        let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
+        if !ok {
+            presentError(
+                context: .createNote,
+                detail: "Lyra couldn't create a new Markdown file in this folder."
+            )
+            return
+        }
         refresh()
         selection = url.path
     }
@@ -80,7 +112,7 @@ final class VaultStore {
             refresh()
             selection = url.path
         } catch {
-            errorMessage = error.localizedDescription
+            presentError(error, context: .createFolder)
         }
     }
 
@@ -94,7 +126,7 @@ final class VaultStore {
             refresh()
             selection = dest.path
         } catch {
-            errorMessage = error.localizedDescription
+            presentError(error, context: .rename)
         }
     }
 
@@ -105,7 +137,7 @@ final class VaultStore {
             selection = nil
             refresh()
         } catch {
-            errorMessage = error.localizedDescription
+            presentError(error, context: .delete)
         }
     }
 

@@ -111,7 +111,7 @@ struct LivePreviewView: View {
                         Button("Cancel") { cancelFocus() }
                         Spacer()
                     }
-                    .font(.caption)
+                    .font(LyraFonts.caption)
                 }
             } else {
                 MarkdownBlockRow(
@@ -169,7 +169,7 @@ struct LivePreviewView: View {
         if !links.isEmpty {
             Divider().padding(.top, 8)
             Text("Wiki links")
-                .font(.caption)
+                .font(LyraFonts.caption)
                 .foregroundStyle(.secondary)
             ForEach(links, id: \.self) { name in
                 Button {
