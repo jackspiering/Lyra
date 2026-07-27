@@ -11,11 +11,13 @@ Thanks for helping improve Lyra.
 ## Building and testing
 
 ```bash
-xcodebuild -scheme Lyra -destination 'platform=macOS' build
-xcodebuild -scheme Lyra -destination 'platform=macOS' test
+bash Scripts/smoke.sh                 # structure checks (Linux/macOS)
+bash Scripts/xcode-test.sh            # xcodebuild build + test (macOS only)
 ```
 
 Unit tests live in `LyraTests/` and target pure logic (vault helpers, wiki links, naming).
+
+Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
 
 ## Style
 

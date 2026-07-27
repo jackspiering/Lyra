@@ -12,8 +12,20 @@ struct ContentView: View {
     var body: some View {
         Group {
             if store.rootURL == nil {
-                OpenVaultView { url in
-                    store.openVault(at: url)
+                ContentUnavailableView {
+                    Label("No Vault Open", systemImage: "folder.badge.questionmark")
+                } description: {
+                    Text("Open a folder of Markdown files to begin.")
+                } actions: {
+                    Button("Open Vault…") {
+                        if let url = VaultFolderPicker.pick(
+                            message: "Choose a folder to use as a Lyra vault"
+                        ) {
+                            store.openVault(at: url)
+                        }
+                    }
+                    .keyboardShortcut("o", modifiers: .command)
+                    .buttonStyle(.borderedProminent)
                 }
             } else {
                 vaultWorkspace
@@ -21,9 +33,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 560)
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
-                editor.saveIfNeeded()
-            }
+            if phase != .active { editor.saveIfNeeded() }
         }
         .alert("Error", isPresented: Binding(
             get: { store.errorMessage != nil },
@@ -69,7 +79,6 @@ struct ContentView: View {
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
-                    .help("New Note")
                     .keyboardShortcut("n", modifiers: .command)
 
                     Button {
@@ -77,50 +86,42 @@ struct ContentView: View {
                     } label: {
                         Label("New Folder", systemImage: "folder.badge.plus")
                     }
-                    .help("New Folder")
                 }
             }
         } detail: {
-            detailPane
-                .toolbar {
-                    ToolbarItemGroup {
-                        Button {
-                            if let url = VaultFolderPicker.pick() {
-                                editor.close()
-                                store.openVault(at: url)
-                            }
-                        } label: {
-                            Label("Open Vault", systemImage: "folder")
+            HSplitView {
+                editorPane.frame(minWidth: 280)
+                if previewVisible {
+                    MarkdownPreviewView(text: editor.text) { openWikiLink($0) }
+                        .frame(minWidth: 240)
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup {
+                    Button {
+                        if let url = VaultFolderPicker.pick() {
+                            editor.close()
+                            store.openVault(at: url)
                         }
-                        .keyboardShortcut("o", modifiers: .command)
-
-                        Button {
-                            previewVisible.toggle()
-                        } label: {
-                            Label("Toggle Preview", systemImage: "sidebar.right")
-                        }
-                        .keyboardShortcut("p", modifiers: [.command, .shift])
-
-                        Button {
-                            editor.saveIfNeeded()
-                        } label: {
-                            Label("Save", systemImage: "square.and.arrow.down")
-                        }
-                        .keyboardShortcut("s", modifiers: .command)
+                    } label: {
+                        Label("Open Vault", systemImage: "folder")
                     }
-                }
-        }
-    }
+                    .keyboardShortcut("o", modifiers: .command)
 
-    private var detailPane: some View {
-        HSplitView {
-            editorPane
-                .frame(minWidth: 280)
-            if previewVisible {
-                MarkdownPreviewView(text: editor.text) { linkText in
-                    openWikiLink(linkText)
+                    Button {
+                        previewVisible.toggle()
+                    } label: {
+                        Label("Toggle Preview", systemImage: "sidebar.right")
+                    }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                    Button {
+                        editor.saveIfNeeded()
+                    } label: {
+                        Label("Save", systemImage: "square.and.arrow.down")
+                    }
+                    .keyboardShortcut("s", modifiers: .command)
                 }
-                .frame(minWidth: 240)
             }
         }
     }
@@ -128,9 +129,7 @@ struct ContentView: View {
     @ViewBuilder
     private var editorPane: some View {
         if editor.fileURL != nil {
-            MarkdownTextView(text: $editor.text) {
-                editor.noteEdited()
-            }
+            MarkdownTextView(text: $editor.text) { editor.noteEdited() }
         } else {
             ContentUnavailableView(
                 "Select a note",
@@ -152,8 +151,7 @@ struct ContentView: View {
                     let oldPath = node.url.path
                     editor.saveIfNeeded()
                     store.renameSelected(to: renameText)
-                    if editor.fileURL?.path == oldPath,
-                       let newURL = store.selectedFileURL() {
+                    if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
                         editor.open(url: newURL)
                     }
                     renameTarget = nil
@@ -171,19 +169,18 @@ struct ContentView: View {
               let root = store.rootNode,
               let node = FileSystemVault.findNode(id: newValue, in: root),
               !node.isDirectory else {
-            if store.selectedFileURL() == nil {
-                editor.close()
-            }
+            if store.selectedFileURL() == nil { editor.close() }
             return
         }
-        if editor.fileURL?.path == node.url.path { return }
-        editor.open(url: node.url)
+        if editor.fileURL?.path != node.url.path {
+            editor.open(url: node.url)
+        }
     }
 
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
         editor.saveIfNeeded()
-        store.openNote(url: url)
+        store.selection = url.path
         editor.open(url: url)
     }
 }

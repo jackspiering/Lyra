@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* LyraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* LyraApp.swift */; };
 		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ContentView.swift */; };
-		A10000000000000000000003 /* OpenVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* OpenVaultView.swift */; };
 		A10000000000000000000004 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SidebarView.swift */; };
 		A10000000000000000000005 /* VaultNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* VaultNode.swift */; };
 		A10000000000000000000007 /* FileSystemVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* FileSystemVault.swift */; };
@@ -40,7 +39,6 @@
 /* Begin PBXFileReference section */
 		B10000000000000000000001 /* LyraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		B10000000000000000000003 /* OpenVaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVaultView.swift; sourceTree = "<group>"; };
 		B10000000000000000000004 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* VaultNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNode.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* FileSystemVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemVault.swift; sourceTree = "<group>"; };
@@ -128,7 +126,6 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000002 /* ContentView.swift */,
-				B10000000000000000000003 /* OpenVaultView.swift */,
 				B10000000000000000000004 /* SidebarView.swift */,
 				B10000000000000000000018 /* VaultFolderPicker.swift */,
 			);
@@ -273,7 +270,6 @@
 			files = (
 				A10000000000000000000001 /* LyraApp.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
-				A10000000000000000000003 /* OpenVaultView.swift in Sources */,
 				A10000000000000000000004 /* SidebarView.swift in Sources */,
 				A10000000000000000000018 /* VaultFolderPicker.swift in Sources */,
 				A10000000000000000000005 /* VaultNode.swift in Sources */,

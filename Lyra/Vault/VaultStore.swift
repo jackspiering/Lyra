@@ -10,8 +10,7 @@ final class VaultStore {
     var rootNode: VaultNode?
     var selection: VaultNode.ID?
     var errorMessage: String?
-    var isAccessingSecurityScope = false
-
+    private var isAccessingSecurityScope = false
     private var wikiResolver = WikiLinkResolver(noteURLs: [])
 
     init() {
@@ -21,7 +20,6 @@ final class VaultStore {
     func openVault(at url: URL) {
         stopAccessingIfNeeded()
         errorMessage = nil
-
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
 
         do {
@@ -64,19 +62,10 @@ final class VaultStore {
         wikiResolver.resolve(text)
     }
 
-    func openNote(url: URL) {
-        selection = url.path
-    }
-
     func createNote() {
         guard let rootURL else { return }
         let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
-        let name = UntitledName.next(in: parent)
-        let url = parent.appendingPathComponent(name)
-        guard !FileManager.default.fileExists(atPath: url.path) else {
-            errorMessage = "File already exists"
-            return
-        }
+        let url = parent.appendingPathComponent(UntitledName.next(in: parent))
         FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
         refresh()
         selection = url.path
@@ -85,8 +74,7 @@ final class VaultStore {
     func createFolder() {
         guard let rootURL else { return }
         let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
-        let name = UntitledName.next(base: "New Folder", ext: nil, in: parent)
-        let url = parent.appendingPathComponent(name)
+        let url = parent.appendingPathComponent(UntitledName.next(base: "New Folder", ext: nil, in: parent))
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
             refresh()
@@ -113,8 +101,7 @@ final class VaultStore {
     func deleteSelected() {
         guard let node = selectedNode() else { return }
         do {
-            var resultingURL: NSURL?
-            try FileManager.default.trashItem(at: node.url, resultingItemURL: &resultingURL)
+            try FileManager.default.trashItem(at: node.url, resultingItemURL: nil)
             selection = nil
             refresh()
         } catch {
@@ -125,17 +112,13 @@ final class VaultStore {
     private func restoreLastVaultIfPossible() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
         var isStale = false
-        do {
-            let url = try URL(
-                resolvingBookmarkData: data,
-                options: [.withSecurityScope],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-            openVault(at: url)
-        } catch {
-            // Ignore stale bookmarks at launch.
-        }
+        guard let url = try? URL(
+            resolvingBookmarkData: data,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) else { return }
+        openVault(at: url)
     }
 
     private func stopAccessingIfNeeded() {

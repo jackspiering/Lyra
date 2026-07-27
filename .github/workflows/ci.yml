@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke (structure)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run structural smoke
+        run: bash Scripts/smoke.sh
+
+  macos:
+    name: Build & test (macOS)
+    runs-on: macos-15
+    needs: smoke
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Prefer latest installed Xcode on the runner image.
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Build and test
+        run: bash Scripts/xcode-test.sh
+
+  # Future ideas (not enabled yet):
+  # - notarized release artifacts on tag
+  # - SwiftLint (keep rules minimal if added)
+  # - extract pure vault logic to SPM for Linux unit tests

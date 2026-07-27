@@ -40,12 +40,14 @@ open Lyra.xcodeproj
 
 In Xcode: select the **Lyra** scheme, destination **My Mac**, then **Run** (⌘R).
 
-From the command line (on a Mac):
+From the command line:
 
 ```bash
-xcodebuild -scheme Lyra -destination 'platform=macOS' build
-xcodebuild -scheme Lyra -destination 'platform=macOS' test
+bash Scripts/smoke.sh                 # structure checks (any OS)
+bash Scripts/xcode-test.sh            # build + unit tests (Mac + Xcode)
 ```
+
+CI runs both (see [docs/ci.md](docs/ci.md)).
 
 1. Launch Lyra → **Open Vault…**
 2. Choose a folder of Markdown files

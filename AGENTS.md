@@ -10,11 +10,12 @@ Native **macOS-only** Markdown vault editor. Local folders of plain `.md` files.
 
 ```
 Lyra/
-  App/        # SwiftUI shell, menus, open vault, NavigationSplitView
+  App/        # SwiftUI shell, open vault, NavigationSplitView, folder picker
   Vault/      # Scan tree, CRUD, bookmarks, wiki link resolution
   Editor/     # Source editing, TextKit highlight, autosave
   Preview/    # Live preview
   Models/     # VaultNode
+  Scripts/    # smoke.sh (any OS), xcode-test.sh (Mac)
 LyraTests/    # Unit tests for pure logic
 docs/         # Architecture + design/plan specs
 ```
