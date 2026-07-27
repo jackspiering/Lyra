@@ -31,6 +31,7 @@ for path in \
   Lyra/Vault/VaultStore.swift \
   Lyra/Vault/WikiLinkResolver.swift \
   Lyra/Vault/UntitledName.swift \
+  Lyra/Vault/AttachmentStore.swift \
   Lyra/Editor/EditorViewModel.swift \
   Lyra/Editor/MarkdownTextView.swift \
   Lyra/Editor/MarkdownHighlighter.swift \
@@ -43,7 +44,8 @@ for path in \
   Lyra/Info.plist \
   LyraTests/WikiLinkResolverTests.swift \
   LyraTests/UntitledNameTests.swift \
-  LyraTests/FileSystemVaultTests.swift
+  LyraTests/FileSystemVaultTests.swift \
+  LyraTests/AttachmentStoreTests.swift
 do
   if [[ -e "$path" ]]; then
     echo "  ok: $path"
@@ -64,7 +66,7 @@ for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Edi
 done
 
 echo "-- pbxproj references"
-for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks; do
+for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks AttachmentStore AttachmentStoreTests; do
   if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
     echo "  ok: pbxproj lists $name.swift"
   else
