@@ -22,7 +22,7 @@ struct MarkdownPreviewView: View {
                             vaultRoot: vaultRoot
                         )
                     }
-                    wikiLinks
+                    WikiLinksSection(text: text, onWikiLink: onWikiLink)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,38 +30,5 @@ struct MarkdownPreviewView: View {
             .textSelection(.enabled)
         }
         .background(Color(nsColor: .textBackgroundColor))
-    }
-
-    @ViewBuilder
-    private var wikiLinks: some View {
-        let links = linkNames(in: text)
-        if !links.isEmpty {
-            Divider().padding(.top, 8)
-            Text("Wiki links")
-                .font(LyraFonts.caption)
-                .foregroundStyle(.secondary)
-            ForEach(links, id: \.self) { name in
-                Button {
-                    onWikiLink?(name)
-                } label: {
-                    Text("[[\(name)]]")
-                        .foregroundStyle(LyraTheme.accentColor)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func linkNames(in source: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return [] }
-        let ns = source as NSString
-        var names: [String] = []
-        var seen = Set<String>()
-        regex.enumerateMatches(in: source, range: NSRange(location: 0, length: ns.length)) { match, _, _ in
-            guard let match, match.numberOfRanges > 1 else { return }
-            let name = ns.substring(with: match.range(at: 1))
-            if seen.insert(name).inserted { names.append(name) }
-        }
-        return names
     }
 }

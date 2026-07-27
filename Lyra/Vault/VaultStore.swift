@@ -20,19 +20,14 @@ final class VaultStore {
         restoreLastVaultIfPossible()
     }
 
-    func presentError(_ error: Error, context: UserFacingError.Context) {
+    func present(error: Error, context: UserFacingError.Context) {
         let pair = UserFacingError.presentable(for: error, context: context)
         errorTitle = pair.title
         errorMessage = pair.message
     }
 
-    func presentError(context: UserFacingError.Context, detail: String) {
-        errorTitle = context.title
-        errorMessage = UserFacingError.message(context: context, detail: detail)
-    }
-
-    /// Present a pre-built body (already includes tips) with a known context title.
-    func presentPrepared(context: UserFacingError.Context, message: String) {
+    /// Pre-built body (include tips yourself, or use `UserFacingError.message`).
+    func present(context: UserFacingError.Context, message: String) {
         errorTitle = context.title
         errorMessage = message
     }
@@ -55,7 +50,7 @@ final class VaultStore {
             )
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
         } catch {
-            presentError(error, context: .rememberVault)
+            present(error: error, context: .rememberVault)
         }
 
         rootURL = url
@@ -69,7 +64,7 @@ final class VaultStore {
             rootNode = node
             wikiResolver = WikiLinkResolver(noteURLs: FileSystemVault.collectNoteURLs(from: node))
         } catch {
-            presentError(error, context: .readVault)
+            present(error: error, context: .readVault)
         }
     }
 
@@ -93,9 +88,12 @@ final class VaultStore {
         let url = parent.appendingPathComponent(UntitledName.next(in: parent))
         let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
         if !ok {
-            presentError(
+            present(
                 context: .createNote,
-                detail: "Lyra couldn't create a new Markdown file in this folder."
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "Lyra couldn't create a new Markdown file in this folder."
+                )
             )
             return
         }
@@ -112,7 +110,7 @@ final class VaultStore {
             refresh()
             selection = url.path
         } catch {
-            presentError(error, context: .createFolder)
+            present(error: error, context: .createFolder)
         }
     }
 
@@ -126,7 +124,7 @@ final class VaultStore {
             refresh()
             selection = dest.path
         } catch {
-            presentError(error, context: .rename)
+            present(error: error, context: .rename)
         }
     }
 
@@ -137,7 +135,7 @@ final class VaultStore {
             selection = nil
             refresh()
         } catch {
-            presentError(error, context: .delete)
+            present(error: error, context: .delete)
         }
     }
 

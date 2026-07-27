@@ -2,53 +2,52 @@
 
 ## Goals
 
-1. **Catch broken structure** on every PR without a Mac (file layout, Xcode project refs).
-2. **Build and unit-test** the macOS app on a Mac runner.
-3. **Produce a downloadable DMG** on version tags (unsigned for now).
+1. Catch broken structure on every PR without a Mac (layout, Xcode project refs).
+2. Build and unit-test the macOS app on a Mac runner.
+3. Attach an unsigned DMG on version tags.
 
 ## Pipelines
 
 ### PR / push — `.github/workflows/ci.yml`
 
-| Job | Runner | What |
-|-----|--------|------|
+| Job | Runner | Command |
+|-----|--------|---------|
 | `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` |
-| `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug build + unit tests) |
+| `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug + unit tests) |
 
 ### Tags — `.github/workflows/release.yml`
 
-| Trigger | What |
-|---------|------|
-| Push tag `v*` (e.g. `v0.4.0`) | Release build → DMG → GitHub Release asset |
-| Manual **workflow_dispatch** | Same DMG build; uploads an artifact (no Release unless you tagged) |
+| Trigger | Result |
+|---------|--------|
+| Push tag `v*` (e.g. `v0.5.0`) | Release build → DMG → GitHub Release asset |
+| Manual **workflow_dispatch** | Same DMG build as an Actions artifact (no Release unless tagged) |
 
-Local (Mac only):
+## Local
 
 ```bash
 bash Scripts/smoke.sh
-bash Scripts/xcode-test.sh
-VERSION=0.4.0 bash Scripts/package-dmg.sh   # → build/dist/Lyra-0.4.0.dmg
+bash Scripts/xcode-test.sh                              # Mac + Xcode
+VERSION=0.5.0 bash Scripts/package-dmg.sh               # → build/dist/Lyra-0.5.0.dmg
 ```
 
-## How to ship a DMG
+## Ship a DMG
 
-1. Merge version + release workflow to `main`.
-2. Ensure marketing version in the project matches the tag (e.g. `0.4.0` ↔ `v0.4.0`).
-3. Tag and push:
+1. Merge to `main` with marketing version matching the intended tag (`0.5.0`).
+2. Tag and push:
 
 ```bash
 git checkout main && git pull
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
-4. Open **Actions → Release**; when green, download from the **Releases** page (`Lyra-0.4.0.dmg`).
+3. When **Actions → Release** is green, download `Lyra-0.5.0.dmg` from [Releases](https://github.com/jackspiering/Lyra/releases).
 
-### Gatekeeper note
+### Gatekeeper
 
 CI builds are **unsigned / not notarized**. Testers may need right-click → **Open** the first time. Developer ID + notarization is a later step (Apple Developer Program).
 
-## Signing in CI
+### Signing flags in CI
 
 ```text
 CODE_SIGN_IDENTITY=-
@@ -56,17 +55,8 @@ CODE_SIGNING_REQUIRED=NO
 CODE_SIGNING_ALLOWED=NO
 ```
 
-## Roadmap (later)
-
-| Idea | When |
-|------|------|
-| Developer ID sign + notarize | Public installs without Gatekeeper friction |
-| Sparkle auto-updates | Regular shipping cadence |
-| SwiftLint | Style fights appear in review |
-| SPM `LyraCore` + Linux tests | Pure logic grows |
-
 ## Non-goals
 
-- GitHub Packages for the `.app` (use **Releases** + DMG)
-- Multi-platform matrices
+- Publishing the app via GitHub Packages (use Releases + DMG)
+- Multi-platform CI matrices
 - Automatic version bumps without a human tag

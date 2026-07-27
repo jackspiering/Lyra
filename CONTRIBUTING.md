@@ -1,54 +1,53 @@
-# Contributing to Lyra
+# Contributing
 
-Thanks for helping improve Lyra.
-
-## Development setup
+## Setup
 
 1. macOS 15+ and Xcode 16+
-2. Clone the repo and open `Lyra.xcodeproj`
-3. Select scheme **Lyra** → Run
+2. Clone the repo, open `Lyra.xcodeproj`
+3. Scheme **Lyra** → Run
 
-## Building and testing
+## Build and test
 
 ```bash
-bash Scripts/smoke.sh                 # structure checks (Linux/macOS)
-bash Scripts/xcode-test.sh            # xcodebuild build + test (macOS only)
+bash Scripts/smoke.sh          # structure checks (Linux/macOS)
+bash Scripts/xcode-test.sh     # xcodebuild build + test (macOS)
 ```
 
-Unit tests live in `LyraTests/` and target pure logic (vault helpers, wiki links, naming).
+Unit tests live in `LyraTests/` (vault helpers, wiki links, naming, block ranges, errors).
 
-Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
+PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
 
 ## Style
 
-- Follow [Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/)
-- Keep types focused; one main type per file when practical
-- No drive-by refactors unrelated to your change
-- Read [AGENTS.md](AGENTS.md) for architecture invariants
+- [Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/)
+- One main type per file when practical
+- No drive-by refactors
+- Read [AGENTS.md](AGENTS.md) for invariants
 
 ## Commits and PRs
 
-- Prefer small commits with conventional-ish prefixes: `feat:`, `fix:`, `docs:`, `test:`, `chore:`
-- PR description: what changed, why, how you verified
-- **Update `README.md`** whenever user-facing behavior, version, install, or features change
-- Do not expand scope into plugins, sync, or non-macOS ports unless agreed
+- Prefer small commits: `feat:`, `fix:`, `docs:`, `test:`, `chore:`
+- PR: what / why / how verified
+- **Update `README.md`** for user-facing changes (features, install, version, shortcuts)
+- Update `docs/architecture.md` when structure or invariants change
+- Do not expand into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke checklist (v0.5)
+## Manual smoke (v0.5)
 
-1. Open a folder with nested `.md` files as a vault
-2. Sidebar shows folders and markdown only; ignores `.git` / hidden files
-3. Edit a note in **Source**; wait ~1s; quit and reopen — content persisted
-4. Cycle **Source → Live → Reading** with the segmented control and with **⌘E**; mode persists across relaunch
-5. In **Live**, click a heading/paragraph, edit raw Markdown, **Done** — block re-renders; **Cancel** discards
-6. Create, rename, and delete a note (and a folder)
-7. Add `[[Other Note]]` where `Other Note.md` exists; open via Reading/Live wiki link
-8. In **Source**, paste an image (⌘V); file under `_attachments/` + `![](...)` link; image shows in Live/Reading
-9. In **Live**, focus a block and paste an image the same way
-10. **File → Export PDF…** from each mode; open the PDF and check content
-11. **⌘S** saves immediately (autosave still works after ~1s without ⌘S)
-12. Force a save failure if you can (e.g. lock the file) — alert title/body should be plain language, not `NSCocoaErrorDomain`
-13. Confirm Source / Live / Reading text uses Inter (not system mono for body text); code fences stay monospaced
+1. Open a vault with nested `.md` files
+2. Sidebar shows folders + Markdown only (no `.git` / hidden)
+3. **Source:** edit, wait ~1s, quit/reopen — content persisted
+4. **⌘E** / segmented control: Source → Live → Reading; mode survives relaunch
+5. **Live:** click a block, edit Markdown, **Done** re-renders; **Cancel** discards
+6. Create, rename, delete note and folder
+7. `[[Other Note]]` opens from Live/Reading when the file exists
+8. **Source:** paste image → `_attachments/` + link; shows in Live/Reading
+9. **Live:** paste image inside a focused block
+10. **Export PDF…** from each mode
+11. **⌘S** saves immediately
+12. A failed save/paste shows a plain-language alert (not raw Cocoa codes)
+13. Body text uses Inter; code fences stay monospaced
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the MIT License.
+Contributions are licensed under the MIT License.

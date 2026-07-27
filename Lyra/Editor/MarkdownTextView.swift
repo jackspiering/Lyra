@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
@@ -31,7 +30,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = LyraFonts.editor(size: 14)
+        textView.font = LyraFonts.ui(size: 14)
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -143,17 +142,11 @@ final class LyraTextView: NSTextView {
            let png = rep.representation(using: .png, properties: [:]) {
             return png
         }
-        let typeNames = pb.types?.map(\.rawValue) ?? []
-        for name in typeNames {
-            if name.contains("png") || name == UTType.png.identifier {
-                if let data = pb.data(forType: NSPasteboard.PasteboardType(name)) { return data }
-            }
-        }
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
             for url in urls {
-                guard let img = NSImage(contentsOf: url),
-                      let data = AttachmentStore.pngData(from: img) else { continue }
-                return data
+                if let img = NSImage(contentsOf: url), let data = AttachmentStore.pngData(from: img) {
+                    return data
+                }
             }
         }
         return nil

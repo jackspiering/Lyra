@@ -1,10 +1,9 @@
 import Foundation
 
-/// Maps system errors into short titles and plain-language messages for alerts.
+/// Short titles + plain-language alert bodies for vault I/O failures.
 enum UserFacingError {
     enum Context: Equatable {
         case rememberVault
-        case openVault
         case readVault
         case openNote
         case saveNote
@@ -18,7 +17,6 @@ enum UserFacingError {
         var title: String {
             switch self {
             case .rememberVault: return "Couldn't remember this vault"
-            case .openVault: return "Couldn't open vault"
             case .readVault: return "Couldn't read the vault"
             case .openNote: return "Couldn't open note"
             case .saveNote: return "Couldn't save note"
@@ -32,65 +30,44 @@ enum UserFacingError {
         }
     }
 
-    /// Title + multi-line body suitable for an alert.
     static func presentable(for error: Error, context: Context) -> (title: String, message: String) {
         (context.title, message(for: error, context: context))
     }
 
     static func message(for error: Error, context: Context) -> String {
-        let detail = humanDetail(for: error)
-        let tip = tip(for: context)
-        if tip.isEmpty { return detail }
-        return "\(detail)\n\n\(tip)"
+        "\(humanDetail(for: error))\n\n\(tip(for: context))"
     }
 
-    /// Message when there is no underlying `Error` (e.g. createFile returned false).
     static func message(context: Context, detail: String) -> String {
-        let tip = tip(for: context)
-        if tip.isEmpty { return detail }
-        return "\(detail)\n\n\(tip)"
+        "\(detail)\n\n\(tip(for: context))"
     }
-
-    // MARK: - Detail
 
     private static func humanDetail(for error: Error) -> String {
         let ns = error as NSError
+        let code = ns.code
+        let domain = ns.domain
 
-        if ns.domain == NSPOSIXErrorDomain {
-            switch ns.code {
-            case Int(EACCES), Int(EPERM):
-                return "Lyra doesn't have permission to access that location."
-            case Int(ENOENT):
-                return "That file or folder could not be found. It may have been moved or deleted."
-            case Int(ENOSPC):
-                return "There isn't enough free space on the disk."
-            case Int(EROFS):
-                return "That disk or folder is read-only."
-            case Int(EEXIST):
-                return "Something with that name already exists."
-            default:
-                break
+        if domain == NSPOSIXErrorDomain {
+            switch code {
+            case Int(EACCES), Int(EPERM): return Self.permission
+            case Int(ENOENT): return Self.missing
+            case Int(ENOSPC): return Self.noSpace
+            case Int(EROFS): return Self.readOnly
+            case Int(EEXIST): return Self.exists
+            default: break
             }
         }
 
-        if ns.domain == NSCocoaErrorDomain {
-            switch ns.code {
-            case NSFileReadNoPermissionError, NSFileWriteNoPermissionError:
-                return "Lyra doesn't have permission to access that location."
-            case NSFileNoSuchFileError, NSFileReadNoSuchFileError:
-                return "That file or folder could not be found. It may have been moved or deleted."
-            case NSFileWriteOutOfSpaceError:
-                return "There isn't enough free space on the disk."
-            case NSFileWriteVolumeReadOnlyError:
-                return "That disk or folder is read-only."
-            case NSFileWriteFileExistsError:
-                return "Something with that name already exists."
-            case NSFileWriteInvalidFileNameError:
-                return "That name isn't valid for a file on this system."
-            case NSFileLockingError:
-                return "The file is locked or in use by another app."
-            default:
-                break
+        if domain == NSCocoaErrorDomain {
+            switch code {
+            case NSFileReadNoPermissionError, NSFileWriteNoPermissionError: return Self.permission
+            case NSFileNoSuchFileError, NSFileReadNoSuchFileError: return Self.missing
+            case NSFileWriteOutOfSpaceError: return Self.noSpace
+            case NSFileWriteVolumeReadOnlyError: return Self.readOnly
+            case NSFileWriteFileExistsError: return Self.exists
+            case NSFileWriteInvalidFileNameError: return "That name isn't valid for a file on this system."
+            case NSFileLockingError: return "The file is locked or in use by another app."
+            default: break
             }
         }
 
@@ -98,32 +75,35 @@ enum UserFacingError {
         if !localized.isEmpty, localized.count < 180, !localized.hasPrefix("The operation") {
             return localized
         }
-        if let reason = ns.localizedFailureReason, !reason.isEmpty {
-            return reason
-        }
-        return "Something unexpected went wrong."
+        return ns.localizedFailureReason ?? "Something unexpected went wrong."
     }
+
+    private static let permission = "Lyra doesn't have permission to access that location."
+    private static let missing = "That file or folder could not be found. It may have been moved or deleted."
+    private static let noSpace = "There isn't enough free space on the disk."
+    private static let readOnly = "That disk or folder is read-only."
+    private static let exists = "Something with that name already exists."
 
     private static func tip(for context: Context) -> String {
         switch context {
         case .rememberVault:
-            return "You can still use the vault this session. Choose Open Vault again next time if it doesn't reopen automatically."
-        case .openVault, .readVault:
-            return "Try choosing the folder again with Open Vault…, and confirm Lyra is allowed to access it in System Settings → Privacy & Security → Files and Folders."
+            return "You can still use the vault this session. Open Vault again next time if it doesn't reopen."
+        case .readVault:
+            return "Try Open Vault… again. Check System Settings → Privacy & Security → Files and Folders."
         case .openNote:
-            return "Select the note again from the sidebar, or check that the file still exists on disk."
+            return "Select the note again from the sidebar, or check that the file still exists."
         case .saveNote:
-            return "Your latest edits may not be on disk yet. Check disk space and folder permissions, then press ⌘S to try again."
+            return "Edits may not be on disk yet. Check permissions and free space, then press ⌘S."
         case .createNote, .createFolder:
-            return "Check that the vault folder is writable and that a file with the same name doesn't already exist."
+            return "Check that the vault is writable and nothing already uses that name."
         case .rename:
-            return "Pick a different name, or check that nothing else is using the current file."
+            return "Try a different name, or check that nothing else is using the file."
         case .delete:
-            return "The item may be locked or already removed. Try again from Finder if needed."
+            return "The item may be locked or already removed."
         case .pasteImage:
-            return "The image wasn't added to the note. Check that the vault is writable, then copy the image and paste again (⌘V)."
+            return "The image wasn't added. Check the vault is writable, then paste again (⌘V)."
         case .exportPDF:
-            return "Try a different save location, and confirm there is free disk space."
+            return "Try another save location and confirm free disk space."
         }
     }
 }

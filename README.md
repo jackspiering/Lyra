@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>Native macOS Markdown vault editor.</strong><br>
-  Open a folder of plain <code>.md</code> files. Edit, link, preview. No Electron, no cloud, no lock-in.
+  <strong>A native macOS editor for local Markdown vaults.</strong><br>
+  Open any folder of <code>.md</code> files. Edit, link, preview, export. No Electron, no cloud, no lock-in.
 </p>
 
 <p align="center">
@@ -18,96 +18,117 @@
 
 ## Download
 
-[Latest release (DMG)](https://github.com/jackspiering/Lyra/releases) — unsigned. First launch: right-click → **Open** if Gatekeeper warns.
+[**Latest DMG**](https://github.com/jackspiering/Lyra/releases) — unsigned builds.
+
+First open: right-click the app → **Open** if Gatekeeper blocks it.
 
 ## Quick start
 
-1. Launch Lyra → **Open Vault…** (⌘O)
-2. Choose a folder of Markdown files
-3. Select a note in the sidebar to edit
-4. Use the toolbar **Source · Live · Reading** control (or **⌘E**) to switch how you view the note
+1. Open Lyra → **Open Vault…** (⌘O)
+2. Pick a folder of Markdown notes
+3. Select a note in the sidebar
+4. Switch **Source · Live · Reading** (or **⌘E**)
 
-| Action | Shortcut |
-|--------|----------|
-| Open vault | ⌘O |
-| New note | ⌘N |
-| Save | ⌘S |
-| Cycle view mode | ⌘E |
+| Shortcut | Action |
+|----------|--------|
+| ⌘O | Open vault |
+| ⌘N | New note |
+| ⌘S | Save now |
+| ⌘E | Cycle Source → Live → Reading |
 
-Autosave after ~500ms idle; ⌘S saves immediately.
+Autosave runs after ~500ms idle.
 
 ### View modes
 
-| Mode | What you get |
-|------|----------------|
-| **Source** | Raw Markdown editor (syntax highlight) |
-| **Live** | Rendered blocks; click a block to edit its Markdown in place |
-| **Reading** | Full-width rendered preview (not editable) |
+| Mode | Behavior |
+|------|----------|
+| **Source** | Raw Markdown with syntax highlighting |
+| **Live** | Rendered note; click a block to edit its Markdown, then **Done** |
+| **Reading** | Full-width preview only |
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| Local vault | Folder of UTF-8 `.md` files — disk is source of truth |
-| Sidebar tree | Folders + notes; ignores `.git` / hidden files |
-| Source editor | TextKit + basic Markdown highlighting |
-| Live Preview | Hybrid edit: click a block, edit raw MD, Done to re-render |
-| Reading view | Full-width preview with local images |
+| Local vault | Any folder of UTF-8 `.md` files — disk is the source of truth |
+| Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| CRUD | Create, rename, delete notes and folders |
-| Paste images | ⌘V in Source or Live block edit → `_attachments/` + `![](...)` |
-| Export PDF | **File → Export PDF…** for the current note |
-| Native UI | SwiftUI + AppKit; custom app icon |
-| Readable type | [Inter](https://rsms.me/inter/) (SIL Open Font License) for UI, editor, and preview |
+| Paste images | ⌘V → `_attachments/` + `![](...)` (Source or Live block edit) |
+| Export PDF | **File → Export PDF…** for the open note |
+| Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
+| Errors | Plain-language alerts (permissions, missing files, disk full, …) |
 
-**Not in scope:** plugins, graph view, cloud sync, tags index, iOS, full WYSIWYG.
+**Not in scope:** plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
 
-## Why
+## Who it's for
 
-Plain Markdown on disk (git-friendly, no proprietary store) with a native Mac UI — not an Electron shell. For people who want a local vault without a plugin host or cloud account.
+People who want a **local** Markdown vault with a real Mac UI — git-friendly plain files, no account, no proprietary store. Closer to a focused native editor than a plugin platform.
 
 ## Build from source
 
 **Requires:** macOS 15+, Xcode 16+ (Swift 5.10+)
 
 ```bash
+git clone https://github.com/jackspiering/Lyra.git
+cd Lyra
 open Lyra.xcodeproj
 ```
 
-Scheme **Lyra** → **My Mac** → Run (⌘R).
+Scheme **Lyra** → destination **My Mac** → Run (⌘R).
 
 ```bash
-bash Scripts/smoke.sh        # structure checks (any OS)
-bash Scripts/xcode-test.sh   # build + unit tests (Mac + Xcode)
+bash Scripts/smoke.sh        # layout checks (Linux or Mac)
+bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 ```
 
-CI details: [docs/ci.md](docs/ci.md).
-
 <details>
-<summary>Release DMG</summary>
+<summary>Ship a release DMG</summary>
 
-Tag must match the Xcode marketing version (`0.5.0` ↔ `v0.5.0`):
+Marketing version in Xcode must match the tag (`0.5.0` ↔ `v0.5.0`):
 
 ```bash
 git tag v0.5.0 && git push origin v0.5.0
 ```
 
-CI attaches unsigned `Lyra-0.5.0.dmg` to the [Release](https://github.com/jackspiering/Lyra/releases).
+CI uploads unsigned `Lyra-0.5.0.dmg` to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.5.0 bash Scripts/package-dmg.sh   # local Mac only → build/dist/
+VERSION=0.5.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
+
+More: [docs/ci.md](docs/ci.md)
 
 </details>
 
+## Project layout
+
+| Path | Role |
+|------|------|
+| `Lyra/App/` | Window shell, themes, fonts, errors, view modes |
+| `Lyra/Vault/` | Tree scan, CRUD, bookmarks, attachments, wiki resolve |
+| `Lyra/Editor/` | TextKit source editor, highlight, autosave |
+| `Lyra/Preview/` | Reading / Live Preview, PDF export |
+| `Lyra/Models/` | Shared types |
+| `LyraTests/` | Unit tests for pure logic |
+| `docs/` | Architecture, CI, design specs |
+
 ## Docs
 
-| Doc | For |
-|-----|-----|
-| [docs/architecture.md](docs/architecture.md) | Layout, invariants, design decisions |
-| [AGENTS.md](AGENTS.md) | AI agents extending the codebase |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, tests, PR checklist |
-| [docs/superpowers/](docs/superpowers/) | Design specs and plans |
+| Doc | Audience |
+|-----|----------|
+| [docs/architecture.md](docs/architecture.md) | Design decisions and invariants |
+| [docs/ci.md](docs/ci.md) | CI, tests, DMG releases |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and manual checklist |
+| [AGENTS.md](AGENTS.md) | Rules for AI agents and humans |
+| [docs/superpowers/](docs/superpowers/) | Versioned design specs |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Small PRs; update the README when user-facing behavior changes.
+
+## Acknowledgments
+
+- [Inter](https://rsms.me/inter/) by Rasmus Andersson — SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
 
 ## License
 

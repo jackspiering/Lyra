@@ -46,6 +46,7 @@ for path in \
   Lyra/App/UserFacingError.swift \
   Lyra/App/LyraFonts.swift \
   Lyra/Resources/Fonts/Inter-Regular.ttf \
+  Lyra/Resources/Fonts/Inter-SemiBold.ttf \
   Lyra/Resources/Fonts/Inter-Bold.ttf \
   Lyra/Resources/Fonts/Inter-OFL.txt \
   LyraTests/UserFacingErrorTests.swift \

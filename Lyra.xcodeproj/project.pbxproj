@@ -40,7 +40,6 @@
 		A10000000000000000000026 /* LyraFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* LyraFonts.swift */; };
 		A10000000000000000000027 /* UserFacingErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* UserFacingErrorTests.swift */; };
 		A10000000000000000000028 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* Inter-Regular.ttf */; };
-		A10000000000000000000029 /* Inter-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* Inter-Medium.ttf */; };
 		A1000000000000000000002A /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002A /* Inter-SemiBold.ttf */; };
 		A1000000000000000000002B /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002B /* Inter-Bold.ttf */; };
 		A1000000000000000000002C /* Inter-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002C /* Inter-OFL.txt */; };
@@ -94,7 +93,6 @@
 		B10000000000000000000026 /* LyraFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraFonts.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 /* UserFacingErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFacingErrorTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000028 /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Regular.ttf"; sourceTree = "<group>"; };
-		B10000000000000000000029 /* Inter-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Medium.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002A /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-SemiBold.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002B /* Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Bold.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002C /* Inter-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Inter-OFL.txt"; sourceTree = "<group>"; };
@@ -237,7 +235,6 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000028 /* Inter-Regular.ttf */,
-				B10000000000000000000029 /* Inter-Medium.ttf */,
 				B1000000000000000000002A /* Inter-SemiBold.ttf */,
 				B1000000000000000000002B /* Inter-Bold.ttf */,
 				B1000000000000000000002C /* Inter-OFL.txt */,
@@ -327,7 +324,6 @@
 			files = (
 				A10000000000000000000010 /* Assets.xcassets in Resources */,
 				A10000000000000000000028 /* Inter-Regular.ttf in Resources */,
-				A10000000000000000000029 /* Inter-Medium.ttf in Resources */,
 				A1000000000000000000002A /* Inter-SemiBold.ttf in Resources */,
 				A1000000000000000000002B /* Inter-Bold.ttf in Resources */,
 				A1000000000000000000002C /* Inter-OFL.txt in Resources */,

@@ -44,7 +44,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 liveCommitToken += 1
-                presentSaveFailureIfNeeded(editor.saveIfNeeded())
+                _ = editor.saveIfNeeded()
+                flushEditorError()
             }
         }
         .alert(
@@ -82,7 +83,8 @@ struct ContentView: View {
             liveCommitToken += 1
             // Allow Live Preview to commit before save on next run loop.
             DispatchQueue.main.async {
-                presentSaveFailureIfNeeded(editor.saveIfNeeded())
+                _ = editor.saveIfNeeded()
+                flushEditorError()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
@@ -173,7 +175,7 @@ struct ContentView: View {
                     text: $editor.text,
                     vaultRoot: store.rootURL,
                     onEdit: { editor.noteEdited() },
-                    onPasteError: { store.presentPrepared(context: .pasteImage, message: $0) }
+                    onPasteError: { store.present(context: .pasteImage, message: $0) }
                 )
             case .livePreview:
                 LivePreviewView(
@@ -182,7 +184,7 @@ struct ContentView: View {
                     vaultRoot: store.rootURL,
                     onWikiLink: { openWikiLink($0) },
                     onEdit: { editor.noteEdited() },
-                    onPasteError: { store.presentPrepared(context: .pasteImage, message: $0) },
+                    onPasteError: { store.present(context: .pasteImage, message: $0) },
                     commitToken: liveCommitToken
                 )
             case .reading:
@@ -207,7 +209,8 @@ struct ContentView: View {
                 Button("Rename") {
                     let oldPath = node.url.path
                     liveCommitToken += 1
-                    presentSaveFailureIfNeeded(editor.saveIfNeeded())
+                    _ = editor.saveIfNeeded()
+                    flushEditorError()
                     store.renameSelected(to: renameText)
                     if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
                         editor.open(url: newURL)
@@ -235,38 +238,35 @@ struct ContentView: View {
             // Commit token already bumped; open after Live Preview can apply on next frame.
             DispatchQueue.main.async {
                 editor.open(url: node.url)
-                presentEditorErrorIfNeeded()
+                flushEditorError()
             }
         }
     }
 
-    private func presentEditorErrorIfNeeded() {
-        if let last = editor.lastError {
-            store.presentError(last.error, context: last.context)
-            editor.lastError = nil
-        }
+    private func flushEditorError() {
+        guard let last = editor.lastError else { return }
+        store.present(error: last.error, context: last.context)
+        editor.lastError = nil
     }
 
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
         liveCommitToken += 1
         DispatchQueue.main.async {
-            presentSaveFailureIfNeeded(editor.saveIfNeeded())
+            _ = editor.saveIfNeeded()
+            flushEditorError()
             store.selection = url.path
             editor.open(url: url)
-            presentEditorErrorIfNeeded()
+            flushEditorError()
         }
-    }
-
-    private func presentSaveFailureIfNeeded(_ ok: Bool) {
-        if !ok { presentEditorErrorIfNeeded() }
     }
 
     private func exportPDF() {
         liveCommitToken += 1
         DispatchQueue.main.async {
             guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
-            presentSaveFailureIfNeeded(editor.saveIfNeeded())
+            _ = editor.saveIfNeeded()
+            flushEditorError()
             do {
                 let data = try NotePDFExporter.pdfData(
                     markdown: editor.text,
@@ -282,11 +282,11 @@ struct ContentView: View {
                     do {
                         try data.write(to: url, options: .atomic)
                     } catch {
-                        store.presentError(error, context: .exportPDF)
+                        store.present(error: error, context: .exportPDF)
                     }
                 }
             } catch {
-                store.presentError(error, context: .exportPDF)
+                store.present(error: error, context: .exportPDF)
             }
         }
     }

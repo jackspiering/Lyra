@@ -83,3 +83,41 @@ struct MarkdownBlockRow: View {
         return AttributedString(source)
     }
 }
+
+/// Clickable `[[wiki]]` list shared by Reading and Live Preview.
+struct WikiLinksSection: View {
+    let text: String
+    var onWikiLink: ((String) -> Void)?
+
+    var body: some View {
+        let links = Self.linkNames(in: text)
+        if !links.isEmpty {
+            Divider().padding(.top, 8)
+            Text("Wiki links")
+                .font(LyraFonts.caption)
+                .foregroundStyle(.secondary)
+            ForEach(links, id: \.self) { name in
+                Button {
+                    onWikiLink?(name)
+                } label: {
+                    Text("[[\(name)]]")
+                        .foregroundStyle(LyraTheme.accentColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    static func linkNames(in source: String) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return [] }
+        let ns = source as NSString
+        var names: [String] = []
+        var seen = Set<String>()
+        regex.enumerateMatches(in: source, range: NSRange(location: 0, length: ns.length)) { match, _, _ in
+            guard let match, match.numberOfRanges > 1 else { return }
+            let name = ns.substring(with: match.range(at: 1))
+            if seen.insert(name).inserted { names.append(name) }
+        }
+        return names
+    }
+}
