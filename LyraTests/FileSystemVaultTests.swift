@@ -62,18 +62,4 @@ final class FileSystemVaultTests: XCTestCase {
         let urls = FileSystemVault.collectNoteURLs(from: tree)
         XCTAssertEqual(Set(urls.map(\.lastPathComponent)), Set(["a.md", "root.md"]))
     }
-
-    func testReadWriteUTF8() throws {
-        let dir = try FileManager.default.url(
-            for: .itemReplacementDirectory,
-            in: .userDomainMask,
-            appropriateFor: FileManager.default.temporaryDirectory,
-            create: true
-        )
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let url = dir.appendingPathComponent("t.md")
-        try FileSystemVault.writeUTF8("hello", to: url)
-        XCTAssertEqual(try FileSystemVault.readUTF8(from: url), "hello")
-    }
 }

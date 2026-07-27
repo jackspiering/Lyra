@@ -37,4 +37,21 @@ final class UntitledNameTests: XCTestCase {
         )
         XCTAssertEqual(UntitledName.next(in: dir), "Untitled 3.md")
     }
+
+    func testFolderNameWithoutExtension() throws {
+        let dir = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        XCTAssertEqual(UntitledName.next(base: "New Folder", ext: nil, in: dir), "New Folder")
+        try FileManager.default.createDirectory(
+            at: dir.appendingPathComponent("New Folder"),
+            withIntermediateDirectories: false
+        )
+        XCTAssertEqual(UntitledName.next(base: "New Folder", ext: nil, in: dir), "New Folder 2")
+    }
 }

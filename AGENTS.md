@@ -14,7 +14,7 @@ Lyra/
   Vault/      # Scan tree, CRUD, bookmarks, wiki link resolution
   Editor/     # Source editing, TextKit highlight, autosave
   Preview/    # Live preview
-  Models/     # VaultNode, NoteDocument
+  Models/     # VaultNode
 LyraTests/    # Unit tests for pure logic
 docs/         # Architecture + design/plan specs
 ```

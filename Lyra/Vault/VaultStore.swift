@@ -9,7 +9,6 @@ final class VaultStore {
     var rootURL: URL?
     var rootNode: VaultNode?
     var selection: VaultNode.ID?
-    var noteURLs: [URL] = []
     var errorMessage: String?
     var isAccessingSecurityScope = false
 
@@ -19,12 +18,11 @@ final class VaultStore {
         restoreLastVaultIfPossible()
     }
 
-    func openVault(at url: URL) async {
+    func openVault(at url: URL) {
         stopAccessingIfNeeded()
         errorMessage = nil
 
-        let accessed = url.startAccessingSecurityScopedResource()
-        isAccessingSecurityScope = accessed
+        isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
 
         do {
             let bookmark = try url.bookmarkData(
@@ -34,23 +32,19 @@ final class VaultStore {
             )
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
         } catch {
-            // Still open for this session even if bookmark fails.
             errorMessage = "Could not save vault bookmark: \(error.localizedDescription)"
         }
 
         rootURL = url
-        await refresh()
+        refresh()
     }
 
-    func refresh() async {
+    func refresh() {
         guard let rootURL else { return }
         do {
-            let node = try await Task.detached {
-                try FileSystemVault.scan(root: rootURL)
-            }.value
+            let node = try FileSystemVault.scan(root: rootURL)
             rootNode = node
-            noteURLs = FileSystemVault.collectNoteURLs(from: node)
-            wikiResolver = WikiLinkResolver(noteURLs: noteURLs)
+            wikiResolver = WikiLinkResolver(noteURLs: FileSystemVault.collectNoteURLs(from: node))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -74,57 +68,55 @@ final class VaultStore {
         selection = url.path
     }
 
-    func createNote() async {
+    func createNote() {
         guard let rootURL else { return }
         let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
         let name = UntitledName.next(in: parent)
-        do {
-            let url = try FileSystemVault.createNote(named: name, in: parent)
-            await refresh()
-            selection = url.path
-        } catch {
-            errorMessage = error.localizedDescription
+        let url = parent.appendingPathComponent(name)
+        guard !FileManager.default.fileExists(atPath: url.path) else {
+            errorMessage = "File already exists"
+            return
         }
+        FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
+        refresh()
+        selection = url.path
     }
 
-    func createFolder() async {
+    func createFolder() {
         guard let rootURL else { return }
         let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
-        let base = "New Folder"
-        var name = base
-        var n = 2
-        while FileManager.default.fileExists(atPath: parent.appendingPathComponent(name).path) {
-            name = "\(base) \(n)"
-            n += 1
-        }
+        let name = UntitledName.next(base: "New Folder", ext: nil, in: parent)
+        let url = parent.appendingPathComponent(name)
         do {
-            let url = try FileSystemVault.createFolder(named: name, in: parent)
-            await refresh()
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            refresh()
             selection = url.path
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func renameSelected(to newName: String) async {
+    func renameSelected(to newName: String) {
         guard let node = selectedNode() else { return }
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let dest = node.url.deletingLastPathComponent().appendingPathComponent(trimmed)
         do {
-            let newURL = try FileSystemVault.rename(url: node.url, to: trimmed)
-            await refresh()
-            selection = newURL.path
+            try FileManager.default.moveItem(at: node.url, to: dest)
+            refresh()
+            selection = dest.path
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func deleteSelected() async {
+    func deleteSelected() {
         guard let node = selectedNode() else { return }
         do {
-            try FileSystemVault.trash(node.url)
+            var resultingURL: NSURL?
+            try FileManager.default.trashItem(at: node.url, resultingItemURL: &resultingURL)
             selection = nil
-            await refresh()
+            refresh()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -140,7 +132,7 @@ final class VaultStore {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
-            Task { await openVault(at: url) }
+            openVault(at: url)
         } catch {
             // Ignore stale bookmarks at launch.
         }

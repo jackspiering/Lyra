@@ -12,13 +12,11 @@
 		A10000000000000000000003 /* OpenVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* OpenVaultView.swift */; };
 		A10000000000000000000004 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SidebarView.swift */; };
 		A10000000000000000000005 /* VaultNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* VaultNode.swift */; };
-		A10000000000000000000006 /* NoteDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* NoteDocument.swift */; };
 		A10000000000000000000007 /* FileSystemVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* FileSystemVault.swift */; };
 		A10000000000000000000008 /* UntitledName.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* UntitledName.swift */; };
 		A10000000000000000000009 /* WikiLinkResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* WikiLinkResolver.swift */; };
 		A1000000000000000000000A /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* VaultStore.swift */; };
 		A1000000000000000000000B /* EditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* EditorViewModel.swift */; };
-		A1000000000000000000000C /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* EditorView.swift */; };
 		A1000000000000000000000D /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* MarkdownTextView.swift */; };
 		A1000000000000000000000E /* MarkdownHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* MarkdownHighlighter.swift */; };
 		A1000000000000000000000F /* MarkdownPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* MarkdownPreviewView.swift */; };
@@ -26,6 +24,7 @@
 		A10000000000000000000011 /* WikiLinkResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* WikiLinkResolverTests.swift */; };
 		A10000000000000000000012 /* UntitledNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* UntitledNameTests.swift */; };
 		A10000000000000000000013 /* FileSystemVaultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* FileSystemVaultTests.swift */; };
+		A10000000000000000000018 /* VaultFolderPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* VaultFolderPicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,13 +43,11 @@
 		B10000000000000000000003 /* OpenVaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVaultView.swift; sourceTree = "<group>"; };
 		B10000000000000000000004 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* VaultNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNode.swift; sourceTree = "<group>"; };
-		B10000000000000000000006 /* NoteDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDocument.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* FileSystemVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemVault.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* UntitledName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UntitledName.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* WikiLinkResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiLinkResolver.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
 		B1000000000000000000000B /* EditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorViewModel.swift; sourceTree = "<group>"; };
-		B1000000000000000000000C /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* MarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextView.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* MarkdownHighlighter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownHighlighter.swift; sourceTree = "<group>"; };
 		B1000000000000000000000F /* MarkdownPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewView.swift; sourceTree = "<group>"; };
@@ -62,6 +59,7 @@
 		B10000000000000000000015 /* LyraTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LyraTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000016 /* Lyra.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Lyra.entitlements; sourceTree = "<group>"; };
 		B10000000000000000000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000000000000000000018 /* VaultFolderPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFolderPicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +130,7 @@
 				B10000000000000000000002 /* ContentView.swift */,
 				B10000000000000000000003 /* OpenVaultView.swift */,
 				B10000000000000000000004 /* SidebarView.swift */,
+				B10000000000000000000018 /* VaultFolderPicker.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -140,7 +139,6 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000005 /* VaultNode.swift */,
-				B10000000000000000000006 /* NoteDocument.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -160,7 +158,6 @@
 			isa = PBXGroup;
 			children = (
 				B1000000000000000000000B /* EditorViewModel.swift */,
-				B1000000000000000000000C /* EditorView.swift */,
 				B1000000000000000000000D /* MarkdownTextView.swift */,
 				B1000000000000000000000E /* MarkdownHighlighter.swift */,
 			);
@@ -278,14 +275,13 @@
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				A10000000000000000000003 /* OpenVaultView.swift in Sources */,
 				A10000000000000000000004 /* SidebarView.swift in Sources */,
+				A10000000000000000000018 /* VaultFolderPicker.swift in Sources */,
 				A10000000000000000000005 /* VaultNode.swift in Sources */,
-				A10000000000000000000006 /* NoteDocument.swift in Sources */,
 				A10000000000000000000007 /* FileSystemVault.swift in Sources */,
 				A10000000000000000000008 /* UntitledName.swift in Sources */,
 				A10000000000000000000009 /* WikiLinkResolver.swift in Sources */,
 				A1000000000000000000000A /* VaultStore.swift in Sources */,
 				A1000000000000000000000B /* EditorViewModel.swift in Sources */,
-				A1000000000000000000000C /* EditorView.swift in Sources */,
 				A1000000000000000000000D /* MarkdownTextView.swift in Sources */,
 				A1000000000000000000000E /* MarkdownHighlighter.swift in Sources */,
 				A1000000000000000000000F /* MarkdownPreviewView.swift in Sources */,

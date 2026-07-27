@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -8,14 +7,13 @@ struct ContentView: View {
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
-    @State private var lastOpenedPath: String?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
             if store.rootURL == nil {
                 OpenVaultView { url in
-                    Task { await store.openVault(at: url) }
+                    store.openVault(at: url)
                 }
             } else {
                 vaultWorkspace
@@ -24,7 +22,7 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 560)
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                Task { await editor.saveIfNeeded() }
+                editor.saveIfNeeded()
             }
         }
         .alert("Error", isPresented: Binding(
@@ -36,7 +34,7 @@ struct ContentView: View {
             Text(store.errorMessage ?? "")
         }
         .onChange(of: store.selection) { _, newValue in
-            Task { await handleSelectionChange(newValue) }
+            handleSelectionChange(newValue)
         }
         .sheet(item: $renameTarget) { node in
             renameSheet(node)
@@ -47,11 +45,8 @@ struct ContentView: View {
             titleVisibility: .visible
         ) {
             Button("Move to Trash", role: .destructive) {
-                Task {
-                    await editor.close()
-                    await store.deleteSelected()
-                    lastOpenedPath = nil
-                }
+                editor.close()
+                store.deleteSelected()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -70,7 +65,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItemGroup {
                     Button {
-                        Task { await store.createNote() }
+                        store.createNote()
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
@@ -78,7 +73,7 @@ struct ContentView: View {
                     .keyboardShortcut("n", modifiers: .command)
 
                     Button {
-                        Task { await store.createFolder() }
+                        store.createFolder()
                     } label: {
                         Label("New Folder", systemImage: "folder.badge.plus")
                     }
@@ -90,7 +85,10 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItemGroup {
                         Button {
-                            pickVault()
+                            if let url = VaultFolderPicker.pick() {
+                                editor.close()
+                                store.openVault(at: url)
+                            }
                         } label: {
                             Label("Open Vault", systemImage: "folder")
                         }
@@ -104,7 +102,7 @@ struct ContentView: View {
                         .keyboardShortcut("p", modifiers: [.command, .shift])
 
                         Button {
-                            Task { await editor.saveIfNeeded() }
+                            editor.saveIfNeeded()
                         } label: {
                             Label("Save", systemImage: "square.and.arrow.down")
                         }
@@ -116,14 +114,29 @@ struct ContentView: View {
 
     private var detailPane: some View {
         HSplitView {
-            EditorView(viewModel: editor)
+            editorPane
                 .frame(minWidth: 280)
             if previewVisible {
                 MarkdownPreviewView(text: editor.text) { linkText in
-                    Task { await openWikiLink(linkText) }
+                    openWikiLink(linkText)
                 }
                 .frame(minWidth: 240)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var editorPane: some View {
+        if editor.fileURL != nil {
+            MarkdownTextView(text: $editor.text) {
+                editor.noteEdited()
+            }
+        } else {
+            ContentUnavailableView(
+                "Select a note",
+                systemImage: "doc.text",
+                description: Text("Choose a Markdown file from the sidebar, or create a new note.")
+            )
         }
     }
 
@@ -136,17 +149,14 @@ struct ContentView: View {
                 Spacer()
                 Button("Cancel") { renameTarget = nil }
                 Button("Rename") {
-                    Task {
-                        let oldPath = node.url.path
-                        await editor.saveIfNeeded()
-                        await store.renameSelected(to: renameText)
-                        if editor.document?.url.path == oldPath,
-                           let newURL = store.selectedFileURL() {
-                            await editor.open(url: newURL)
-                            lastOpenedPath = newURL.path
-                        }
-                        renameTarget = nil
+                    let oldPath = node.url.path
+                    editor.saveIfNeeded()
+                    store.renameSelected(to: renameText)
+                    if editor.fileURL?.path == oldPath,
+                       let newURL = store.selectedFileURL() {
+                        editor.open(url: newURL)
                     }
+                    renameTarget = nil
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -156,42 +166,24 @@ struct ContentView: View {
         .frame(width: 360)
     }
 
-    private func handleSelectionChange(_ newValue: VaultNode.ID?) async {
+    private func handleSelectionChange(_ newValue: VaultNode.ID?) {
         guard let newValue,
               let root = store.rootNode,
               let node = FileSystemVault.findNode(id: newValue, in: root),
               !node.isDirectory else {
             if store.selectedFileURL() == nil {
-                await editor.close()
-                lastOpenedPath = nil
+                editor.close()
             }
             return
         }
-        if lastOpenedPath == node.url.path { return }
-        await editor.open(url: node.url)
-        lastOpenedPath = node.url.path
+        if editor.fileURL?.path == node.url.path { return }
+        editor.open(url: node.url)
     }
 
-    private func openWikiLink(_ text: String) async {
+    private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
-        await editor.saveIfNeeded()
+        editor.saveIfNeeded()
         store.openNote(url: url)
-        await editor.open(url: url)
-        lastOpenedPath = url.path
-    }
-
-    private func pickVault() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Open Vault"
-        if panel.runModal() == .OK, let url = panel.url {
-            Task {
-                await editor.close()
-                lastOpenedPath = nil
-                await store.openVault(at: url)
-            }
-        }
+        editor.open(url: url)
     }
 }

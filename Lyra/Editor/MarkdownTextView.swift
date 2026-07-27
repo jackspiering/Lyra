@@ -3,7 +3,7 @@ import SwiftUI
 
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
-    var onChange: (String) -> Void
+    var onEdit: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -30,8 +30,8 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.parent = self
+        guard let textView = scrollView.documentView as? NSTextView else { return }
         if textView.string != text {
             context.coordinator.applyHighlight(text)
         }
@@ -57,10 +57,9 @@ struct MarkdownTextView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !isApplying, let textView else { return }
-            let string = textView.string
-            parent.text = string
-            parent.onChange(string)
-            applyHighlight(string)
+            parent.text = textView.string
+            parent.onEdit()
+            applyHighlight(textView.string)
         }
     }
 }

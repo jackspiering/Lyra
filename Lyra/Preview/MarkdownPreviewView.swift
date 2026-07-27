@@ -38,7 +38,7 @@ struct MarkdownPreviewView: View {
 
     @ViewBuilder
     private var wikiLinksSection: some View {
-        let links = WikiLinkSplitter.linkNames(in: text)
+        let links = Self.linkNames(in: text)
         if !links.isEmpty {
             Divider()
             Text("Wiki links")
@@ -55,10 +55,8 @@ struct MarkdownPreviewView: View {
             }
         }
     }
-}
 
-enum WikiLinkSplitter {
-    static func linkNames(in source: String) -> [String] {
+    private static func linkNames(in source: String) -> [String] {
         guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else {
             return []
         }
