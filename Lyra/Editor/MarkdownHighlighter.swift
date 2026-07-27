@@ -12,101 +12,79 @@ enum MarkdownHighlighter {
                 .foregroundColor: NSColor.textColor,
             ]
         )
-        let full = NSRange(location: 0, length: (source as NSString).length)
         let ns = source as NSString
+        let full = NSRange(location: 0, length: ns.length)
 
-        apply(pattern: #"(?m)^(#{1,6})\s+.*$"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"(?m)^(#{1,6})\s+.*$"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
                 [.foregroundColor: NSColor.systemPurple, .font: boldFont],
-                range: match
+                range: range
             )
         }
 
-        apply(pattern: #"`[^`\n]+`"#, in: ns, fullRange: full) { match, storage in
-            storage.addAttributes(
-                [.foregroundColor: NSColor.systemOrange, .font: baseFont],
-                range: match
-            )
-        }
-
-        apply(pattern: #"(?m)^```.*$"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"`[^`\n]+`"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
                 [.foregroundColor: NSColor.systemOrange],
-                range: match
+                range: range
             )
         }
 
-        apply(pattern: #"\*\*[^*\n]+\*\*"#, in: ns, fullRange: full) { match, storage in
-            storage.addAttributes([.font: boldFont], range: match)
+        highlight(pattern: #"(?m)^```.*$"#, in: ns, fullRange: full, onto: result) { range, storage in
+            storage.addAttributes(
+                [.foregroundColor: NSColor.systemOrange],
+                range: range
+            )
         }
 
-        apply(pattern: #"(?<!\*)\*[^*\n]+\*(?!\*)"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"\*\*[^*\n]+\*\*"#, in: ns, fullRange: full, onto: result) { range, storage in
+            storage.addAttributes([.font: boldFont], range: range)
+        }
+
+        highlight(pattern: #"(?<!\*)\*[^*\n]+\*(?!\*)"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
                 [.foregroundColor: NSColor.systemTeal],
-                range: match
+                range: range
             )
         }
 
-        apply(pattern: #"\[[^\]]+\]\([^)]+\)"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"\[[^\]]+\]\([^)]+\)"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
                 [.foregroundColor: NSColor.systemBlue],
-                range: match
+                range: range
             )
         }
 
-        apply(pattern: #"\[\[[^\]]+\]\]"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"\[\[[^\]]+\]\]"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
-                [.foregroundColor: NSColor.systemIndigo, .underlineStyle: NSUnderlineStyle.single.rawValue],
-                range: match
+                [
+                    .foregroundColor: NSColor.systemIndigo,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                ],
+                range: range
             )
         }
 
-        apply(pattern: #"(?m)^\s*([-*+]|\d+\.)\s+"#, in: ns, fullRange: full) { match, storage in
+        highlight(pattern: #"(?m)^\s*([-*+]|\d+\.)\s+"#, in: ns, fullRange: full, onto: result) { range, storage in
             storage.addAttributes(
                 [.foregroundColor: NSColor.secondaryLabelColor],
-                range: match
+                range: range
             )
         }
 
         return result
     }
 
-    private static func apply(
+    private static func highlight(
         pattern: String,
         in ns: NSString,
         fullRange: NSRange,
-        block: (NSRange, NSMutableAttributedString) -> Void
-    ) {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
-        // We need a mutable copy; caller owns the string storage.
-        // This helper is only used with a single mutable attributed string created above.
-    }
-
-    // Overload that mutates `result` — keep API simple for call sites above via local closure.
-    private static func apply(
-        pattern: String,
-        in ns: NSString,
-        fullRange: NSRange,
-        to result: NSMutableAttributedString,
-        block: (NSRange, NSMutableAttributedString) -> Void
+        onto storage: NSMutableAttributedString,
+        apply: (NSRange, NSMutableAttributedString) -> Void
     ) {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
         regex.enumerateMatches(in: ns as String, options: [], range: fullRange) { match, _, _ in
             guard let match else { return }
-            block(match.range, result)
+            apply(match.range, storage)
         }
-    }
-}
-
-// Fix: the first apply helper was a stub. Provide working apply used by attributedString.
-extension MarkdownHighlighter {
-    fileprivate static func apply(
-        pattern: String,
-        in ns: NSString,
-        fullRange: NSRange,
-        block: (NSRange, NSMutableAttributedString) -> Void
-    ) {
-        // Intentionally empty — real implementation is below after rewrite.
-        _ = (pattern, ns, fullRange, block)
     }
 }
