@@ -8,6 +8,13 @@ enum NotePDFExporter {
     private static let blockGap: CGFloat = 10
     private static let contentWidth: CGFloat = pageWidth - margin * 2
 
+    // Print-safe colors (not semantic — avoid light-on-light when host is dark mode).
+    private static let bodyColor = NSColor.black
+    private static let secondaryColor = NSColor(calibratedWhite: 0.35, alpha: 1)
+    private static let codeBackgroundColor = NSColor(calibratedWhite: 0.92, alpha: 1)
+    private static let quoteBarColor = NSColor(calibratedRed: 0.85, green: 0.65, blue: 0.13, alpha: 1)
+    private static let ruleColor = NSColor(calibratedWhite: 0.7, alpha: 1)
+
     static func pdfData(markdown: String, noteDirectory: URL, vaultRoot: URL) throws -> Data {
         try Renderer(markdown: markdown, noteDirectory: noteDirectory, vaultRoot: vaultRoot).run()
     }
@@ -74,7 +81,7 @@ enum NotePDFExporter {
             let text = "\(pageNumber)"
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 10),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: NotePDFExporter.secondaryColor,
             ]
             let attr = NSAttributedString(string: text, attributes: attrs)
             let size = attr.size()
@@ -96,10 +103,10 @@ enum NotePDFExporter {
         private func draw(_ block: MarkdownPreviewBlocks.Block) {
             switch block {
             case .heading(let level, let text):
-                drawText(text, font: headingFont(level), color: .labelColor)
+                drawText(text, font: headingFont(level), color: NotePDFExporter.bodyColor)
 
             case .paragraph(let text):
-                drawText(text, font: bodyFont, color: .labelColor)
+                drawText(text, font: bodyFont, color: NotePDFExporter.bodyColor)
 
             case .listItem(let text):
                 drawListItem(text)
@@ -136,10 +143,10 @@ enum NotePDFExporter {
         private func drawListItem(_ text: String) {
             let bulletAttrs: [NSAttributedString.Key: Any] = [
                 .font: bodyFont,
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: NotePDFExporter.secondaryColor,
             ]
             let bullet = NSAttributedString(string: "•", attributes: bulletAttrs)
-            let body = makeAttributed(text, font: bodyFont, color: .labelColor)
+            let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.bodyColor)
             let bulletWidth: CGFloat = 16
             let bodyWidth = NotePDFExporter.contentWidth - bulletWidth
             let height = max(measure(body, width: bodyWidth), bodyFont.ascender - bodyFont.descender)
@@ -158,7 +165,7 @@ enum NotePDFExporter {
         private func drawQuote(_ text: String) {
             let barWidth: CGFloat = 3
             let pad: CGFloat = 10
-            let body = makeAttributed(text, font: bodyFont, color: .secondaryLabelColor)
+            let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.secondaryColor)
             let textWidth = NotePDFExporter.contentWidth - barWidth - pad
             let height = max(measure(body, width: textWidth), 16)
             ensureSpace(height)
@@ -168,7 +175,7 @@ enum NotePDFExporter {
                 width: barWidth,
                 height: height
             )
-            NSColor.controlAccentColor.setFill()
+            NotePDFExporter.quoteBarColor.setFill()
             bar.fill()
             let rect = CGRect(
                 x: NotePDFExporter.margin + barWidth + pad,
@@ -183,7 +190,7 @@ enum NotePDFExporter {
         private func drawCode(_ code: String) {
             let display = code.isEmpty ? " " : code
             let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-            let attr = makeAttributed(display, font: font, color: .labelColor)
+            let attr = makeAttributed(display, font: font, color: NotePDFExporter.bodyColor)
             let padding: CGFloat = 8
             let textWidth = NotePDFExporter.contentWidth - padding * 2
             let textHeight = measure(attr, width: textWidth)
@@ -195,7 +202,7 @@ enum NotePDFExporter {
                 width: NotePDFExporter.contentWidth,
                 height: boxHeight
             )
-            NSColor(calibratedWhite: 0.92, alpha: 1).setFill()
+            NotePDFExporter.codeBackgroundColor.setFill()
             let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
             path.fill()
             let textRect = CGRect(
@@ -215,7 +222,7 @@ enum NotePDFExporter {
             let path = NSBezierPath()
             path.move(to: NSPoint(x: NotePDFExporter.margin, y: midY))
             path.line(to: NSPoint(x: NotePDFExporter.pageWidth - NotePDFExporter.margin, y: midY))
-            NSColor.separatorColor.setStroke()
+            NotePDFExporter.ruleColor.setStroke()
             path.lineWidth = 1
             path.stroke()
             y += lineHeight + NotePDFExporter.blockGap
@@ -244,7 +251,7 @@ enum NotePDFExporter {
                 y += drawH + NotePDFExporter.blockGap
             } else {
                 let label = alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
-                drawText(label, font: NSFont.systemFont(ofSize: 11), color: .secondaryLabelColor)
+                drawText(label, font: NSFont.systemFont(ofSize: 11), color: NotePDFExporter.secondaryColor)
             }
         }
 
