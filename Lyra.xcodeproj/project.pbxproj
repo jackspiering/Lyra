@@ -34,7 +34,6 @@
 		A10000000000000000000020 /* NotePDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* NotePDFExporter.swift */; };
 		A10000000000000000000021 /* NotePDFExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* NotePDFExporterTests.swift */; };
 		A10000000000000000000022 /* NoteViewMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* NoteViewMode.swift */; };
-		A10000000000000000000023 /* LivePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* LivePreviewView.swift */; };
 		A10000000000000000000024 /* MarkdownBlockRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* MarkdownBlockRow.swift */; };
 		A10000000000000000000025 /* UserFacingError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* UserFacingError.swift */; };
 		A10000000000000000000026 /* LyraFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* LyraFonts.swift */; };
@@ -87,7 +86,6 @@
 		B10000000000000000000020 /* NotePDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporter.swift; sourceTree = "<group>"; };
 		B10000000000000000000021 /* NotePDFExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporterTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000022 /* NoteViewMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteViewMode.swift; sourceTree = "<group>"; };
-		B10000000000000000000023 /* LivePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePreviewView.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* MarkdownBlockRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownBlockRow.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* UserFacingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFacingError.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 /* LyraFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraFonts.swift; sourceTree = "<group>"; };
@@ -216,7 +214,6 @@
 				B1000000000000000000001A /* MarkdownPreviewBlocks.swift */,
 				B1000000000000000000001E /* MarkdownImagePath.swift */,
 				B10000000000000000000020 /* NotePDFExporter.swift */,
-				B10000000000000000000023 /* LivePreviewView.swift */,
 				B10000000000000000000024 /* MarkdownBlockRow.swift */,
 			);
 			path = Preview;
@@ -356,7 +353,6 @@
 				A1000000000000000000001E /* MarkdownImagePath.swift in Sources */,
 				A10000000000000000000020 /* NotePDFExporter.swift in Sources */,
 				A10000000000000000000022 /* NoteViewMode.swift in Sources */,
-				A10000000000000000000023 /* LivePreviewView.swift in Sources */,
 				A10000000000000000000024 /* MarkdownBlockRow.swift in Sources */,
 				A10000000000000000000025 /* UserFacingError.swift in Sources */,
 				A10000000000000000000026 /* LyraFonts.swift in Sources */,

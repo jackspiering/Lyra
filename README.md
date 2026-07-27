@@ -43,7 +43,7 @@ Autosave runs after ~500ms idle.
 | Mode | Behavior |
 |------|----------|
 | **Source** | Raw Markdown with syntax highlighting |
-| **Live** | Rendered note; click a block to edit its Markdown, then **Done** |
+| **Live** | Continuous Markdown editor (same as Source); click for caret, type to edit |
 | **Reading** | Full-width preview only |
 
 ## Features
@@ -53,7 +53,7 @@ Autosave runs after ~500ms idle.
 | Local vault | Any folder of UTF-8 `.md` files — disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V → `_attachments/` + `![](...)` (Source or Live block edit) |
+| Paste images | ⌘V → `_attachments/` + `![](...)` (Source or Live) |
 | Export PDF | **File → Export PDF…** for the open note |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts (permissions, missing files, disk full, …) |
@@ -107,7 +107,7 @@ More: [docs/ci.md](docs/ci.md)
 | `Lyra/App/` | Window shell, themes, fonts, errors, view modes |
 | `Lyra/Vault/` | Tree scan, CRUD, bookmarks, attachments, wiki resolve |
 | `Lyra/Editor/` | TextKit source editor, highlight, autosave |
-| `Lyra/Preview/` | Reading / Live Preview, PDF export |
+| `Lyra/Preview/` | Reading, PDF export |
 | `Lyra/Models/` | Shared types |
 | `LyraTests/` | Unit tests for pure logic |
 | `docs/` | Architecture, CI, design specs |
