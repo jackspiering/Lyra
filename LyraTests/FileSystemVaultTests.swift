@@ -62,4 +62,33 @@ final class FileSystemVaultTests: XCTestCase {
         let urls = FileSystemVault.collectNoteURLs(from: tree)
         XCTAssertEqual(Set(urls.map(\.lastPathComponent)), Set(["a.md", "root.md"]))
     }
+
+    func testScanHidesAttachmentsFolder() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        FileManager.default.createFile(
+            atPath: root.appendingPathComponent("note.md").path,
+            contents: Data("# Note".utf8),
+            attributes: nil
+        )
+        let attachments = root.appendingPathComponent(AttachmentStore.folderName)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        FileManager.default.createFile(
+            atPath: attachments.appendingPathComponent("foo.png").path,
+            contents: Data(),
+            attributes: nil
+        )
+
+        let tree = try FileSystemVault.scan(root: root)
+        let names = (tree.children ?? []).map(\.name)
+        XCTAssertTrue(names.contains("note.md") || names.contains(where: { $0.hasSuffix(".md") }))
+        XCTAssertFalse(names.contains("_attachments"))
+        XCTAssertFalse(names.contains(AttachmentStore.folderName))
+    }
 }

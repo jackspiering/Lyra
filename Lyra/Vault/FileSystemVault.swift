@@ -29,6 +29,7 @@ enum FileSystemVault {
 
             let childIsDir = (try childURL.resourceValues(forKeys: [.isDirectoryKey])).isDirectory ?? false
             if childIsDir {
+                if childName == AttachmentStore.folderName { continue }
                 children.append(try scan(root: childURL))
             } else if childURL.pathExtension.lowercased() == "md" {
                 children.append(VaultNode(name: childName, url: childURL, isDirectory: false, children: nil))
