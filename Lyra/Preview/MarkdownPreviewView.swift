@@ -72,6 +72,11 @@ struct MarkdownPreviewView: View {
         case .thematicBreak:
             Divider()
                 .padding(.vertical, 4)
+
+        case .image(let alt, let path):
+            Text(alt.isEmpty ? "Image: \(path)" : "\(alt) (\(path))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
