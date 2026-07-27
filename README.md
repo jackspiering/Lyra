@@ -23,7 +23,10 @@ The name **Lyra** comes from the constellation Lyra and the mythical lyre of Orp
 - **Live preview** (side-by-side, toggleable)
 - Wiki-style links: `[[Note Name]]` (resolve within the vault)
 - Create, rename, and delete notes and folders
-- **Autosave** (debounced)
+- Paste images into notes (saved under `_attachments/`)
+- Live preview renders local images
+- **Export PDF…** for the current note
+- **Autosave** (debounced) and **⌘S** to save immediately
 - Native macOS UI (SwiftUI + AppKit where it helps)
 - Custom **macOS app icon** (Dock / Finder / About)
 - Unsigned **DMG** builds on version tags via GitHub Actions
