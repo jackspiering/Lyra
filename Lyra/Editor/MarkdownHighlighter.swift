@@ -5,23 +5,26 @@ enum MarkdownHighlighter {
     private static let boldFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .bold)
 
     private static let rules: [(String, [NSAttributedString.Key: Any])] = {
-        let purple: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemPurple, .font: boldFont]
-        let orange: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemOrange]
-        let teal: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemTeal]
-        let blue: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemBlue]
+        let heading: [NSAttributedString.Key: Any] = [
+            .foregroundColor: LyraTheme.heading,
+            .font: boldFont,
+        ]
+        let code: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.code]
+        let emphasis: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.emphasis]
+        let link: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.link]
         let wiki: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.systemIndigo,
+            .foregroundColor: LyraTheme.wiki,
             .underlineStyle: NSUnderlineStyle.single.rawValue,
         ]
-        let list: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.secondaryLabelColor]
+        let list: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.listMarker]
         let bold: [NSAttributedString.Key: Any] = [.font: boldFont]
         return [
-            (#"(?m)^(#{1,6})\s+.*$"#, purple),
-            (#"`[^`\n]+`"#, orange),
-            (#"(?m)^```.*$"#, orange),
+            (#"(?m)^(#{1,6})\s+.*$"#, heading),
+            (#"`[^`\n]+`"#, code),
+            (#"(?m)^```.*$"#, code),
             (#"\*\*[^*\n]+\*\*"#, bold),
-            (#"(?<!\*)\*[^*\n]+\*(?!\*)"#, teal),
-            (#"\[[^\]]+\]\([^)]+\)"#, blue),
+            (#"(?<!\*)\*[^*\n]+\*(?!\*)"#, emphasis),
+            (#"\[[^\]]+\]\([^)]+\)"#, link),
             (#"\[\[[^\]]+\]\]"#, wiki),
             (#"(?m)^\s*([-*+]|\d+\.)\s+"#, list),
         ]

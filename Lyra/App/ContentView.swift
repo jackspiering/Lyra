@@ -114,13 +114,6 @@ struct ContentView: View {
                         Label("Toggle Preview", systemImage: "sidebar.right")
                     }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
-
-                    Button {
-                        editor.saveIfNeeded()
-                    } label: {
-                        Label("Save", systemImage: "square.and.arrow.down")
-                    }
-                    .keyboardShortcut("s", modifiers: .command)
                 }
             }
         }
