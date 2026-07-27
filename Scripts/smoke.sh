@@ -22,6 +22,10 @@ echo "-- required paths"
 for path in \
   README.md AGENTS.md CONTRIBUTING.md LICENSE \
   docs/architecture.md \
+  docs/ci.md \
+  .github/workflows/ci.yml \
+  .github/workflows/release.yml \
+  Scripts/package-dmg.sh \
   Lyra.xcodeproj/project.pbxproj \
   Lyra.xcodeproj/xcshareddata/xcschemes/Lyra.xcscheme \
   Lyra/LyraApp.swift \

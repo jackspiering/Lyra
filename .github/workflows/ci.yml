@@ -35,7 +35,4 @@ jobs:
       - name: Build and test
         run: bash Scripts/xcode-test.sh
 
-  # Future ideas (not enabled yet):
-  # - notarized release artifacts on tag
-  # - SwiftLint (keep rules minimal if added)
-  # - extract pure vault logic to SPM for Linux unit tests
+  # DMG releases: see release.yml (tag v*)

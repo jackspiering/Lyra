@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for the DMG (e.g. 0.2.0). Leave empty to use MARKETING_VERSION."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    name: Build DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            V="${{ inputs.version }}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            V="${GITHUB_REF_NAME}"
+          else
+            V=""
+          fi
+          V="${V#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: '${V:-from project}'"
+
+      - name: Build DMG
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: bash Scripts/package-dmg.sh
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lyra-dmg
+          path: build/dist/*.dmg
+          if-no-files-found: error
+
+      - name: Create GitHub Release (tags only)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          DMG="$(ls build/dist/*.dmg | head -1)"
+          NOTES="## Lyra ${TAG}
+
+          Unsigned macOS build for testing (not notarized).
+
+          - Download the DMG, open it, drag **Lyra** to **Applications**.
+          - First launch: right-click → **Open** if Gatekeeper warns (unsigned CI build).
+          - Built by GitHub Actions on macOS 15.
+
+          Source: \`${{ github.sha }}\`
+          "
+          # Create release if missing, then upload asset (idempotent-ish)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$DMG" --clobber
+          else
+            gh release create "$TAG" "$DMG" --title "Lyra ${TAG}" --notes "$NOTES"
+          fi
