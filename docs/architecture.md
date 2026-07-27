@@ -20,19 +20,15 @@ Lyra is a single macOS app target with module-shaped source folders. This docume
 
 ## Decision: TextKit source editor
 
-**Choice:** Markdown source editing via AppKit `NSTextView` / TextKit wrapped in `NSViewRepresentable`, with a simple regex-based highlighter for v0.1.
+**Choice:** Markdown source editing via AppKit `NSTextView` wrapped in `NSViewRepresentable` (`MarkdownTextView`), with a simple regex-based highlighter (`MarkdownHighlighter`) for v0.1.
 
 **Why:** Native performance and feel; better long-term control than a WebView editor.
 
-**Fallback:** SwiftUI `TextEditor` only as a temporary stand-in if TextKit wiring blocks progress — still prefer TextKit for v0.1.
-
 ## Decision: native preview first
 
-**Choice:** Live preview from the same in-memory string as the editor, rendered with native APIs (`AttributedString` markdown / lightweight rendering).
+**Choice:** Live preview from the same in-memory string as the editor via SwiftUI `AttributedString(markdown:)` plus a clickable wiki-link list extracted from `[[...]]` patterns.
 
-**Why:** Avoid embedding a browser for the default path.
-
-**Fallback:** A thin WebKit preview is allowed only if native quality is inadequate for basic Markdown; document any switch here if it happens.
+**Why:** Avoid embedding a browser for the default path. No WebKit dependency in v0.1.
 
 ## Decision: sandbox + security-scoped bookmarks
 

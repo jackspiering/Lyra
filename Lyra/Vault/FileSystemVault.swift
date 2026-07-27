@@ -8,11 +8,11 @@ enum FileSystemVault {
     }
 
     static func scan(root: URL) throws -> VaultNode {
-        try scanNode(at: root, isRoot: true)
+        try scanNode(at: root)
     }
 
-    private static func scanNode(at url: URL, isRoot: Bool) throws -> VaultNode {
-        let name = isRoot ? url.lastPathComponent : url.lastPathComponent
+    private static func scanNode(at url: URL) throws -> VaultNode {
+        let name = url.lastPathComponent
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else {
             throw CocoaError(.fileNoSuchFile)
@@ -37,7 +37,7 @@ enum FileSystemVault {
             let childIsDir = values.isDirectory ?? false
 
             if childIsDir {
-                children.append(try scanNode(at: childURL, isRoot: false))
+                children.append(try scanNode(at: childURL))
             } else if childURL.pathExtension.lowercased() == "md" {
                 children.append(
                     VaultNode(name: childName, url: childURL, isDirectory: false, children: nil)
