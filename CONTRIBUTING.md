@@ -33,18 +33,19 @@ Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`
 - **Update `README.md`** whenever user-facing behavior, version, install, or features change
 - Do not expand scope into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke checklist (v0.4)
+## Manual smoke checklist (v0.5)
 
 1. Open a folder with nested `.md` files as a vault
 2. Sidebar shows folders and markdown only; ignores `.git` / hidden files
-3. Edit a note; wait ~1s; quit and reopen — content persisted
-4. Toggle preview (⌘⇧P)
-5. Create, rename, and delete a note (and a folder)
-6. Add `[[Other Note]]` where `Other Note.md` exists; open via preview link if supported
-7. Paste an image into a note; confirm a file appears under `_attachments/` and the note gets a markdown image link
-8. With preview on, confirm the pasted local image renders
-9. **File → Export PDF…** (or menu equivalent) for the current note; open the PDF and check content
-10. Edit a note and press **⌘S**; confirm immediate save (autosave still works after ~1s without ⌘S)
+3. Edit a note in **Source**; wait ~1s; quit and reopen — content persisted
+4. Cycle **Source → Live → Reading** with the segmented control and with **⌘E**; mode persists across relaunch
+5. In **Live**, click a heading/paragraph, edit raw Markdown, **Done** — block re-renders; **Cancel** discards
+6. Create, rename, and delete a note (and a folder)
+7. Add `[[Other Note]]` where `Other Note.md` exists; open via Reading/Live wiki link
+8. In **Source**, paste an image (⌘V); file under `_attachments/` + `![](...)` link; image shows in Live/Reading
+9. In **Live**, focus a block and paste an image the same way
+10. **File → Export PDF…** from each mode; open the PDF and check content
+11. **⌘S** saves immediately (autosave still works after ~1s without ⌘S)
 
 ## License
 

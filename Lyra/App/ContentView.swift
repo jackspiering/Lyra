@@ -5,11 +5,17 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @State private var store = VaultStore()
     @State private var editor = EditorViewModel()
-    @AppStorage("lyra.previewVisible") private var previewVisible = true
+    @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
+    @State private var liveCommitToken = 0
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
     @Environment(\.scenePhase) private var scenePhase
+
+    private var noteViewMode: NoteViewMode {
+        get { NoteViewMode(rawValue: noteViewModeRaw) ?? .source }
+        nonmutating set { noteViewModeRaw = newValue.rawValue }
+    }
 
     var body: some View {
         Group {
@@ -35,7 +41,10 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 560)
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { editor.saveIfNeeded() }
+            if phase != .active {
+                liveCommitToken += 1
+                editor.saveIfNeeded()
+            }
         }
         .alert("Error", isPresented: Binding(
             get: { store.errorMessage != nil },
@@ -57,6 +66,7 @@ struct ContentView: View {
             titleVisibility: .visible
         ) {
             Button("Move to Trash", role: .destructive) {
+                liveCommitToken += 1
                 editor.close()
                 store.deleteSelected()
             }
@@ -65,7 +75,11 @@ struct ContentView: View {
             Text("This item will be moved to the Trash.")
         }
         .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
-            editor.saveIfNeeded()
+            liveCommitToken += 1
+            // Allow Live Preview to commit before save on next run loop.
+            DispatchQueue.main.async {
+                editor.saveIfNeeded()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
             exportPDF()
@@ -97,60 +111,84 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            HSplitView {
-                editorPane.frame(minWidth: 280)
-                if previewVisible {
-                    MarkdownPreviewView(
-                        text: editor.text,
-                        noteDirectory: editor.fileURL?.deletingLastPathComponent(),
-                        vaultRoot: store.rootURL
-                    ) { openWikiLink($0) }
-                        .frame(minWidth: 240)
-                }
-            }
-            .toolbar {
-                ToolbarItemGroup {
-                    Button {
-                        if let url = VaultFolderPicker.pick() {
-                            editor.close()
-                            store.openVault(at: url)
+            noteDetail
+                .toolbar {
+                    ToolbarItemGroup {
+                        Button {
+                            if let url = VaultFolderPicker.pick() {
+                                liveCommitToken += 1
+                                editor.close()
+                                store.openVault(at: url)
+                            }
+                        } label: {
+                            Label("Open Vault", systemImage: "folder")
                         }
-                    } label: {
-                        Label("Open Vault", systemImage: "folder")
-                    }
-                    .keyboardShortcut("o", modifiers: .command)
+                        .keyboardShortcut("o", modifiers: .command)
 
-                    Button {
-                        previewVisible.toggle()
-                    } label: {
-                        Label("Toggle Preview", systemImage: "sidebar.right")
-                    }
-                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                        Picker("View", selection: $noteViewModeRaw) {
+                            ForEach(NoteViewMode.allCases) { mode in
+                                Text(mode.label).tag(mode.rawValue)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 280)
 
-                    Button {
-                        exportPDF()
-                    } label: {
-                        Label("Export PDF", systemImage: "doc.richtext")
+                        Button {
+                            liveCommitToken += 1
+                            noteViewMode = noteViewMode.next()
+                        } label: {
+                            Label("Cycle View Mode", systemImage: "rectangle.split.2x1")
+                        }
+                        .keyboardShortcut("e", modifiers: .command)
+                        .help("Cycle Source → Live → Reading")
+
+                        Button {
+                            exportPDF()
+                        } label: {
+                            Label("Export PDF", systemImage: "doc.richtext")
+                        }
+                        .disabled(editor.fileURL == nil)
+                        .help("Export current note to PDF")
                     }
-                    .disabled(editor.fileURL == nil)
-                    .help("Export current note to PDF")
                 }
-            }
         }
     }
 
     @ViewBuilder
-    private var editorPane: some View {
-        if editor.fileURL != nil {
-            MarkdownTextView(text: $editor.text, vaultRoot: store.rootURL) {
-                editor.noteEdited()
-            }
-        } else {
+    private var noteDetail: some View {
+        if editor.fileURL == nil {
             ContentUnavailableView(
                 "Select a note",
                 systemImage: "doc.text",
                 description: Text("Choose a Markdown file from the sidebar, or create a new note.")
             )
+        } else {
+            switch noteViewMode {
+            case .source:
+                MarkdownTextView(
+                    text: $editor.text,
+                    vaultRoot: store.rootURL,
+                    onEdit: { editor.noteEdited() },
+                    onPasteError: { store.errorMessage = $0 }
+                )
+            case .livePreview:
+                LivePreviewView(
+                    text: $editor.text,
+                    noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                    vaultRoot: store.rootURL,
+                    onWikiLink: { openWikiLink($0) },
+                    onEdit: { editor.noteEdited() },
+                    onPasteError: { store.errorMessage = $0 },
+                    commitToken: liveCommitToken
+                )
+            case .reading:
+                MarkdownPreviewView(
+                    text: editor.text,
+                    noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                    vaultRoot: store.rootURL,
+                    onWikiLink: { openWikiLink($0) }
+                )
+            }
         }
     }
 
@@ -164,6 +202,7 @@ struct ContentView: View {
                 Button("Cancel") { renameTarget = nil }
                 Button("Rename") {
                     let oldPath = node.url.path
+                    liveCommitToken += 1
                     editor.saveIfNeeded()
                     store.renameSelected(to: renameText)
                     if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
@@ -180,6 +219,7 @@ struct ContentView: View {
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
+        liveCommitToken += 1
         guard let newValue,
               let root = store.rootNode,
               let node = FileSystemVault.findNode(id: newValue, in: root),
@@ -188,40 +228,49 @@ struct ContentView: View {
             return
         }
         if editor.fileURL?.path != node.url.path {
-            editor.open(url: node.url)
+            // Commit token already bumped; open after Live Preview can apply on next frame.
+            DispatchQueue.main.async {
+                editor.open(url: node.url)
+            }
         }
     }
 
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
-        editor.saveIfNeeded()
-        store.selection = url.path
-        editor.open(url: url)
+        liveCommitToken += 1
+        DispatchQueue.main.async {
+            editor.saveIfNeeded()
+            store.selection = url.path
+            editor.open(url: url)
+        }
     }
 
     private func exportPDF() {
-        guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
-        editor.saveIfNeeded()
-        do {
-            let data = try NotePDFExporter.pdfData(
-                markdown: editor.text,
-                noteDirectory: noteURL.deletingLastPathComponent(),
-                vaultRoot: vault
-            )
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [.pdf]
-            panel.nameFieldStringValue = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
-            panel.directoryURL = noteURL.deletingLastPathComponent()
-            panel.begin { resp in
-                guard resp == .OK, let url = panel.url else { return }
-                do {
-                    try data.write(to: url, options: .atomic)
-                } catch {
-                    store.errorMessage = error.localizedDescription
+        liveCommitToken += 1
+        DispatchQueue.main.async {
+            guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
+            editor.saveIfNeeded()
+            do {
+                let data = try NotePDFExporter.pdfData(
+                    markdown: editor.text,
+                    noteDirectory: noteURL.deletingLastPathComponent(),
+                    vaultRoot: vault
+                )
+                let panel = NSSavePanel()
+                panel.allowedContentTypes = [.pdf]
+                panel.nameFieldStringValue = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
+                panel.directoryURL = noteURL.deletingLastPathComponent()
+                panel.begin { resp in
+                    guard resp == .OK, let url = panel.url else { return }
+                    do {
+                        try data.write(to: url, options: .atomic)
+                    } catch {
+                        store.errorMessage = error.localizedDescription
+                    }
                 }
+            } catch {
+                store.errorMessage = error.localizedDescription
             }
-        } catch {
-            store.errorMessage = error.localizedDescription
         }
     }
 }

@@ -26,9 +26,17 @@ Lyra is a single macOS app target with module-shaped source folders. This docume
 
 ## Decision: native preview first
 
-**Choice:** Live preview from the same in-memory string as the editor via SwiftUI `AttributedString(markdown:)` plus a clickable wiki-link list extracted from `[[...]]` patterns.
+**Choice:** Rendered preview from the same in-memory string as the editor via block parsing + SwiftUI `AttributedString(markdown:)` for inline runs, plus a clickable wiki-link list extracted from `[[...]]` patterns.
 
-**Why:** Avoid embedding a browser for the default path. No WebKit dependency in v0.1.
+**Why:** Avoid embedding a browser for the default path. No WebKit dependency.
+
+## Decision: three note view modes (v0.5)
+
+**Choice:** One detail surface at a time — **Source** (raw `MarkdownTextView`), **Live Preview** (hybrid: render blocks, click to edit block source), **Reading** (full-width preview). Mode is persisted (`lyra.noteViewMode`); **⌘E** cycles modes.
+
+**Why:** Matches common vault workflows without side-by-side split complexity. Live Preview stays hybrid (not full WYSIWYG) so disk Markdown remains the single source of truth with simple range splice on commit.
+
+**Consequence:** Block parse attaches UTF-16 source ranges (`MarkdownPreviewBlocks.parseRanged`) for splice-safe edits.
 
 ## Decision: sandbox + security-scoped bookmarks
 

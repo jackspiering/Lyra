@@ -12,7 +12,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -25,15 +25,24 @@
 1. Launch Lyra → **Open Vault…** (⌘O)
 2. Choose a folder of Markdown files
 3. Select a note in the sidebar to edit
+4. Use the toolbar **Source · Live · Reading** control (or **⌘E**) to switch how you view the note
 
 | Action | Shortcut |
 |--------|----------|
 | Open vault | ⌘O |
 | New note | ⌘N |
 | Save | ⌘S |
-| Toggle preview | ⌘⇧P |
+| Cycle view mode | ⌘E |
 
 Autosave after ~500ms idle; ⌘S saves immediately.
+
+### View modes
+
+| Mode | What you get |
+|------|----------------|
+| **Source** | Raw Markdown editor (syntax highlight) |
+| **Live** | Rendered blocks; click a block to edit its Markdown in place |
+| **Reading** | Full-width rendered preview (not editable) |
 
 ## Features
 
@@ -42,14 +51,15 @@ Autosave after ~500ms idle; ⌘S saves immediately.
 | Local vault | Folder of UTF-8 `.md` files — disk is source of truth |
 | Sidebar tree | Folders + notes; ignores `.git` / hidden files |
 | Source editor | TextKit + basic Markdown highlighting |
-| Live preview | Side-by-side, toggleable; local images render |
+| Live Preview | Hybrid edit: click a block, edit raw MD, Done to re-render |
+| Reading view | Full-width preview with local images |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | CRUD | Create, rename, delete notes and folders |
-| Paste images | ⌘V → `_attachments/` + `![](...)` insert |
+| Paste images | ⌘V in Source or Live block edit → `_attachments/` + `![](...)` |
 | Export PDF | **File → Export PDF…** for the current note |
 | Native UI | SwiftUI + AppKit; custom app icon |
 
-**Not in scope:** plugins, graph view, cloud sync, tags index, iOS.
+**Not in scope:** plugins, graph view, cloud sync, tags index, iOS, full WYSIWYG.
 
 ## Why
 
@@ -75,16 +85,16 @@ CI details: [docs/ci.md](docs/ci.md).
 <details>
 <summary>Release DMG</summary>
 
-Tag must match the Xcode marketing version (`0.4.0` ↔ `v0.4.0`):
+Tag must match the Xcode marketing version (`0.5.0` ↔ `v0.5.0`):
 
 ```bash
-git tag v0.4.0 && git push origin v0.4.0
+git tag v0.5.0 && git push origin v0.5.0
 ```
 
-CI attaches unsigned `Lyra-0.4.0.dmg` to the [Release](https://github.com/jackspiering/Lyra/releases).
+CI attaches unsigned `Lyra-0.5.0.dmg` to the [Release](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.4.0 bash Scripts/package-dmg.sh   # local Mac only → build/dist/
+VERSION=0.5.0 bash Scripts/package-dmg.sh   # local Mac only → build/dist/
 ```
 
 </details>
