@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    var vaultRoot: URL?
     var onEdit: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -10,8 +11,20 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
+        let textView = LyraTextView()
+        textView.minSize = .zero
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(
+            width: 0,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = true
 
         textView.delegate = context.coordinator
         textView.isRichText = false
@@ -22,6 +35,15 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.vaultRoot = vaultRoot
+
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        scrollView.documentView = textView
 
         context.coordinator.textView = textView
         context.coordinator.applyHighlight(text)
@@ -31,7 +53,8 @@ struct MarkdownTextView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        guard let textView = scrollView.documentView as? NSTextView else { return }
+        guard let textView = scrollView.documentView as? LyraTextView else { return }
+        textView.vaultRoot = vaultRoot
         if textView.string != text {
             context.coordinator.applyHighlight(text)
         }
@@ -39,7 +62,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownTextView
-        weak var textView: NSTextView?
+        weak var textView: LyraTextView?
         private var isApplying = false
 
         init(_ parent: MarkdownTextView) {
@@ -61,5 +84,22 @@ struct MarkdownTextView: NSViewRepresentable {
             parent.onEdit()
             applyHighlight(textView.string)
         }
+    }
+}
+
+/// `NSTextView` that pastes clipboard images into the vault `_attachments` folder.
+final class LyraTextView: NSTextView {
+    var vaultRoot: URL?
+
+    override func paste(_ sender: Any?) {
+        let pb = NSPasteboard.general
+        if let img = NSImage(pasteboard: pb),
+           let root = vaultRoot,
+           let data = AttachmentStore.pngData(from: img),
+           let rel = try? AttachmentStore.savePNG(data: data, vaultRoot: root) {
+            insertText("![](\(rel))", replacementRange: selectedRange())
+            return
+        }
+        super.paste(sender)
     }
 }

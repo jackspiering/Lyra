@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var store = VaultStore()
@@ -62,6 +64,12 @@ struct ContentView: View {
         } message: {
             Text("This item will be moved to the Trash.")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
+            editor.saveIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
+            exportPDF()
+        }
     }
 
     private var vaultWorkspace: some View {
@@ -92,7 +100,11 @@ struct ContentView: View {
             HSplitView {
                 editorPane.frame(minWidth: 280)
                 if previewVisible {
-                    MarkdownPreviewView(text: editor.text) { openWikiLink($0) }
+                    MarkdownPreviewView(
+                        text: editor.text,
+                        noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                        vaultRoot: store.rootURL
+                    ) { openWikiLink($0) }
                         .frame(minWidth: 240)
                 }
             }
@@ -114,6 +126,14 @@ struct ContentView: View {
                         Label("Toggle Preview", systemImage: "sidebar.right")
                     }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                    Button {
+                        exportPDF()
+                    } label: {
+                        Label("Export PDF", systemImage: "doc.richtext")
+                    }
+                    .disabled(editor.fileURL == nil)
+                    .help("Export current note to PDF")
                 }
             }
         }
@@ -122,7 +142,9 @@ struct ContentView: View {
     @ViewBuilder
     private var editorPane: some View {
         if editor.fileURL != nil {
-            MarkdownTextView(text: $editor.text) { editor.noteEdited() }
+            MarkdownTextView(text: $editor.text, vaultRoot: store.rootURL) {
+                editor.noteEdited()
+            }
         } else {
             ContentUnavailableView(
                 "Select a note",
@@ -175,5 +197,31 @@ struct ContentView: View {
         editor.saveIfNeeded()
         store.selection = url.path
         editor.open(url: url)
+    }
+
+    private func exportPDF() {
+        guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
+        editor.saveIfNeeded()
+        do {
+            let data = try NotePDFExporter.pdfData(
+                markdown: editor.text,
+                noteDirectory: noteURL.deletingLastPathComponent(),
+                vaultRoot: vault
+            )
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.pdf]
+            panel.nameFieldStringValue = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
+            panel.directoryURL = noteURL.deletingLastPathComponent()
+            panel.begin { resp in
+                guard resp == .OK, let url = panel.url else { return }
+                do {
+                    try data.write(to: url, options: .atomic)
+                } catch {
+                    store.errorMessage = error.localizedDescription
+                }
+            }
+        } catch {
+            store.errorMessage = error.localizedDescription
+        }
     }
 }

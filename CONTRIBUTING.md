@@ -33,7 +33,7 @@ Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`
 - **Update `README.md`** whenever user-facing behavior, version, install, or features change
 - Do not expand scope into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke checklist (v0.3)
+## Manual smoke checklist (v0.4)
 
 1. Open a folder with nested `.md` files as a vault
 2. Sidebar shows folders and markdown only; ignores `.git` / hidden files
@@ -41,6 +41,10 @@ Pull requests run GitHub Actions: smoke on Ubuntu, then build/test on `macos-15`
 4. Toggle preview (⌘⇧P)
 5. Create, rename, and delete a note (and a folder)
 6. Add `[[Other Note]]` where `Other Note.md` exists; open via preview link if supported
+7. Paste an image into a note; confirm a file appears under `_attachments/` and the note gets a markdown image link
+8. With preview on, confirm the pasted local image renders
+9. **File → Export PDF…** (or menu equivalent) for the current note; open the PDF and check content
+10. Edit a note and press **⌘S**; confirm immediate save (autosave still works after ~1s without ⌘S)
 
 ## License
 

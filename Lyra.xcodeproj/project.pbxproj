@@ -27,6 +27,12 @@
 		A10000000000000000000019 /* LyraTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* LyraTheme.swift */; };
 		A1000000000000000000001A /* MarkdownPreviewBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* MarkdownPreviewBlocks.swift */; };
 		A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */; };
+		A1000000000000000000001C /* AttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* AttachmentStore.swift */; };
+		A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* AttachmentStoreTests.swift */; };
+		A1000000000000000000001E /* MarkdownImagePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* MarkdownImagePath.swift */; };
+		A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* MarkdownImagePathTests.swift */; };
+		A10000000000000000000020 /* NotePDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* NotePDFExporter.swift */; };
+		A10000000000000000000021 /* NotePDFExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* NotePDFExporterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +70,12 @@
 		B10000000000000000000019 /* LyraTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraTheme.swift; sourceTree = "<group>"; };
 		B1000000000000000000001A /* MarkdownPreviewBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewBlocks.swift; sourceTree = "<group>"; };
 		B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewBlocksTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000001C /* AttachmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentStore.swift; sourceTree = "<group>"; };
+		B1000000000000000000001D /* AttachmentStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentStoreTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000001E /* MarkdownImagePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePath.swift; sourceTree = "<group>"; };
+		B1000000000000000000001F /* MarkdownImagePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePathTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* NotePDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporter.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* NotePDFExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotePDFExporterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +128,9 @@
 				B10000000000000000000012 /* UntitledNameTests.swift */,
 				B10000000000000000000013 /* FileSystemVaultTests.swift */,
 				B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */,
+				B1000000000000000000001D /* AttachmentStoreTests.swift */,
+				B1000000000000000000001F /* MarkdownImagePathTests.swift */,
+				B10000000000000000000021 /* NotePDFExporterTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -155,6 +170,7 @@
 				B10000000000000000000008 /* UntitledName.swift */,
 				B10000000000000000000009 /* WikiLinkResolver.swift */,
 				B1000000000000000000000A /* VaultStore.swift */,
+				B1000000000000000000001C /* AttachmentStore.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -174,6 +190,8 @@
 			children = (
 				B1000000000000000000000F /* MarkdownPreviewView.swift */,
 				B1000000000000000000001A /* MarkdownPreviewBlocks.swift */,
+				B1000000000000000000001E /* MarkdownImagePath.swift */,
+				B10000000000000000000020 /* NotePDFExporter.swift */,
 			);
 			path = Preview;
 			sourceTree = "<group>";
@@ -292,6 +310,9 @@
 				A1000000000000000000000F /* MarkdownPreviewView.swift in Sources */,
 				A10000000000000000000019 /* LyraTheme.swift in Sources */,
 				A1000000000000000000001A /* MarkdownPreviewBlocks.swift in Sources */,
+				A1000000000000000000001C /* AttachmentStore.swift in Sources */,
+				A1000000000000000000001E /* MarkdownImagePath.swift in Sources */,
+				A10000000000000000000020 /* NotePDFExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +324,9 @@
 				A10000000000000000000012 /* UntitledNameTests.swift in Sources */,
 				A10000000000000000000013 /* FileSystemVaultTests.swift in Sources */,
 				A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */,
+				A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */,
+				A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */,
+				A10000000000000000000021 /* NotePDFExporterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,7 +381,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -366,7 +390,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -382,7 +406,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -391,7 +415,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -404,10 +428,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -420,10 +444,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

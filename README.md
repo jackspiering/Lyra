@@ -1,7 +1,7 @@
 # Lyra
 
 <p align="center">
-  <img src="Assets/lyra-icon-master-1024.png" alt="Lyra" width="160" height="160">
+  <img src="Assets/lyra-logo.png" alt="Lyra" width="160" height="160">
 </p>
 
 **Lyra** is a native, lightweight, local-first Markdown editor and knowledge vault for macOS.  
@@ -15,7 +15,7 @@ Inspired by the simplicity of tools like Obsidian for local vaults, but built as
 
 The name **Lyra** comes from the constellation Lyra and the mythical lyre of Orpheus — the instrument associated with poetry, knowledge, harmony, and the music of the spheres. It reflects a tool for organizing and composing personal knowledge with elegance and clarity.
 
-## Features (v0.3)
+## Features (v0.4)
 
 - Open a local folder as a **vault**
 - Sidebar with a recursive tree of folders and `.md` files
@@ -23,7 +23,10 @@ The name **Lyra** comes from the constellation Lyra and the mythical lyre of Orp
 - **Live preview** (side-by-side, toggleable)
 - Wiki-style links: `[[Note Name]]` (resolve within the vault)
 - Create, rename, and delete notes and folders
-- **Autosave** (debounced)
+- Paste images into notes (saved under `_attachments/`)
+- Live preview renders local images
+- **Export PDF…** for the current note
+- **Autosave** (debounced) and **⌘S** to save immediately
 - Native macOS UI (SwiftUI + AppKit where it helps)
 - Custom **macOS app icon** (Dock / Finder / About)
 - Unsigned **DMG** builds on version tags via GitHub Actions
@@ -69,19 +72,19 @@ CI runs both on PRs (see [docs/ci.md](docs/ci.md)).
 
 ### Release DMG (macOS runner)
 
-Push a version tag after merge (example for **0.3.0**):
+Push a version tag after merge (example for **0.4.0**):
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
-GitHub Actions builds an **unsigned** `Lyra-0.3.0.dmg` and attaches it to a [GitHub Release](https://github.com/jackspiering/Lyra/releases). Details: [docs/ci.md](docs/ci.md).
+GitHub Actions builds an **unsigned** `Lyra-0.4.0.dmg` and attaches it to a [GitHub Release](https://github.com/jackspiering/Lyra/releases). Details: [docs/ci.md](docs/ci.md).
 
 Local (Mac only):
 
 ```bash
-VERSION=0.3.0 bash Scripts/package-dmg.sh   # → build/dist/Lyra-0.3.0.dmg
+VERSION=0.4.0 bash Scripts/package-dmg.sh   # → build/dist/Lyra-0.4.0.dmg
 ```
 
 ## Architecture overview
