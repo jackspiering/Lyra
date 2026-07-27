@@ -19,7 +19,7 @@
 
 | Trigger | What |
 |---------|------|
-| Push tag `v*` (e.g. `v0.2.0`) | Release build → DMG → GitHub Release asset |
+| Push tag `v*` (e.g. `v0.4.0`) | Release build → DMG → GitHub Release asset |
 | Manual **workflow_dispatch** | Same DMG build; uploads an artifact (no Release unless you tagged) |
 
 Local (Mac only):
@@ -27,22 +27,22 @@ Local (Mac only):
 ```bash
 bash Scripts/smoke.sh
 bash Scripts/xcode-test.sh
-VERSION=0.2.0 bash Scripts/package-dmg.sh   # → build/dist/Lyra-0.2.0.dmg
+VERSION=0.4.0 bash Scripts/package-dmg.sh   # → build/dist/Lyra-0.4.0.dmg
 ```
 
 ## How to ship a DMG
 
 1. Merge version + release workflow to `main`.
-2. Ensure marketing version in the project matches the tag (e.g. `0.2.0` ↔ `v0.2.0`).
+2. Ensure marketing version in the project matches the tag (e.g. `0.4.0` ↔ `v0.4.0`).
 3. Tag and push:
 
 ```bash
 git checkout main && git pull
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
-4. Open **Actions → Release**; when green, download from the **Releases** page (`Lyra-0.2.0.dmg`).
+4. Open **Actions → Release**; when green, download from the **Releases** page (`Lyra-0.4.0.dmg`).
 
 ### Gatekeeper note
 
