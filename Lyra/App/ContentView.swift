@@ -92,7 +92,11 @@ struct ContentView: View {
             HSplitView {
                 editorPane.frame(minWidth: 280)
                 if previewVisible {
-                    MarkdownPreviewView(text: editor.text) { openWikiLink($0) }
+                    MarkdownPreviewView(
+                        text: editor.text,
+                        noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                        vaultRoot: store.rootURL
+                    ) { openWikiLink($0) }
                         .frame(minWidth: 240)
                 }
             }

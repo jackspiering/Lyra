@@ -3,6 +3,8 @@ import SwiftUI
 
 struct MarkdownPreviewView: View {
     let text: String
+    var noteDirectory: URL?
+    var vaultRoot: URL?
     var onWikiLink: ((String) -> Void)?
 
     var body: some View {
@@ -74,9 +76,19 @@ struct MarkdownPreviewView: View {
                 .padding(.vertical, 4)
 
         case .image(let alt, let path):
-            Text(alt.isEmpty ? "Image: \(path)" : "\(alt) (\(path))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if let noteDirectory, let vaultRoot,
+               let url = MarkdownImagePath.resolve(path: path, noteDirectory: noteDirectory, vaultRoot: vaultRoot),
+               let nsImage = NSImage(contentsOf: url) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 480, alignment: .leading)
+                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+            } else {
+                Text("Missing image: \(path)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
