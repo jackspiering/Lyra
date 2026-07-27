@@ -13,7 +13,7 @@ Lyra/
   App/        # Shell, open vault, theme, Inter fonts, UserFacingError, NoteViewMode
   Vault/      # Tree scan, CRUD, bookmarks, wiki resolve, AttachmentStore
   Editor/     # TextKit source, highlight, autosave, image paste
-  Preview/    # Block parse, Reading / Live Preview, PDF export
+  Preview/    # Block parse, Reading, PDF export
   Models/     # VaultNode
   Resources/  # Assets, Fonts (Inter + OFL)
   Scripts/    # smoke.sh (any OS), xcode-test.sh (Mac)

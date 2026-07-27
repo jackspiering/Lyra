@@ -17,7 +17,7 @@ Lyra is a single macOS app target with module-shaped folders. This doc is the de
 | `App/` | Shell, navigation, open vault, theme, fonts, errors, `NoteViewMode` |
 | `Vault/` | Scan, CRUD, bookmarks, wiki resolve, `_attachments` paste storage |
 | `Editor/` | `NSTextView` source editing, highlight, autosave |
-| `Preview/` | Block parse, Reading / Live Preview, PDF export |
+| `Preview/` | Block parse, Reading, PDF export |
 | `Models/` | Shared types (`VaultNode`) |
 
 One primary type per file when practical.
@@ -50,11 +50,11 @@ One primary type per file when practical.
 
 **Why:** Avoid embedding a browser for the default experience.
 
-### Three note view modes (v0.5)
+### Three note view modes (v0.5+)
 
-**Choice:** One detail surface: **Source** | **Live Preview** (hybrid block edit) | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** cycles.
+**Choice:** One detail surface: **Source** | **Live** | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** cycles.
 
-**Why:** Matches vault workflows without a permanent side-by-side split. Live stays hybrid (click block → edit raw MD → commit) so the on-disk string remains simple to splice via UTF-16 ranges from `parseRanged`.
+**Why:** Matches vault workflows without a permanent side-by-side split. Source and Live both use continuous `MarkdownTextView` over the full note string (caret on click, live typing). Reading is rendered, non-editable preview (images, wiki links).
 
 ### Inter typeface (v0.5)
 

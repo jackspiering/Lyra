@@ -38,11 +38,11 @@ PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](do
 2. Sidebar shows folders + Markdown only (no `.git` / hidden)
 3. **Source:** edit, wait ~1s, quit/reopen — content persisted
 4. **⌘E** / segmented control: Source → Live → Reading; mode survives relaunch
-5. **Live:** click a block, edit Markdown, **Done** re-renders; **Cancel** discards
+5. **Live:** click in the note — blinking caret; type — content updates; no Done/Cancel
 6. Create, rename, delete note and folder
-7. `[[Other Note]]` opens from Live/Reading when the file exists
+7. `[[Other Note]]` opens from Reading when the file exists
 8. **Source:** paste image → `_attachments/` + link; shows in Live/Reading
-9. **Live:** paste image inside a focused block
+9. **Live:** paste image (same as Source) → `_attachments/` + link; shows in Reading
 10. **Export PDF…** from each mode
 11. **⌘S** saves immediately
 12. A failed save/paste shows a plain-language alert (not raw Cocoa codes)
