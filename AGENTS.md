@@ -63,3 +63,17 @@ Prefer tests for: wiki resolution, ignore rules, `Untitled` naming, file write h
 ## Prefer the simplest working change
 
 When in doubt: fewer files, fewer abstractions, less configuration. A later **ponytail**-style review will flag over-engineering.
+
+## Git author identity (privacy)
+
+**Never** put a personal/real email address in git commits, tags, or git config for this repo.
+
+Use the GitHub noreply address only, for example:
+
+```text
+user.name  jackspiering
+user.email 46534141+jackspiering@users.noreply.github.com
+```
+
+(Or the account’s `…@users.noreply.github.com` form from GitHub → Settings → Emails.)  
+Configure this **locally** in the clone (`git config user.email …`); do not commit secrets or personal mailboxes.
