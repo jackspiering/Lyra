@@ -126,7 +126,9 @@ struct ContentView: View {
     @ViewBuilder
     private var editorPane: some View {
         if editor.fileURL != nil {
-            MarkdownTextView(text: $editor.text) { editor.noteEdited() }
+            MarkdownTextView(text: $editor.text, vaultRoot: store.rootURL) {
+                editor.noteEdited()
+            }
         } else {
             ContentUnavailableView(
                 "Select a note",
