@@ -39,7 +39,6 @@ for path in \
   Lyra/Preview/MarkdownPreviewBlocks.swift \
   Lyra/Preview/MarkdownImagePath.swift \
   Lyra/Preview/NotePDFExporter.swift \
-  Lyra/Preview/LivePreviewView.swift \
   Lyra/Preview/MarkdownBlockRow.swift \
   Lyra/App/LyraTheme.swift \
   Lyra/App/NoteViewMode.swift \
@@ -70,7 +69,7 @@ do
 done
 
 echo "-- removed / unwanted paths"
-for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Editor/EditorView.swift; do
+for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Editor/EditorView.swift Lyra/Preview/LivePreviewView.swift; do
   if [[ -e "$path" ]]; then
     echo "  FAIL: should not exist: $path"
     fail=1
@@ -80,7 +79,7 @@ for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Edi
 done
 
 echo "-- pbxproj references"
-for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks MarkdownImagePath AttachmentStore AttachmentStoreTests MarkdownImagePathTests NotePDFExporter NotePDFExporterTests NoteViewMode LivePreviewView MarkdownBlockRow UserFacingError LyraFonts UserFacingErrorTests; do
+for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks MarkdownImagePath AttachmentStore AttachmentStoreTests MarkdownImagePathTests NotePDFExporter NotePDFExporterTests NoteViewMode MarkdownBlockRow UserFacingError LyraFonts UserFacingErrorTests; do
   if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
     echo "  ok: pbxproj lists $name.swift"
   else
@@ -88,7 +87,7 @@ for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView Vau
     fail=1
   fi
 done
-for name in OpenVaultView NoteDocument EditorView; do
+for name in OpenVaultView NoteDocument EditorView LivePreviewView; do
   if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
     echo "  FAIL: pbxproj still lists $name.swift"
     fail=1
