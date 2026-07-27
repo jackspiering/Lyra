@@ -9,6 +9,7 @@ enum MarkdownPreviewBlocks {
         case quote(String)
         case code(String)
         case thematicBreak
+        case image(alt: String, path: String)
     }
 
     static func parse(_ source: String) -> [Block] {
@@ -19,7 +20,15 @@ enum MarkdownPreviewBlocks {
 
         func flushParagraph() {
             let text = paragraph.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty { blocks.append(.paragraph(text)) }
+            if text.isEmpty {
+                paragraph.removeAll()
+                return
+            }
+            if let image = MarkdownImagePath.parseImageLine(text) {
+                blocks.append(.image(alt: image.alt, path: image.path))
+            } else {
+                blocks.append(.paragraph(text))
+            }
             paragraph.removeAll()
         }
 

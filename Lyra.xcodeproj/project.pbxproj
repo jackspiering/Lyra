@@ -29,6 +29,8 @@
 		A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */; };
 		A1000000000000000000001C /* AttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* AttachmentStore.swift */; };
 		A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* AttachmentStoreTests.swift */; };
+		A1000000000000000000001E /* MarkdownImagePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* MarkdownImagePath.swift */; };
+		A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* MarkdownImagePathTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +70,8 @@
 		B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewBlocksTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000001C /* AttachmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentStore.swift; sourceTree = "<group>"; };
 		B1000000000000000000001D /* AttachmentStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentStoreTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000001E /* MarkdownImagePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePath.swift; sourceTree = "<group>"; };
+		B1000000000000000000001F /* MarkdownImagePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownImagePathTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +125,7 @@
 				B10000000000000000000013 /* FileSystemVaultTests.swift */,
 				B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */,
 				B1000000000000000000001D /* AttachmentStoreTests.swift */,
+				B1000000000000000000001F /* MarkdownImagePathTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -180,6 +185,7 @@
 			children = (
 				B1000000000000000000000F /* MarkdownPreviewView.swift */,
 				B1000000000000000000001A /* MarkdownPreviewBlocks.swift */,
+				B1000000000000000000001E /* MarkdownImagePath.swift */,
 			);
 			path = Preview;
 			sourceTree = "<group>";
@@ -299,6 +305,7 @@
 				A10000000000000000000019 /* LyraTheme.swift in Sources */,
 				A1000000000000000000001A /* MarkdownPreviewBlocks.swift in Sources */,
 				A1000000000000000000001C /* AttachmentStore.swift in Sources */,
+				A1000000000000000000001E /* MarkdownImagePath.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +318,7 @@
 				A10000000000000000000013 /* FileSystemVaultTests.swift in Sources */,
 				A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */,
 				A1000000000000000000001D /* AttachmentStoreTests.swift in Sources */,
+				A1000000000000000000001F /* MarkdownImagePathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -37,4 +37,28 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertFalse(prepared.contains("[[Home Page]]"))
         XCTAssertTrue(prepared.contains("*more*"))
     }
+
+    func testParseImageBlock() {
+        let blocks = MarkdownPreviewBlocks.parse("![a](_attachments/b.png)\n")
+        XCTAssertEqual(blocks, [.image(alt: "a", path: "_attachments/b.png")])
+    }
+
+    func testParseImageBlockAmongOtherBlocks() {
+        let source = """
+        # Title
+
+        ![shot](_attachments/x.png)
+
+        After
+        """
+        let blocks = MarkdownPreviewBlocks.parse(source)
+        XCTAssertEqual(blocks[0], .heading(level: 1, text: "Title"))
+        XCTAssertEqual(blocks[1], .image(alt: "shot", path: "_attachments/x.png"))
+        XCTAssertEqual(blocks[2], .paragraph("After"))
+    }
+
+    func testInlineImageInParagraphStaysParagraph() {
+        let blocks = MarkdownPreviewBlocks.parse("Hello ![a](b.png) world\n")
+        XCTAssertEqual(blocks, [.paragraph("Hello ![a](b.png) world")])
+    }
 }
