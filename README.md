@@ -47,7 +47,18 @@ bash Scripts/smoke.sh                 # structure checks (any OS)
 bash Scripts/xcode-test.sh            # build + unit tests (Mac + Xcode)
 ```
 
-CI runs both (see [docs/ci.md](docs/ci.md)).
+CI runs both on PRs (see [docs/ci.md](docs/ci.md)).
+
+### Release DMG (macOS runner)
+
+Push a version tag after merge (example for **0.2.0**):
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+GitHub Actions builds an **unsigned** `Lyra-0.2.0.dmg` and attaches it to a [GitHub Release](https://github.com/jackspiering/Lyra/releases). Details: [docs/ci.md](docs/ci.md).
 
 1. Launch Lyra → **Open Vault…**
 2. Choose a folder of Markdown files
