@@ -1,7 +1,7 @@
 # Lyra
 
 <p align="center">
-  <img src="Assets/lyra-icon-master-1024.png" alt="Lyra" width="160" height="160">
+  <img src="Assets/lyra-logo.png" alt="Lyra" width="160" height="160">
 </p>
 
 **Lyra** is a native, lightweight, local-first Markdown editor and knowledge vault for macOS.  
