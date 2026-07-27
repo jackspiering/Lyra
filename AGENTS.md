@@ -43,7 +43,7 @@ One primary type per file when practical. Keep files small.
 1. Read the v0.1 design/plan under `docs/superpowers/` if the change is large.
 2. Put logic in the right folder (`Vault` vs `Editor` vs `Preview`).
 3. Add unit tests in `LyraTests` for pure functions (paths, wiki resolve, naming).
-4. Update README / architecture only when behavior or structure actually changes.
+4. **Always update `README.md`** for user-visible changes (features, install, build, version, screenshots, requirements). Treat README drift as a bug. Update `docs/architecture.md` when structure or invariants change.
 5. Keep commits small and reviewable.
 
 ## Non-goals (v0.1)
