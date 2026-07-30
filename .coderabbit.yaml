@@ -61,6 +61,7 @@ reviews:
         - Prefer the simplest working change; flag speculative abstractions and over-engineering.
         - One primary type per file when practical; match existing names
           (VaultStore, FileSystemVault, WikiLinkResolver, EditorViewModel, UserFacingError, LyraFonts).
+        - Flag user-visible behavior changes that update code but not README.md when CONTRIBUTING requires it.
 
     - path: "Lyra/Vault/**"
       instructions: |
@@ -88,7 +89,6 @@ reviews:
     - path: "docs/**"
       instructions: |
         Keep docs consistent with product invariants (macOS-only, disk-as-truth, sandbox, YAGNI).
-        Flag user-visible behavior changes that update code but not README.md when CONTRIBUTING requires it.
         Architecture changes should update docs/architecture.md.
 
     - path: "Scripts/**"
