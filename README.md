@@ -14,6 +14,7 @@
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
   <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
+  <a href="https://coderabbit.ai"><img alt="CodeRabbit Pull Request Reviews" src="https://img.shields.io/coderabbit/prs/github/jackspiering/Lyra?utm_source=oss&utm_medium=github&utm_campaign=jackspiering%2FLyra&labelColor=171717&color=FF570A&label=CodeRabbit+Reviews&style=flat-square"></a>
 </p>
 
 ## Download
