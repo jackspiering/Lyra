@@ -1,0 +1,169 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit config for Lyra (native macOS Markdown vault editor).
+# Schema: https://docs.coderabbit.ai/reference/configuration (updated regularly).
+# AGENTS.md is auto-detected as code guidelines — keep product rules there.
+#
+language: en-US
+
+reviews:
+  # chill = balanced; assertive feels nitpicky on small SwiftUI diffs.
+  # quiet = only critical issues if review noise becomes a problem.
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  review_status: true
+  review_details: false
+  collapse_walkthrough: true
+  # Sequence diagrams add little for a single-target AppKit/SwiftUI app.
+  sequence_diagrams: false
+  estimate_code_review_effort: true
+  # Helpful when agents address inline review comments.
+  enable_prompt_for_ai_agents: true
+
+  # Defaults already skip images, fonts, binaries, lockfiles, etc.
+  # Only extend for Lyra-specific low-signal paths.
+  path_filters:
+    - "!Assets/**"
+    - "!**/Resources/Fonts/**"
+    - "!**/Assets.xcassets/**/*.{png,jpg,jpeg}"
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+      - "[skip review]"
+
+  # Path instructions supplement AGENTS.md for module-local focus.
+  # Do not list AGENTS.md here (that reviews the file; it does not load guidelines).
+  path_instructions:
+    - path: "Lyra/**/*.swift"
+      instructions: |
+        Lyra is a native macOS-only Markdown vault editor (SwiftUI + AppKit).
+        Flag high-severity violations of product invariants:
+        1. Disk is source of truth — UTF-8 .md files; no sidecar DB or search index store.
+        2. macOS only — no iOS targets or multiplatform abstractions “just in case.”
+        3. No Electron / web-first UI; WebKit only as a last-resort fallback documented in docs/architecture.md.
+        4. Sandbox-friendly — security-scoped bookmarks for user-selected vault folders.
+        5. YAGNI — no plugins, graph view, cloud sync, tags index, theme marketplace, or accounts unless explicitly requested.
+
+        Style:
+        - Swift API Design Guidelines; clarity over cleverness.
+        - UI state: @MainActor + @Observable stores/view models.
+        - File I/O must not block the main thread on large vault trees.
+        - Prefer Apple frameworks / stdlib before new dependencies.
+        - User-visible failures via UserFacingError + VaultStore.present…, not raw Cocoa strings.
+        - Prefer the simplest working change; flag speculative abstractions and over-engineering.
+        - One primary type per file when practical; match existing names
+          (VaultStore, FileSystemVault, WikiLinkResolver, EditorViewModel, UserFacingError, LyraFonts).
+
+    - path: "Lyra/Vault/**"
+      instructions: |
+        Focus on filesystem CRUD correctness, ignore rules, security-scoped bookmarks,
+        _attachments storage, and wiki link resolution (case-insensitive stem match; first match wins).
+        Do not introduce a database, background sync, or network dependency.
+
+    - path: "Lyra/Editor/**"
+      instructions: |
+        Focus on NSTextView / TextKit correctness, caret and selection, highlight performance,
+        autosave timing, and image paste. Source and Live continuous editing must keep a real
+        caret and live typing — no modal Done/Cancel commit flow.
+
+    - path: "Lyra/Preview/**"
+      instructions: |
+        Focus on block parsing, Reading-mode [[wiki link]] navigation, image path resolution,
+        and PDF export. Prefer native preview over WebKit.
+
+    - path: "LyraTests/**"
+      instructions: |
+        Prefer pure logic unit tests (paths, wiki resolve, naming, ranges, errors, attachments).
+        Flag missing tests for pure helpers. Do not demand UI test suites unless requested.
+        Keep tests deterministic and filesystem-safe (temp directories, no network).
+
+    - path: "docs/**"
+      instructions: |
+        Keep docs consistent with product invariants (macOS-only, disk-as-truth, sandbox, YAGNI).
+        Flag user-visible behavior changes that update code but not README.md when CONTRIBUTING requires it.
+        Architecture changes should update docs/architecture.md.
+
+    - path: "Scripts/**"
+      instructions: |
+        smoke.sh should stay portable (Linux/macOS). xcode-test.sh is macOS-only.
+        Flag brittle paths, unquoted expansions, and non-idempotent release steps.
+
+    - path: "**/*.{yml,yaml}"
+      instructions: |
+        For GitHub Actions: prefer pinned major versions, least-privilege permissions,
+        and no secrets in logs. Do not expand CI into a large lint matrix without clear need
+        (SwiftLint/full matrix is currently YAGNI per docs/ci.md).
+
+  pre_merge_checks:
+    # Swift is not JSDoc-style; docstring coverage is a poor signal here.
+    docstrings:
+      mode: "off"
+    title:
+      mode: "warning"
+      requirements: >
+        Prefer conventional, concise titles (feat:, fix:, docs:, test:, chore:).
+        Describe the user- or developer-facing change, not only the file list.
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "off"
+    custom_checks:
+      - name: "Lyra invariants"
+        mode: "warning"
+        instructions: |
+          Pass unless the PR introduces any of the following without explicit human request
+          documented in the PR body:
+          - iOS / multiplatform targets or abstractions
+          - Electron, web-first UI, or WebKit as the default editor/preview path
+          - Cloud sync, accounts, or remote vault backends
+          - Plugins, graph view, full-text search index, or theme marketplace
+          - Sidecar database replacing plain .md files on disk
+          Fail (report failing check) only when such scope clearly lands in the diff.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: true
+    simplify:
+      # Aligns with YAGNI / “prefer the simplest working change.”
+      enabled: true
+
+  tools:
+    # No .swiftlint.yml by design (YAGNI until pain shows). Keep integration on
+    # for opportunistic signal; do not treat it as a required gate.
+    swiftlint:
+      enabled: true
+    # Shell scripts in Scripts/
+    shellcheck:
+      enabled: true
+    # Secret scanning stays on
+    gitleaks:
+      enabled: true
+    # Docs-heavy repo; disable if PR noise is high.
+    markdownlint:
+      enabled: true
+    actionlint:
+      enabled: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # AGENTS.md is auto-detected at repo root for the whole tree.
+    # Map architecture decisions onto Swift sources (Jul 2026 filePatterns form).
+    filePatterns:
+      - files: "docs/architecture.md"
+        applyTo: "Lyra/**/*.swift"
+      - files: "CONTRIBUTING.md"
+        applyTo: "{Lyra,LyraTests,Scripts,docs}/**/*"
+
+chat:
+  auto_reply: true
