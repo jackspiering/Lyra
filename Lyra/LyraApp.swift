@@ -74,6 +74,7 @@ struct LyraApp: App {
 
     init() {
         LyraFonts.registerBundledFonts()
+        GeneralPreferences.migrateConfirmDeleteIfNeeded()
     }
 
     var body: some Scene {
@@ -141,8 +142,9 @@ struct LyraApp: App {
 
         Settings {
             SettingsView()
-                .frame(minWidth: 420, minHeight: 280)
         }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 480, height: 420)
     }
 }
 

@@ -249,10 +249,13 @@ struct ContentView: View {
         }
     }
 
-    /// ⌘⌫, File → Move to Trash, or context Delete. Respects confirm preference.
+    /// ⌘⌫, File → Move to Trash, or context Delete. Respects note vs folder confirm prefs.
     private func requestDelete() {
-        guard store.selectedNode() != nil else { return }
-        if GeneralPreferences.confirmDelete {
+        guard let node = store.selectedNode() else { return }
+        let needsConfirm = node.isDirectory
+            ? GeneralPreferences.confirmDeleteFolder
+            : GeneralPreferences.confirmDeleteNote
+        if needsConfirm {
             deleteDontAskAgain = false
             showDeleteConfirm = true
         } else {
@@ -269,7 +272,9 @@ struct ContentView: View {
     }
 
     private func deleteConfirmSheet() -> some View {
-        let name = store.selectedNode()?.name ?? "this item"
+        let node = store.selectedNode()
+        let name = node?.name ?? "this item"
+        let isFolder = node?.isDirectory == true
         return VStack(alignment: .leading, spacing: 16) {
             Text("Move to Trash").font(LyraFonts.headline)
             Text("Move “\(name)” to the Trash?")
@@ -279,7 +284,10 @@ struct ContentView: View {
                 Button("Cancel") { showDeleteConfirm = false }
                 Button("Move to Trash", role: .destructive) {
                     if deleteDontAskAgain {
-                        UserDefaults.standard.set(false, forKey: GeneralPreferences.confirmDeleteKey)
+                        let key = isFolder
+                            ? GeneralPreferences.confirmDeleteFolderKey
+                            : GeneralPreferences.confirmDeleteNoteKey
+                        UserDefaults.standard.set(false, forKey: key)
                     }
                     showDeleteConfirm = false
                     performDelete()
