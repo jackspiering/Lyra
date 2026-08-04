@@ -72,6 +72,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
 | Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm per note or folder with “Don’t ask again” |
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
+| Sidebar empty menu | Right-click empty sidebar area → New Note / New Folder (uses selected folder when one is selected) |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
 | Status bar | Bottom of the open note: word and character counts, created date, last saved |

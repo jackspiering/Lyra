@@ -82,6 +82,7 @@ struct SidebarView: View {
             }
             commitRename(node)
         }
+        // Selection menu (rows). Empty-area New Note/Folder uses the view-level menu below.
         .contextMenu(forSelectionType: VaultNode.ID.self) { ids in
             if let id = ids.first,
                let root = store.rootNode,
@@ -120,6 +121,11 @@ struct SidebarView: View {
                     onRequestDelete()
                 }
             }
+        }
+        // Empty/padding right-click: create in selected folder (or vault root via store parent logic).
+        .contextMenu {
+            Button("New Note") { onNewNote() }
+            Button("New Folder") { store.createFolder() }
         }
     }
 
