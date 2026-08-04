@@ -11,6 +11,8 @@ extension Notification.Name {
     static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
     /// Move the sidebar selection to the Trash (⌘⌫).
     static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
+    /// Focus the sidebar vault name search field (⌘F). No in-note find yet.
+    static let lyraFocusVaultSearch = Notification.Name("lyraFocusVaultSearch")
     /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
@@ -126,6 +128,12 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraToggleViewMode, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: .command)
+            }
+            CommandGroup(replacing: .find) {
+                Button("Find in Vault") {
+                    NotificationCenter.default.post(name: .lyraFocusVaultSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
 

@@ -9,17 +9,49 @@ struct SidebarView: View {
     var onExportNotePDF: (VaultNode) -> Void = { _ in }
     var onExportFolderSeparate: (VaultNode) -> Void = { _ in }
     var onExportFolderCombined: (VaultNode) -> Void = { _ in }
+    /// Bumped by ContentView when ⌘F / Find in Vault targets this window.
+    var searchFocusToken: Int = 0
 
+    @State private var query: String = ""
     @State private var renamingID: VaultNode.ID?
     @State private var renameDraft: String = ""
     @State private var selectionBecameCurrentAt: Date = .distantPast
     /// When true, focus-loss must not commit (Escape / selection change / successful commit cleanup).
     @State private var suppressFocusCommit = false
     @FocusState private var renameFieldFocused: Bool
+    @FocusState private var searchFieldFocused: Bool
+
+    private var displayRoot: VaultNode? {
+        guard let root = store.rootNode else { return nil }
+        return VaultSearch.filteredTree(root: root, query: query)
+    }
 
     var body: some View {
+        VStack(spacing: 0) {
+            searchField
+            Divider()
+            treeList
+        }
+        .onChange(of: searchFocusToken) { _, _ in
+            searchFieldFocused = true
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searchFieldFocused)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    private var treeList: some View {
         List(selection: $store.selection) {
-            if let root = store.rootNode {
+            if let root = displayRoot {
                 Section(root.name) {
                     OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
                         row(for: node)
@@ -185,4 +217,3 @@ struct SidebarView: View {
         }
     }
 }
-

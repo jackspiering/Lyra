@@ -53,6 +53,8 @@
 		A10000000000000000000034 /* GeneralPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* GeneralPreferences.swift */; };
 		A10000000000000000000035 /* FilenameValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* FilenameValidation.swift */; };
 		A10000000000000000000036 /* FilenameValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000036 /* FilenameValidationTests.swift */; };
+		A10000000000000000000037 /* VaultSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* VaultSearch.swift */; };
+		A10000000000000000000038 /* VaultSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* VaultSearchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -116,6 +118,8 @@
 		B10000000000000000000034 /* GeneralPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPreferences.swift; sourceTree = "<group>"; };
 		B10000000000000000000035 /* FilenameValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameValidation.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* FilenameValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameValidationTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000037 /* VaultSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSearch.swift; sourceTree = "<group>"; };
+		B10000000000000000000038 /* VaultSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSearchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -176,6 +180,7 @@
 				B1000000000000000000002E /* MarkdownHighlighterTests.swift */,
 				B1000000000000000000002F /* VaultStoreRenameTests.swift */,
 				B10000000000000000000036 /* FilenameValidationTests.swift */,
+				B10000000000000000000038 /* VaultSearchTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -225,6 +230,7 @@
 				B10000000000000000000009 /* WikiLinkResolver.swift */,
 				B1000000000000000000000A /* VaultStore.swift */,
 				B1000000000000000000001C /* AttachmentStore.swift */,
+				B10000000000000000000037 /* VaultSearch.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -394,6 +400,7 @@
 				A10000000000000000000032 /* AppSession.swift in Sources */,
 				A10000000000000000000034 /* GeneralPreferences.swift in Sources */,
 				A10000000000000000000035 /* FilenameValidation.swift in Sources */,
+				A10000000000000000000037 /* VaultSearch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +420,7 @@
 				A1000000000000000000002E /* MarkdownHighlighterTests.swift in Sources */,
 				A1000000000000000000002F /* VaultStoreRenameTests.swift in Sources */,
 				A10000000000000000000036 /* FilenameValidationTests.swift in Sources */,
+				A10000000000000000000038 /* VaultSearchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

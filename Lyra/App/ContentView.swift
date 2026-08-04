@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var showNewNoteSheet = false
     @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
+    /// Bumped when ⌘F / Find in Vault targets this window so the sidebar focuses search.
+    @State private var vaultSearchFocusToken = 0
     @Environment(\.scenePhase) private var scenePhase
 
     private var noteViewMode: NoteViewMode {
@@ -45,6 +47,7 @@ struct ContentView: View {
                 beginNewNote: beginNewNote,
                 requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
+                focusVaultSearch: { vaultSearchFocusToken += 1 },
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
@@ -81,7 +84,8 @@ struct ContentView: View {
                 onNewNote: beginNewNote,
                 onExportNotePDF: exportNotePDF,
                 onExportFolderSeparate: exportFolderSeparatePDFs,
-                onExportFolderCombined: exportFolderCombinedPDF
+                onExportFolderCombined: exportFolderCombinedPDF,
+                searchFocusToken: vaultSearchFocusToken
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
@@ -628,6 +632,7 @@ private struct ContentViewChrome: ViewModifier {
     var beginNewNote: () -> Void
     var requestDelete: () -> Void
     var toggleViewMode: () -> Void
+    var focusVaultSearch: () -> Void
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
@@ -645,6 +650,7 @@ private struct ContentViewChrome: ViewModifier {
         beginNewNote: @escaping () -> Void,
         requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
+        focusVaultSearch: @escaping () -> Void,
         newNoteSheet: @escaping () -> some View,
         deleteConfirmSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
@@ -661,6 +667,7 @@ private struct ContentViewChrome: ViewModifier {
         self.beginNewNote = beginNewNote
         self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
+        self.focusVaultSearch = focusVaultSearch
         self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
@@ -696,7 +703,8 @@ private struct ContentViewChrome: ViewModifier {
                     _ = editor.saveIfNeeded()
                     flushEditorError()
                 },
-                quitSaveFailed: flushEditorError
+                quitSaveFailed: flushEditorError,
+                focusVaultSearch: focusVaultSearch
             ))
     }
 }
@@ -791,6 +799,7 @@ private struct ContentViewCommands: ViewModifier {
     var refresh: () -> Void
     var save: () -> Void
     var quitSaveFailed: () -> Void
+    var focusVaultSearch: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -825,6 +834,10 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraDeleteSelection)) { _ in
                 guard shouldHandle() else { return }
                 requestDelete()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraFocusVaultSearch)) { _ in
+                guard shouldHandle() else { return }
+                focusVaultSearch()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
                 // All windows may surface; only key window needs UI (others already saved or clean).

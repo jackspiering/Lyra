@@ -37,6 +37,7 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | ⌘S | Save now |
 | ⌘E | Toggle Source ↔ Reading |
 | ⌘R | Refresh vault from disk |
+| ⌘F | Focus sidebar vault search |
 
 Autosave runs after about 500ms of idle time. The toolbar shows **Unsaved**, **Save failed**, or **Autosave paused** when relevant.
 
@@ -57,6 +58,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
+| Vault search | Magnifying glass filters the tree by note/folder name or path (not full-text); ⌘F focuses the field |
 | Rename | Press Return, or click the name of the selected item (Finder-style); Escape cancels |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
