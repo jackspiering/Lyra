@@ -9,6 +9,8 @@ extension Notification.Name {
     static let lyraOpenVault = Notification.Name("lyraOpenVault")
     static let lyraToggleViewMode = Notification.Name("lyraToggleViewMode")
     static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
+    /// Move the sidebar selection to the Trash (⌘⌫).
+    static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
     /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
@@ -111,6 +113,13 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraRefreshVault, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: .command)
+
+                Divider()
+
+                Button("Move to Trash") {
+                    NotificationCenter.default.post(name: .lyraDeleteSelection, object: nil)
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {

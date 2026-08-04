@@ -3,7 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var store: VaultStore
     @Binding var renameTarget: VaultNode?
-    @Binding var showDeleteConfirm: Bool
+    var onRequestDelete: () -> Void = {}
     var onNewNote: () -> Void = {}
     var onExportNotePDF: (VaultNode) -> Void = { _ in }
     var onExportFolderSeparate: (VaultNode) -> Void = { _ in }
@@ -60,7 +60,7 @@ struct SidebarView: View {
                 }
                 Button("Delete…", role: .destructive) {
                     store.selection = id
-                    showDeleteConfirm = true
+                    onRequestDelete()
                 }
             }
         }

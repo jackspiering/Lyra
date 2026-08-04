@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var deleteDontAskAgain = false
     @State private var showNewNoteSheet = false
     @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
@@ -45,9 +46,11 @@ struct ContentView: View {
                 exportPDF: exportPDF,
                 openVault: openVault,
                 beginNewNote: beginNewNote,
+                requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
                 renameSheet: renameSheet,
                 newNoteSheet: newNoteSheet,
+                deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
                     guard let hostWindowNumber else { return true }
                     return NSApp.keyWindow?.windowNumber == hostWindowNumber
@@ -78,7 +81,7 @@ struct ContentView: View {
             SidebarView(
                 store: store,
                 renameTarget: $renameTarget,
-                showDeleteConfirm: $showDeleteConfirm,
+                onRequestDelete: requestDelete,
                 onNewNote: beginNewNote,
                 onExportNotePDF: exportNotePDF,
                 onExportFolderSeparate: exportFolderSeparatePDFs,
@@ -232,6 +235,48 @@ struct ContentView: View {
         } else {
             store.createNote(named: nil)
         }
+    }
+
+    /// ⌘⌫, File → Move to Trash, or context Delete. Respects confirm preference.
+    private func requestDelete() {
+        guard store.selectedNode() != nil else { return }
+        if GeneralPreferences.confirmDelete {
+            deleteDontAskAgain = false
+            showDeleteConfirm = true
+        } else {
+            performDelete()
+        }
+    }
+
+    private func performDelete() {
+        if editor.close() {
+            store.deleteSelected()
+        } else {
+            flushEditorError()
+        }
+    }
+
+    private func deleteConfirmSheet() -> some View {
+        let name = store.selectedNode()?.name ?? "this item"
+        return VStack(alignment: .leading, spacing: 16) {
+            Text("Move to Trash").font(LyraFonts.headline)
+            Text("Move “\(name)” to the Trash?")
+            Toggle("Don’t ask again", isOn: $deleteDontAskAgain)
+            HStack {
+                Spacer()
+                Button("Cancel") { showDeleteConfirm = false }
+                Button("Move to Trash", role: .destructive) {
+                    if deleteDontAskAgain {
+                        UserDefaults.standard.set(false, forKey: GeneralPreferences.confirmDeleteKey)
+                    }
+                    showDeleteConfirm = false
+                    performDelete()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(width: 360)
     }
 
     private var newNoteNameIsValid: Bool {
@@ -599,9 +644,11 @@ private struct ContentViewChrome: ViewModifier {
     var exportPDF: () -> Void
     var openVault: () -> Void
     var beginNewNote: () -> Void
+    var requestDelete: () -> Void
     var toggleViewMode: () -> Void
     var renameSheet: (VaultNode) -> AnyView
     var newNoteSheet: () -> AnyView
+    var deleteConfirmSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
 
     init(
@@ -616,9 +663,11 @@ private struct ContentViewChrome: ViewModifier {
         exportPDF: @escaping () -> Void,
         openVault: @escaping () -> Void,
         beginNewNote: @escaping () -> Void,
+        requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
         renameSheet: @escaping (VaultNode) -> some View,
         newNoteSheet: @escaping () -> some View,
+        deleteConfirmSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
     ) {
         self.store = store
@@ -632,9 +681,11 @@ private struct ContentViewChrome: ViewModifier {
         self.exportPDF = exportPDF
         self.openVault = openVault
         self.beginNewNote = beginNewNote
+        self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
         self.renameSheet = { AnyView(renameSheet($0)) }
         self.newNoteSheet = { AnyView(newNoteSheet()) }
+        self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
     }
 
@@ -648,7 +699,8 @@ private struct ContentViewChrome: ViewModifier {
                 showNewNoteSheet: $showNewNoteSheet,
                 flushEditorError: flushEditorError,
                 renameSheet: renameSheet,
-                newNoteSheet: newNoteSheet
+                newNoteSheet: newNoteSheet,
+                deleteConfirmSheet: deleteConfirmSheet
             ))
             .onChange(of: store.selection) { _, newValue in
                 onSelectionChange(newValue)
@@ -663,6 +715,7 @@ private struct ContentViewChrome: ViewModifier {
                 toggleViewMode: toggleViewMode,
                 createNote: beginNewNote,
                 createFolder: { store.createFolder() },
+                requestDelete: requestDelete,
                 refresh: { store.refresh() },
                 save: {
                     _ = editor.saveIfNeeded()
@@ -682,6 +735,7 @@ private struct ContentViewDialogs: ViewModifier {
     var flushEditorError: () -> Void
     var renameSheet: (VaultNode) -> AnyView
     var newNoteSheet: () -> AnyView
+    var deleteConfirmSheet: () -> AnyView
 
     func body(content: Content) -> some View {
         content
@@ -750,21 +804,8 @@ private struct ContentViewDialogs: ViewModifier {
             .sheet(isPresented: $showNewNoteSheet) {
                 newNoteSheet()
             }
-            .confirmationDialog(
-                "Move to Trash?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Move to Trash", role: .destructive) {
-                    if editor.close() {
-                        store.deleteSelected()
-                    } else {
-                        flushEditorError()
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This item will be moved to the Trash.")
+            .sheet(isPresented: $showDeleteConfirm) {
+                deleteConfirmSheet()
             }
     }
 }
@@ -776,6 +817,7 @@ private struct ContentViewCommands: ViewModifier {
     var toggleViewMode: () -> Void
     var createNote: () -> Void
     var createFolder: () -> Void
+    var requestDelete: () -> Void
     var refresh: () -> Void
     var save: () -> Void
     var quitSaveFailed: () -> Void
@@ -809,6 +851,10 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
                 guard shouldHandle() else { return }
                 refresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraDeleteSelection)) { _ in
+                guard shouldHandle() else { return }
+                requestDelete()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
                 // All windows may surface; only key window needs UI (others already saved or clean).

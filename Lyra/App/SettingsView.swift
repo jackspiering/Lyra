@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
     @AppStorage(GeneralPreferences.promptForNewNoteNameKey) private var promptForNewNoteName = true
     @AppStorage(GeneralPreferences.defaultNoteStemKey) private var defaultNoteStem = "Untitled"
+    @AppStorage(GeneralPreferences.confirmDeleteKey) private var confirmDelete = true
 
     private var appearancePreference: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .system
@@ -59,10 +60,12 @@ struct SettingsView: View {
             Text("Used when creating notes. Extension .md is added automatically.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Toggle("Confirm before moving notes or folders to Trash", isOn: $confirmDelete)
         }
         .formStyle(.grouped)
         .padding()
-        .frame(minWidth: 420, minHeight: 280)
+        .frame(minWidth: 420, minHeight: 300)
         .onDisappear { commitDefaultNoteStem() }
     }
 
