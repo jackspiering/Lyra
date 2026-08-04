@@ -15,7 +15,6 @@ struct SidebarView: View {
     @State private var query: String = ""
     @State private var renamingID: VaultNode.ID?
     @State private var renameDraft: String = ""
-    @State private var selectionBecameCurrentAt: Date = .distantPast
     /// When true, focus-loss must not commit (Escape / selection change / successful commit cleanup).
     @State private var suppressFocusCommit = false
     @FocusState private var renameFieldFocused: Bool
@@ -65,7 +64,6 @@ struct SidebarView: View {
             handleReturnKey()
         }
         .onChange(of: store.selection) { _, newValue in
-            selectionBecameCurrentAt = Date()
             if let renamingID, renamingID != newValue {
                 cancelRename()
             }
@@ -142,11 +140,13 @@ struct SidebarView: View {
                 node.name,
                 systemImage: node.isDirectory ? "folder" : "doc.text"
             )
-            // Finder-style: click the name of an already-selected row after a short delay → rename.
-            // Simultaneous so List still owns selection on first click.
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    attemptDelayedNameClickRename(for: node)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            // Double-click renames even when the row was not previously selected.
+            .highPriorityGesture(
+                TapGesture(count: 2).onEnded {
+                    store.selection = node.id
+                    beginRename(node)
                 }
             )
         }
@@ -164,15 +164,6 @@ struct SidebarView: View {
         }
         beginRename(node)
         return .handled
-    }
-
-    private func attemptDelayedNameClickRename(for node: VaultNode) {
-        guard renamingID == nil else { return }
-        guard store.selection == node.id else { return }
-        // Avoid racing the first click that establishes selection / a double-click.
-        let elapsed = Date().timeIntervalSince(selectionBecameCurrentAt)
-        guard elapsed >= 0.5 else { return }
-        beginRename(node)
     }
 
     private func beginRename(_ node: VaultNode) {
