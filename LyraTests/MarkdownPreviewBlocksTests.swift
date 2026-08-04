@@ -80,6 +80,11 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertTrue(prepared.contains("[today](lyra-wiki:Daily%20Notes/2026-07-27)"), "got: \(prepared)")
     }
 
+    func testPrepareInlineWikiAliasTrimsWhitespace() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("See [[Hello | hi]]")
+        XCTAssertTrue(prepared.contains("[hi](lyra-wiki:Hello)"), "got: \(prepared)")
+    }
+
     func testParseImageBlock() {
         let blocks = MarkdownPreviewBlocks.parse("![a](_attachments/b.png)\n")
         XCTAssertEqual(blocks, [.image(alt: "a", path: "_attachments/b.png")])

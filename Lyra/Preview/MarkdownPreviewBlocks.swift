@@ -129,11 +129,11 @@ enum MarkdownPreviewBlocks {
             let target: String
             let display: String
             if let pipe = body.firstIndex(of: "|") {
-                target = String(body[..<pipe])
-                display = String(body[body.index(after: pipe)...])
+                target = String(body[..<pipe]).trimmingCharacters(in: .whitespacesAndNewlines)
+                display = String(body[body.index(after: pipe)...]).trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
-                target = body
-                display = body
+                target = body.trimmingCharacters(in: .whitespacesAndNewlines)
+                display = target
             }
             let encoded = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
             // Escape brackets in the link label so nested markdown stays stable.
