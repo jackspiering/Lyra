@@ -13,7 +13,7 @@ struct NoteTitleBar: View {
 
     var body: some View {
         TextField("Title", text: $draft)
-            .font(LyraFonts.heading(1))
+            .font(LyraFonts.heading(level: 1))
             .textFieldStyle(.plain)
             .focused($focused)
             .onSubmit { commit() }
