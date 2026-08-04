@@ -3,13 +3,19 @@ import SwiftUI
 
 enum AppearanceController {
     static func apply(_ preference: AppearancePreference) {
+        let appearance: NSAppearance?
         switch preference {
         case .system:
-            NSApp.appearance = nil
+            appearance = nil
         case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
+            appearance = NSAppearance(named: .aqua)
         case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
+            appearance = NSAppearance(named: .darkAqua)
+        }
+        NSApp.appearance = appearance
+        // Clear sticky window-level overrides when returning to System (and keep light/dark consistent).
+        for window in NSApp.windows {
+            window.appearance = appearance
         }
     }
 

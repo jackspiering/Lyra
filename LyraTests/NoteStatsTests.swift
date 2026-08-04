@@ -17,17 +17,19 @@ final class NoteStatsTests: XCTestCase {
         XCTAssertEqual(NoteStats.wordCount("one"), 1)
     }
 
-    func testLetterCountIgnoresSpacesAndPunctuation() {
-        XCTAssertEqual(NoteStats.letterCount("Hi!"), 2)
+    func testCharacterCountIncludesSpacesAndPunctuation() {
+        XCTAssertEqual(NoteStats.characterCount("Hi!"), 3)
+        XCTAssertEqual(NoteStats.characterCount("a b"), 3)
     }
 
-    func testLetterCountUnicode() {
-        XCTAssertEqual(NoteStats.letterCount("café"), 4)
-        XCTAssertEqual(NoteStats.letterCount("Hello, 世界!"), 7)
+    func testCharacterCountEmpty() {
+        XCTAssertEqual(NoteStats.characterCount(""), 0)
     }
 
-    func testLetterCountEmpty() {
-        XCTAssertEqual(NoteStats.letterCount(""), 0)
-        XCTAssertEqual(NoteStats.letterCount(" 123 !"), 0)
+    func testCharacterCountUnicodeGraphemeClusters() {
+        // café: c, a, f, é (precomposed) → 4 clusters
+        XCTAssertEqual(NoteStats.characterCount("café"), 4)
+        // Family emoji is one extended grapheme cluster when presented as a single character sequence
+        XCTAssertEqual(NoteStats.characterCount("a👍b"), 3)
     }
 }

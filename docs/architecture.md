@@ -58,11 +58,19 @@ One primary type per file when practical.
 
 ### Multi-window vaults (v0.7+)
 
-**Choice:** `WindowGroup` — one vault (`VaultStore` + `EditorViewModel`) per window.
+**Choice:** `WindowGroup` — one vault (`VaultStore`) per window.
 
 **Why:** Users need two folders open at once without a multi-vault tab bar. Menu commands target the key window only; quit flushes every open editor via `AppSession`.
 
 **Consequence:** Opening a vault while one is already open creates a new window for the chosen folder.
+
+### In-window note tabs (v0.9+)
+
+**Choice:** Custom tab bar inside each vault window (`NoteTabController` + one `EditorViewModel` per tab). Shared sidebar for the window’s vault. No `NSWindow` native tabbing (that would duplicate whole windows and reintroduce per-tab “No Vault Open”).
+
+**Why:** Open several notes without losing the vault tree; empty tabs can create a note, focus search, or close without dropping the vault.
+
+**Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open).
 
 ### Inter typeface (v0.5)
 

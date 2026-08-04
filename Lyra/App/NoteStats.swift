@@ -7,10 +7,8 @@ enum NoteStats {
         text.split { $0.isWhitespace }.count
     }
 
-    /// Counts Unicode letters only (`Character.isLetter`); ignores spaces and punctuation.
-    static func letterCount(_ text: String) -> Int {
-        text.reduce(0) { count, ch in
-            count + (ch.isLetter ? 1 : 0)
-        }
+    /// Unicode extended grapheme clusters (`String.count`), including spaces and punctuation.
+    static func characterCount(_ text: String) -> Int {
+        text.count
     }
 }

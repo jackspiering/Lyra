@@ -58,6 +58,12 @@
 		A10000000000000000000039 /* NoteStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000039 /* NoteStats.swift */; };
 		A1000000000000000000003A /* EditorStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003A /* EditorStatusBar.swift */; };
 		A1000000000000000000003B /* NoteStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003B /* NoteStatsTests.swift */; };
+		A1000000000000000000003C /* NoteTabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003C /* NoteTabModel.swift */; };
+		A1000000000000000000003D /* NoteTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003D /* NoteTabBar.swift */; };
+		A1000000000000000000003E /* EmptyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003E /* EmptyTabView.swift */; };
+		A1000000000000000000003F /* NoteTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003F /* NoteTitle.swift */; };
+		A10000000000000000000040 /* NoteTitleBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* NoteTitleBar.swift */; };
+		A10000000000000000000041 /* NoteTitleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000041 /* NoteTitleTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -126,6 +132,12 @@
 		B10000000000000000000039 /* NoteStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStats.swift; sourceTree = "<group>"; };
 		B1000000000000000000003A /* EditorStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorStatusBar.swift; sourceTree = "<group>"; };
 		B1000000000000000000003B /* NoteStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStatsTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000003C /* NoteTabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabModel.swift; sourceTree = "<group>"; };
+		B1000000000000000000003D /* NoteTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabBar.swift; sourceTree = "<group>"; };
+		B1000000000000000000003E /* EmptyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyTabView.swift; sourceTree = "<group>"; };
+		B1000000000000000000003F /* NoteTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitle.swift; sourceTree = "<group>"; };
+		B10000000000000000000040 /* NoteTitleBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitleBar.swift; sourceTree = "<group>"; };
+		B10000000000000000000041 /* NoteTitleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitleTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -188,6 +200,7 @@
 				B10000000000000000000036 /* FilenameValidationTests.swift */,
 				B10000000000000000000038 /* VaultSearchTests.swift */,
 				B1000000000000000000003B /* NoteStatsTests.swift */,
+				B10000000000000000000041 /* NoteTitleTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -219,6 +232,11 @@
 				B10000000000000000000035 /* FilenameValidation.swift */,
 				B10000000000000000000039 /* NoteStats.swift */,
 				B1000000000000000000003A /* EditorStatusBar.swift */,
+				B1000000000000000000003C /* NoteTabModel.swift */,
+				B1000000000000000000003D /* NoteTabBar.swift */,
+				B1000000000000000000003E /* EmptyTabView.swift */,
+				B1000000000000000000003F /* NoteTitle.swift */,
+				B10000000000000000000040 /* NoteTitleBar.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -412,6 +430,11 @@
 				A10000000000000000000037 /* VaultSearch.swift in Sources */,
 				A10000000000000000000039 /* NoteStats.swift in Sources */,
 				A1000000000000000000003A /* EditorStatusBar.swift in Sources */,
+				A1000000000000000000003C /* NoteTabModel.swift in Sources */,
+				A1000000000000000000003D /* NoteTabBar.swift in Sources */,
+				A1000000000000000000003E /* EmptyTabView.swift in Sources */,
+				A1000000000000000000003F /* NoteTitle.swift in Sources */,
+				A10000000000000000000040 /* NoteTitleBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -433,6 +456,7 @@
 				A10000000000000000000036 /* FilenameValidationTests.swift in Sources */,
 				A10000000000000000000038 /* VaultSearchTests.swift in Sources */,
 				A1000000000000000000003B /* NoteStatsTests.swift in Sources */,
+				A10000000000000000000041 /* NoteTitleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -491,7 +515,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -500,7 +524,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.8.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -516,7 +540,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -525,7 +549,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.8.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -538,10 +562,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.8.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -554,10 +578,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.8.0;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
