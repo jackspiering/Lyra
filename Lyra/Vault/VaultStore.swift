@@ -139,12 +139,12 @@ final class VaultStore {
     }
 
     /// Pure rename rules for notes/folders. Used by the sheet and unit tests.
-    enum ValidatedRename: Equatable {
+    enum ValidatedRename: Equatable, Sendable {
         case ok(String)
         case invalid(String)
     }
 
-    static func validatedRename(_ newName: String, isDirectory: Bool) -> ValidatedRename {
+    nonisolated static func validatedRename(_ newName: String, isDirectory: Bool) -> ValidatedRename {
         var trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return .invalid("Name can't be empty.")
