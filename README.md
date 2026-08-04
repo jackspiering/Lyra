@@ -5,8 +5,9 @@
 </p>
 
 <p align="center">
-  <strong>A native macOS editor for local Markdown vaults.</strong><br>
-  Open any folder of <code>.md</code> files. Edit, link, preview, export. No Electron, no cloud, no lock-in.
+  <strong>Native macOS editor for local Markdown vaults.</strong><br>
+  Point it at a folder of <code>.md</code> files. Edit, link, preview, export PDF.
+  Files stay on disk as plain text. No Electron. No cloud account.
 </p>
 
 <p align="center">
@@ -19,16 +20,16 @@
 
 ## Download
 
-[**Latest DMG**](https://github.com/jackspiering/Lyra/releases) — unsigned builds.
+[Latest DMG](https://github.com/jackspiering/Lyra/releases) (unsigned).
 
-First open: right-click the app → **Open** if Gatekeeper blocks it.
+Gatekeeper may block the first launch. Right-click the app and choose Open.
 
 ## Quick start
 
-1. Open Lyra → **Open Vault…** (⌘O)
+1. Open Lyra → Open Vault… (⌘O)
 2. Pick a folder of Markdown notes
 3. Select a note in the sidebar
-4. Switch **Source · Reading** (or **⌘E**)
+4. Switch Source / Reading with the control or ⌘E
 
 | Shortcut | Action |
 |----------|--------|
@@ -37,36 +38,36 @@ First open: right-click the app → **Open** if Gatekeeper blocks it.
 | ⌘S | Save now |
 | ⌘E | Toggle Source ↔ Reading |
 
-Autosave runs after ~500ms idle. If the file changed on disk while you were editing, Lyra asks whether to keep your buffer or reload.
+Autosave runs after about 500ms of idle time. If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk.
 
 ### View modes
 
 | Mode | Behavior |
 |------|----------|
-| **Source** | Raw Markdown with syntax highlighting |
-| **Reading** | Full-width preview only |
+| Source | Raw Markdown with syntax highlighting |
+| Reading | Full-width preview |
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| Local vault | Any folder of UTF-8 `.md` files — disk is the source of truth |
+| Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V → vault `_attachments/` + note-relative `![](...)` (Source) |
-| Export PDF | **File → Export PDF…** for the open note |
+| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source) |
+| Export PDF | File → Export PDF… for the open note |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
-| Errors | Plain-language alerts (permissions, missing files, disk full, …) |
+| Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |
 
-**Not in scope:** plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
+Out of scope: plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
 
 ## Who it's for
 
-People who want a **local** Markdown vault with a real Mac UI — git-friendly plain files, no account, no proprietary store. Closer to a focused native editor than a plugin platform.
+You keep notes as plain Markdown and want a Mac UI that does not invent a proprietary store. Files remain git-friendly on disk. No account.
 
 ## Build from source
 
-**Requires:** macOS 15+, Xcode 16+ (Swift 5.10+)
+Requires macOS 15+, Xcode 16+ (Swift 5.10+).
 
 ```bash
 git clone https://github.com/jackspiering/Lyra.git
@@ -74,7 +75,7 @@ cd Lyra
 open Lyra.xcodeproj
 ```
 
-Scheme **Lyra** → destination **My Mac** → Run (⌘R).
+Scheme Lyra → destination My Mac → Run (⌘R).
 
 ```bash
 bash Scripts/smoke.sh        # layout checks (Linux or Mac)
@@ -124,11 +125,11 @@ More: [docs/ci.md](docs/ci.md)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Small PRs; update the README when user-facing behavior changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Prefer small PRs. Update this README when user-facing behavior changes.
 
 ## Acknowledgments
 
-- [Inter](https://rsms.me/inter/) by Rasmus Andersson — SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
+- [Inter](https://rsms.me/inter/) by Rasmus Andersson, SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
 
 ## License
 
