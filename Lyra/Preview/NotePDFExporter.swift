@@ -7,6 +7,7 @@ enum NotePDFExporter {
     private static let margin: CGFloat = 54
     private static let blockGap: CGFloat = 10
     private static let contentWidth: CGFloat = pageWidth - margin * 2
+    private static let contentHeight: CGFloat = pageHeight - margin * 2
 
     // Print-safe colors (not semantic — avoid light-on-light when host is dark mode).
     private static let bodyColor = NSColor.black
@@ -90,9 +91,11 @@ enum NotePDFExporter {
             attr.draw(at: CGPoint(x: x, y: pageY))
         }
 
-        /// Ensure `height` fits; start a new page if needed (unless already at top).
+        private var remainingHeight: CGFloat { contentBottom - y }
+
+        /// Start a new page when the next fragment needs more room (unless already at top).
         private func ensureSpace(_ height: CGFloat) {
-            if y + height > contentBottom, y > NotePDFExporter.margin + 0.5 {
+            if height > remainingHeight, y > NotePDFExporter.margin + 0.5 {
                 endPage()
                 beginPage()
             }
@@ -103,13 +106,13 @@ enum NotePDFExporter {
         private func draw(_ block: MarkdownPreviewBlocks.Block) {
             switch block {
             case .heading(let level, let text):
-                drawText(text, font: headingFont(level), color: NotePDFExporter.bodyColor)
+                drawTextSpanning(text, font: headingFont(level), color: NotePDFExporter.bodyColor)
 
             case .paragraph(let text):
-                drawText(text, font: bodyFont, color: NotePDFExporter.bodyColor)
+                drawTextSpanning(text, font: bodyFont, color: NotePDFExporter.bodyColor)
 
-            case .listItem(let text):
-                drawListItem(text)
+            case .listItem(let text, let ordinal, let depth):
+                drawListItem(text, ordinal: ordinal, depth: depth)
 
             case .quote(let text):
                 drawQuote(text)
@@ -125,35 +128,101 @@ enum NotePDFExporter {
             }
         }
 
-        private func drawText(_ text: String, font: NSFont, color: NSColor) {
-            let attr = makeAttributed(text, font: font, color: color)
-            let width = NotePDFExporter.contentWidth
-            let height = measure(attr, width: width)
-            ensureSpace(height)
-            let rect = CGRect(
-                x: NotePDFExporter.margin,
-                y: y,
-                width: width,
-                height: height
-            )
-            attr.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-            y += height + NotePDFExporter.blockGap
+        /// Draw attributed text, splitting across pages when taller than the remaining space.
+        private func drawTextSpanning(
+            _ text: String,
+            font: NSFont,
+            color: NSColor,
+            x: CGFloat = NotePDFExporter.margin,
+            width: CGFloat = NotePDFExporter.contentWidth
+        ) {
+            let full = makeAttributed(text, font: font, color: color)
+            var offset = 0
+            let ns = full.string as NSString
+            let total = ns.length
+            guard total > 0 else { return }
+
+            while offset < total {
+                ensureSpace(min(20, remainingHeight))
+                let available = remainingHeight
+                let fit = charactersFitting(
+                    full,
+                    from: offset,
+                    width: width,
+                    maxHeight: available
+                )
+                let length = max(1, fit)
+                let range = NSRange(location: offset, length: min(length, total - offset))
+                let slice = full.attributedSubstring(from: range)
+                let height = measure(slice, width: width)
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                slice.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+                y += height
+                offset += range.length
+                if offset < total {
+                    endPage()
+                    beginPage()
+                }
+            }
+            y += NotePDFExporter.blockGap
         }
 
-        private func drawListItem(_ text: String) {
+        /// Binary search for the longest prefix (from `from`) that fits in `maxHeight`.
+        private func charactersFitting(
+            _ attr: NSAttributedString,
+            from: Int,
+            width: CGFloat,
+            maxHeight: CGFloat
+        ) -> Int {
+            let total = attr.length - from
+            guard total > 0 else { return 0 }
+            if measure(attr.attributedSubstring(from: NSRange(location: from, length: total)), width: width) <= maxHeight {
+                return total
+            }
+            var low = 1
+            var high = total
+            while low < high {
+                let mid = (low + high + 1) / 2
+                let sub = attr.attributedSubstring(from: NSRange(location: from, length: mid))
+                if measure(sub, width: width) <= maxHeight {
+                    low = mid
+                } else {
+                    high = mid - 1
+                }
+            }
+            // Prefer breaking near a line boundary when possible.
+            let ns = attr.string as NSString
+            let window = ns.substring(with: NSRange(location: from, length: low)) as NSString
+            let br = window.rangeOfCharacter(from: .newlines, options: .backwards)
+            if br.location != NSNotFound, br.location > 0 {
+                return br.location + 1
+            }
+            if low > 20 {
+                let sp = window.rangeOfCharacter(from: .whitespaces, options: .backwards)
+                if sp.location != NSNotFound, sp.location > low / 2 {
+                    return sp.location + 1
+                }
+            }
+            return max(1, low)
+        }
+
+        private func drawListItem(_ text: String, ordinal: Int?, depth: Int) {
+            let indent = CGFloat(depth) * 16
+            let marker = ordinal.map { "\($0)." } ?? "•"
             let bulletAttrs: [NSAttributedString.Key: Any] = [
                 .font: bodyFont,
                 .foregroundColor: NotePDFExporter.secondaryColor,
             ]
-            let bullet = NSAttributedString(string: "•", attributes: bulletAttrs)
+            let bullet = NSAttributedString(string: marker, attributes: bulletAttrs)
             let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.bodyColor)
-            let bulletWidth: CGFloat = 16
-            let bodyWidth = NotePDFExporter.contentWidth - bulletWidth
+            let bulletWidth: CGFloat = ordinal == nil ? 16 : 28
+            let x = NotePDFExporter.margin + indent
+            let bodyWidth = NotePDFExporter.contentWidth - indent - bulletWidth
             let height = max(measure(body, width: bodyWidth), bodyFont.ascender - bodyFont.descender)
             ensureSpace(height)
-            bullet.draw(at: CGPoint(x: NotePDFExporter.margin, y: y))
+            bullet.draw(at: CGPoint(x: x, y: y))
             let rect = CGRect(
-                x: NotePDFExporter.margin + bulletWidth,
+                x: x + bulletWidth,
                 y: y,
                 width: bodyWidth,
                 height: height
@@ -187,32 +256,64 @@ enum NotePDFExporter {
             y += height + NotePDFExporter.blockGap
         }
 
+        /// Code is uniform line-height text — split by lines that fit each page.
         private func drawCode(_ code: String) {
             let display = code.isEmpty ? " " : code
             let font = LyraFonts.code(size: 11)
-            let attr = makeAttributed(display, font: font, color: NotePDFExporter.bodyColor)
             let padding: CGFloat = 8
             let textWidth = NotePDFExporter.contentWidth - padding * 2
-            let textHeight = measure(attr, width: textWidth)
-            let boxHeight = textHeight + padding * 2
-            ensureSpace(boxHeight)
-            let box = CGRect(
-                x: NotePDFExporter.margin,
-                y: y,
-                width: NotePDFExporter.contentWidth,
-                height: boxHeight
-            )
-            NotePDFExporter.codeBackgroundColor.setFill()
-            let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
-            path.fill()
-            let textRect = CGRect(
-                x: NotePDFExporter.margin + padding,
-                y: y + padding,
-                width: textWidth,
-                height: textHeight
-            )
-            attr.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-            y += boxHeight + NotePDFExporter.blockGap
+            let lines = display.components(separatedBy: "\n")
+            var index = 0
+            while index < lines.count {
+                ensureSpace(min(40, remainingHeight))
+                let available = remainingHeight - padding * 2
+                var chunk: [String] = []
+                var chunkHeight: CGFloat = 0
+                while index < lines.count {
+                    let candidate = chunk + [lines[index]]
+                    let attr = makeAttributed(
+                        candidate.joined(separator: "\n"),
+                        font: font,
+                        color: NotePDFExporter.bodyColor,
+                        parseMarkdown: false
+                    )
+                    let h = measure(attr, width: textWidth)
+                    if !chunk.isEmpty, h > available { break }
+                    chunk = candidate
+                    chunkHeight = h
+                    index += 1
+                    // Single oversize line: still emit one line so we make progress.
+                    if chunk.count == 1, h > available { break }
+                }
+                let boxHeight = chunkHeight + padding * 2
+                let box = CGRect(
+                    x: NotePDFExporter.margin,
+                    y: y,
+                    width: NotePDFExporter.contentWidth,
+                    height: boxHeight
+                )
+                NotePDFExporter.codeBackgroundColor.setFill()
+                let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
+                path.fill()
+                let attr = makeAttributed(
+                    chunk.joined(separator: "\n"),
+                    font: font,
+                    color: NotePDFExporter.bodyColor,
+                    parseMarkdown: false
+                )
+                let textRect = CGRect(
+                    x: NotePDFExporter.margin + padding,
+                    y: y + padding,
+                    width: textWidth,
+                    height: chunkHeight
+                )
+                attr.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
+                y += boxHeight + NotePDFExporter.blockGap
+                if index < lines.count {
+                    endPage()
+                    beginPage()
+                }
+            }
         }
 
         private func drawThematicBreak() {
@@ -235,7 +336,8 @@ enum NotePDFExporter {
                 vaultRoot: vaultRoot
             ), let image = NSImage(contentsOf: url), image.size.width > 0, image.size.height > 0 {
                 let imgSize = image.size
-                let scale = min(1, NotePDFExporter.contentWidth / imgSize.width)
+                let maxH = NotePDFExporter.contentHeight
+                let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)
                 let drawW = imgSize.width * scale
                 let drawH = imgSize.height * scale
                 ensureSpace(drawH)
@@ -251,7 +353,7 @@ enum NotePDFExporter {
                 y += drawH + NotePDFExporter.blockGap
             } else {
                 let label = alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
-                drawText(label, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                drawTextSpanning(label, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
             }
         }
 
@@ -269,15 +371,69 @@ enum NotePDFExporter {
             return LyraFonts.ui(size: size, weight: .bold)
         }
 
-        private func makeAttributed(_ text: String, font: NSFont, color: NSColor) -> NSAttributedString {
+        /// Render inline Markdown (bold/italic/code/links) the way Reading does, with AppKit fonts.
+        private func makeAttributed(
+            _ text: String,
+            font: NSFont,
+            color: NSColor,
+            parseMarkdown: Bool = true
+        ) -> NSAttributedString {
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineBreakMode = .byWordWrapping
             paragraph.alignment = .natural
-            return NSAttributedString(string: text, attributes: [
+
+            guard parseMarkdown else {
+                return NSAttributedString(string: text, attributes: [
+                    .font: font,
+                    .foregroundColor: color,
+                    .paragraphStyle: paragraph,
+                ])
+            }
+
+            let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown(text)
+            var options = AttributedString.MarkdownParsingOptions()
+            options.interpretedSyntax = .inlineOnlyPreservingWhitespace
+            options.failurePolicy = .returnPartiallyParsedIfPossible
+
+            let bridged: NSAttributedString
+            if let attributed = try? AttributedString(markdown: prepared, options: options) {
+                bridged = NSAttributedString(attributed)
+            } else {
+                bridged = NSAttributedString(string: text)
+            }
+
+            let mutable = NSMutableAttributedString(attributedString: bridged)
+            let full = NSRange(location: 0, length: mutable.length)
+            // Base face/colour first (erases presentation styling), then re-apply intents.
+            mutable.addAttributes([
                 .font: font,
                 .foregroundColor: color,
                 .paragraphStyle: paragraph,
-            ])
+            ], range: full)
+
+            mutable.enumerateAttribute(.inlinePresentationIntent, in: full) { value, range, _ in
+                guard let intent = value as? InlinePresentationIntent else { return }
+                var face = font
+                if intent.contains(.stronglyEmphasized) {
+                    face = LyraFonts.ui(size: font.pointSize, weight: .bold)
+                } else if intent.contains(.emphasized) {
+                    // NSFontDescriptor.withSymbolicTraits is non-optional on macOS (unlike UIKit).
+                    let italic = font.fontDescriptor.withSymbolicTraits(.italic)
+                    face = NSFont(descriptor: italic, size: font.pointSize) ?? font
+                }
+                if intent.contains(.code) {
+                    face = LyraFonts.code(size: font.pointSize)
+                }
+                mutable.addAttribute(.font, value: face, range: range)
+            }
+            // Drop wiki-link placeholder brackets that Inter lacks.
+            mutable.mutableString.replaceOccurrences(
+                of: "⟦", with: "", options: [], range: NSRange(location: 0, length: mutable.length)
+            )
+            mutable.mutableString.replaceOccurrences(
+                of: "⟧", with: "", options: [], range: NSRange(location: 0, length: mutable.length)
+            )
+            return mutable
         }
 
         private func measure(_ attr: NSAttributedString, width: CGFloat) -> CGFloat {

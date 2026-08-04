@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Shared rendered row for one Markdown block (Reading + Live Preview idle).
+/// Shared rendered row for one Markdown block in Reading view.
 struct MarkdownBlockRow: View {
     let block: MarkdownPreviewBlocks.Block
     var noteDirectory: URL?
@@ -21,14 +21,16 @@ struct MarkdownBlockRow: View {
                 .font(LyraFonts.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-        case .listItem(let content):
+        case .listItem(let content, let ordinal, let depth):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("•")
+                Text(ordinal.map { "\($0)." } ?? "•")
                     .foregroundStyle(Color(nsColor: LyraTheme.listMarker))
+                    .frame(minWidth: 16, alignment: .trailing)
                 Text(inline(content))
                     .font(LyraFonts.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.leading, CGFloat(depth) * 16)
 
         case .quote(let content):
             HStack(alignment: .top, spacing: 0) {
@@ -84,7 +86,7 @@ struct MarkdownBlockRow: View {
     }
 }
 
-/// Clickable `[[wiki]]` list shared by Reading and Live Preview.
+/// Clickable `[[wiki]]` list under Reading content.
 struct WikiLinksSection: View {
     let text: String
     var onWikiLink: ((String) -> Void)?

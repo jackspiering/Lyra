@@ -16,29 +16,40 @@ enum FileSystemVault {
             return VaultNode(name: name, url: root, isDirectory: false, children: nil)
         }
 
+        // Note: `.skipsPackageDescendants` only applies to directory enumerators, not
+        // contentsOfDirectory — packages are skipped via `.isPackageKey` below.
         let contents = try FileManager.default.contentsOfDirectory(
             at: root,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: [.skipsPackageDescendants]
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey],
+            options: []
         )
 
         var children: [VaultNode] = []
         for childURL in contents {
-            let childName = childURL.lastPathComponent
-            guard shouldInclude(name: childName) else { continue }
+            do {
+                let childName = childURL.lastPathComponent
+                guard shouldInclude(name: childName) else { continue }
 
-            let values = try childURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-            // Skip directory symlinks to avoid ancestor loops (e.g. `ln -s .. loop`).
-            if values.isSymbolicLink == true, values.isDirectory == true {
+                let values = try childURL.resourceValues(
+                    forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]
+                )
+                // Skip bundles / packages so a stray .app or .rtfd is not expanded.
+                if values.isPackage == true { continue }
+                // Skip directory symlinks to avoid ancestor loops (e.g. `ln -s .. loop`).
+                if values.isSymbolicLink == true, values.isDirectory == true {
+                    continue
+                }
+
+                let childIsDir = values.isDirectory ?? false
+                if childIsDir {
+                    if childName == AttachmentStore.folderName { continue }
+                    children.append(try scan(root: childURL))
+                } else if childURL.pathExtension.lowercased() == "md" {
+                    children.append(VaultNode(name: childName, url: childURL, isDirectory: false, children: nil))
+                }
+            } catch {
+                // One unreadable child must not blank the whole vault.
                 continue
-            }
-
-            let childIsDir = values.isDirectory ?? false
-            if childIsDir {
-                if childName == AttachmentStore.folderName { continue }
-                children.append(try scan(root: childURL))
-            } else if childURL.pathExtension.lowercased() == "md" {
-                children.append(VaultNode(name: childName, url: childURL, isDirectory: false, children: nil))
             }
         }
 

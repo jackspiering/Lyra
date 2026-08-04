@@ -5,83 +5,61 @@ enum MarkdownPreviewBlocks {
     enum Block: Equatable {
         case heading(level: Int, text: String)
         case paragraph(String)
-        case listItem(String)
+        /// `ordinal` is nil for bullets; present for ordered lists. `depth` is leading-spaces/2 (preview heuristic).
+        case listItem(text: String, ordinal: Int?, depth: Int)
         case quote(String)
         case code(String)
         case thematicBreak
         case image(alt: String, path: String)
     }
 
-    /// A block plus its UTF-16 range in the original source (for Live Preview splice).
-    struct RangedBlock: Equatable {
-        var block: Block
-        /// UTF-16 range in the source string (`NSString` indices).
-        var range: NSRange
-    }
-
     static func parse(_ source: String) -> [Block] {
-        parseRanged(source).map(\.block)
-    }
-
-    static func parseRanged(_ source: String) -> [RangedBlock] {
-        var blocks: [RangedBlock] = []
+        var blocks: [Block] = []
         let lines = splitLines(source)
         var i = 0
         var paragraphIndices: [Int] = []
 
         func flushParagraph() {
-            guard let first = paragraphIndices.first, let last = paragraphIndices.last else { return }
+            guard !paragraphIndices.isEmpty else { return }
             let texts = paragraphIndices.map { lines[$0].text }
             let text = texts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
             paragraphIndices.removeAll()
             guard !text.isEmpty else { return }
-            let start = lines[first].start
-            let end = lines[last].end
-            let range = NSRange(location: start, length: end - start)
             if let image = MarkdownImagePath.parseImageLine(text) {
-                blocks.append(RangedBlock(block: .image(alt: image.alt, path: image.path), range: range))
+                blocks.append(.image(alt: image.alt, path: image.path))
             } else {
-                blocks.append(RangedBlock(block: .paragraph(text), range: range))
+                blocks.append(.paragraph(text))
             }
         }
 
         while i < lines.count {
             let line = lines[i]
-            let trimmed = line.text.trimmingCharacters(in: .whitespaces)
+            let raw = line.text
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
 
             if trimmed.hasPrefix("```") {
                 flushParagraph()
-                let openStart = line.start
                 i += 1
                 var code: [String] = []
                 while i < lines.count, !lines[i].text.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
                     code.append(lines[i].text)
                     i += 1
                 }
-                let closeEnd: Int
-                if i < lines.count {
-                    closeEnd = lines[i].end
-                    i += 1
-                } else {
-                    closeEnd = lines[max(0, i - 1)].end
-                }
-                let range = NSRange(location: openStart, length: closeEnd - openStart)
-                blocks.append(RangedBlock(block: .code(code.joined(separator: "\n")), range: range))
+                if i < lines.count { i += 1 }
+                blocks.append(.code(code.joined(separator: "\n")))
                 continue
             }
 
             if trimmed == "---" || trimmed == "***" || trimmed == "___" {
                 flushParagraph()
-                let range = NSRange(location: line.start, length: line.end - line.start)
-                blocks.append(RangedBlock(block: .thematicBreak, range: range))
+                blocks.append(.thematicBreak)
                 i += 1
                 continue
             }
 
             if let heading = parseHeading(trimmed) {
                 flushParagraph()
-                let range = NSRange(location: line.start, length: line.end - line.start)
-                blocks.append(RangedBlock(block: heading, range: range))
+                blocks.append(heading)
                 i += 1
                 continue
             }
@@ -89,16 +67,14 @@ enum MarkdownPreviewBlocks {
             if trimmed.hasPrefix("> ") || trimmed == ">" {
                 flushParagraph()
                 let body = trimmed.hasPrefix("> ") ? String(trimmed.dropFirst(2)) : ""
-                let range = NSRange(location: line.start, length: line.end - line.start)
-                blocks.append(RangedBlock(block: .quote(body), range: range))
+                blocks.append(.quote(body))
                 i += 1
                 continue
             }
 
-            if let item = parseListItem(trimmed) {
+            if let item = parseListItem(raw: raw, trimmed: trimmed) {
                 flushParagraph()
-                let range = NSRange(location: line.start, length: line.end - line.start)
-                blocks.append(RangedBlock(block: .listItem(item), range: range))
+                blocks.append(item)
                 i += 1
                 continue
             }
@@ -115,15 +91,6 @@ enum MarkdownPreviewBlocks {
 
         flushParagraph()
         return blocks
-    }
-
-    /// Replace a UTF-16 range in `source` with `replacement`.
-    static func replacing(in source: String, range: NSRange, with replacement: String) -> String {
-        let ns = source as NSString
-        guard range.location != NSNotFound,
-              range.location >= 0,
-              range.location + range.length <= ns.length else { return source }
-        return ns.replacingCharacters(in: range, with: replacement)
     }
 
     /// Protect `[[wiki]]` from CommonMark link parsing, then render inline markdown.
@@ -188,14 +155,25 @@ enum MarkdownPreviewBlocks {
         return .heading(level: level, text: text)
     }
 
-    private static func parseListItem(_ trimmed: String) -> String? {
-        if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
-            return String(trimmed.dropFirst(2))
+    /// Preview-grade list parse. Depth is leading spaces÷2 (tabs count as 2); not full CommonMark.
+    private static func parseListItem(raw: String, trimmed: String) -> Block? {
+        var leading = 0
+        for ch in raw {
+            if ch == " " { leading += 1 }
+            else if ch == "\t" { leading += 2 }
+            else { break }
         }
-        guard let regex = try? NSRegularExpression(pattern: #"^\d+\.\s+(.*)$"#) else { return nil }
+        let depth = leading / 2
+
+        if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
+            return .listItem(text: String(trimmed.dropFirst(2)), ordinal: nil, depth: depth)
+        }
+        guard let regex = try? NSRegularExpression(pattern: #"^(\d+)\.\s+(.*)$"#) else { return nil }
         let ns = trimmed as NSString
         guard let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: ns.length)),
-              match.numberOfRanges > 1 else { return nil }
-        return ns.substring(with: match.range(at: 1))
+              match.numberOfRanges > 2 else { return nil }
+        let ordinal = Int(ns.substring(with: match.range(at: 1)))
+        let text = ns.substring(with: match.range(at: 2))
+        return .listItem(text: text, ordinal: ordinal, depth: depth)
     }
 }

@@ -77,6 +77,8 @@ struct MarkdownTextView: NSViewRepresentable {
         var parent: MarkdownTextView
         weak var textView: LyraTextView?
         private var isApplying = false
+        /// Previous document length — used to expand the highlight range over multi-line paste.
+        private var lastDocumentLength = 0
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
@@ -90,6 +92,7 @@ struct MarkdownTextView: NSViewRepresentable {
             textView.string = string
             MarkdownHighlighter.applyHighlighting(to: storage)
             let newLength = (string as NSString).length
+            lastDocumentLength = newLength
             textView.selectedRanges = selected.map { value -> NSValue in
                 let r = value.rangeValue
                 let loc = min(r.location, newLength)
@@ -104,10 +107,21 @@ struct MarkdownTextView: NSViewRepresentable {
             parent.text = textView.string
             parent.onEdit()
             // Attribute-only restyle (no setAttributedString): preserves undo, selection, and IME.
-            // Prefer paragraph scope when the caret is inside a single paragraph; full restyle
-            // is still cheap enough for typical notes with precompiled regexes.
-            let edited = textView.selectedRange()
-            MarkdownHighlighter.applyHighlighting(to: storage, range: edited)
+            // Expand over the inserted span so multi-line paste is highlighted; caret-only
+            // keystrokes keep a zero-length range at the caret (paragraph scope).
+            // Do not use storage.editedRange — it is already reset by textDidChange.
+            let newLength = storage.length
+            let caret = textView.selectedRange()
+            let delta = newLength - lastDocumentLength
+            lastDocumentLength = newLength
+            let highlight: NSRange
+            if delta > 0 {
+                let start = max(0, caret.location - delta)
+                highlight = NSRange(location: start, length: delta)
+            } else {
+                highlight = caret
+            }
+            MarkdownHighlighter.applyHighlighting(to: storage, range: highlight)
         }
     }
 }
@@ -150,18 +164,20 @@ final class LyraTextView: NSTextView {
     }
 
     /// Best-effort PNG bytes from common pasteboard image representations.
+    /// Never loads remote URLs — a copied https link must paste as text, not trigger a fetch.
     static func pngDataFromPasteboard(_ pb: NSPasteboard) -> Data? {
-        if let img = NSImage(pasteboard: pb), let data = AttachmentStore.pngData(from: img) {
-            return data
-        }
         if let data = pb.data(forType: .png) { return data }
         if let tiff = pb.data(forType: .tiff),
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             return png
         }
+        if let img = NSImage(pasteboard: pb), let data = AttachmentStore.pngData(from: img) {
+            return data
+        }
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
             for url in urls {
+                guard url.isFileURL else { continue }
                 if let img = NSImage(contentsOf: url), let data = AttachmentStore.pngData(from: img) {
                     return data
                 }

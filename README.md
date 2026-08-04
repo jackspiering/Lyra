@@ -13,15 +13,15 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.2-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
 ## Download
 
-[Latest DMG](https://github.com/jackspiering/Lyra/releases) (unsigned).
+[Latest DMG](https://github.com/jackspiering/Lyra/releases) (ad-hoc signed for App Sandbox, **not notarized**).
 
-Gatekeeper may block the first launch. Right-click the app and choose Open.
+macOS may still warn on first open. Use **System Settings → Privacy & Security → Open Anyway**, or build from source below. (Control-click → Open is no longer a reliable bypass on macOS 15+.)
 
 ## Quick start
 
@@ -36,8 +36,13 @@ Gatekeeper may block the first launch. Right-click the app and choose Open.
 | ⌘N | New note |
 | ⌘S | Save now |
 | ⌘E | Toggle Source ↔ Reading |
+| ⌘R | Refresh vault from disk |
 
-Autosave runs after about 500ms of idle time. If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk.
+Autosave runs after about 500ms of idle time. The toolbar shows **Unsaved**, **Save failed**, or **Autosave paused** when relevant.
+
+If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk. **Cancel** pauses autosave so the dialog does not loop; press ⌘S when you are ready to resolve. Quit is blocked while a save is refused (conflict, missing file, or I/O error).
+
+If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog — save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
 
 ### View modes
 
@@ -52,9 +57,10 @@ Autosave runs after about 500ms of idle time. If the file changes on disk while 
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
+| Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source) |
-| Export PDF | File → Export PDF… for the open note |
+| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
+| Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |
 
@@ -74,7 +80,7 @@ cd Lyra
 open Lyra.xcodeproj
 ```
 
-Scheme Lyra → destination My Mac → Run (⌘R).
+Scheme Lyra → destination My Mac → Run.
 
 ```bash
 bash Scripts/smoke.sh        # layout checks (Linux or Mac)
@@ -84,16 +90,16 @@ bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 <details>
 <summary>Ship a release DMG</summary>
 
-Marketing version in Xcode must match the tag (`0.5.0` ↔ `v0.5.0`):
+Marketing version in Xcode must match the tag (`0.6.2` ↔ `v0.6.2`):
 
 ```bash
-git tag v0.5.0 && git push origin v0.5.0
+git tag v0.6.2 && git push origin v0.6.2
 ```
 
-CI uploads unsigned `Lyra-0.5.0.dmg` to [Releases](https://github.com/jackspiering/Lyra/releases).
+CI builds an **ad-hoc signed** `Lyra-0.6.2.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.5.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
+VERSION=0.6.2 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
 
 More: [docs/ci.md](docs/ci.md)

@@ -140,4 +140,127 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertFalse(editor.isDirty)
         XCTAssertFalse(editor.hasExternalConflict)
     }
+
+    func testRelocateUpdatesPathWithoutSaving() throws {
+        let a = tempRoot.appendingPathComponent("old.md")
+        let b = tempRoot.appendingPathComponent("new.md")
+        try "body".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "edited"
+        editor.isDirty = true
+        editor.relocate(to: b)
+        XCTAssertEqual(editor.fileURL?.path, b.path)
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertEqual(editor.text, "edited")
+        // Old path must not be recreated until an explicit save to the new path.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: b.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: a.path))
+    }
+
+    func testCloseSucceedsWhenParentDirectoryRemoved() throws {
+        let dir = tempRoot.appendingPathComponent("gone", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let a = dir.appendingPathComponent("note.md")
+        try "x".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "dirty"
+        editor.isDirty = true
+        try FileManager.default.removeItem(at: dir)
+
+        XCTAssertTrue(editor.close())
+        XCTAssertNil(editor.fileURL)
+        XCTAssertFalse(editor.isDirty)
+    }
+
+    func testBackdatedExternalWriteIsDetected() throws {
+        let a = tempRoot.appendingPathComponent("backdate.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+
+        editor.text = "local"
+        editor.isDirty = true
+
+        try "theirs".write(to: a, atomically: true, encoding: .utf8)
+        let past = known.addingTimeInterval(-30)
+        try FileManager.default.setAttributes([.modificationDate: past], ofItemAtPath: a.path)
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasExternalConflict)
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
+    }
+
+    func testDeletedFileDoesNotRecreateOnAutosave() throws {
+        let a = tempRoot.appendingPathComponent("deleted.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "local"
+        editor.isDirty = true
+        try FileManager.default.removeItem(at: a)
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasMissingFile)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: a.path))
+
+        XCTAssertTrue(editor.saveIfNeeded(force: true))
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "local")
+    }
+
+    func testConflictDeferSuspendsAutosave() throws {
+        let a = tempRoot.appendingPathComponent("defer.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        editor.text = "local"
+        editor.isDirty = true
+        try "theirs".write(to: a, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: known.addingTimeInterval(5)],
+            ofItemAtPath: a.path
+        )
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasExternalConflict)
+
+        editor.deferConflict()
+        XCTAssertTrue(editor.conflictDeferred)
+        editor.noteEdited()
+        // Autosave is suspended; disk still has "theirs".
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
+
+        XCTAssertTrue(editor.saveIfNeeded(force: true))
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "local")
+        XCTAssertFalse(editor.conflictDeferred)
+    }
+
+    func testFailedSaveLeavesDirtyAndError() throws {
+        let roDir = tempRoot.appendingPathComponent("ro-fail", isDirectory: true)
+        try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
+        let a = roDir.appendingPathComponent("note.md")
+        try "x".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "dirty"
+        editor.isDirty = true
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: roDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: roDir.path)
+        }
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertTrue(editor.lastSaveFailed)
+        XCTAssertNotNil(editor.lastError)
+        XCTAssertTrue(editor.hasError)
+    }
 }
