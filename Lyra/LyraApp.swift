@@ -13,6 +13,10 @@ extension Notification.Name {
     static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
     /// Focus the sidebar vault name search field (⌘F). No in-note find yet.
     static let lyraFocusVaultSearch = Notification.Name("lyraFocusVaultSearch")
+    /// New empty note tab in the key vault window (⌘T).
+    static let lyraNewTab = Notification.Name("lyraNewTab")
+    /// Close the selected note tab (File → Close Tab). Last tab becomes empty.
+    static let lyraCloseTab = Notification.Name("lyraCloseTab")
     /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
@@ -33,10 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// One vault window: own store + editor (multi-vault = multiple windows).
+/// One vault window: one store + note-tab controller (multi-vault = multiple windows).
 struct VaultWindowRoot: View {
     @State private var store = VaultStore()
-    @State private var editor = EditorViewModel()
+    @State private var tabs = NoteTabController()
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
     @Environment(\.openWindow) private var openWindow
 
@@ -45,14 +49,16 @@ struct VaultWindowRoot: View {
     }
 
     var body: some View {
-        ContentView(store: store, editor: editor, openNewVaultWindow: {
+        ContentView(store: store, tabs: tabs, openNewVaultWindow: {
             openWindow(id: "vault")
         })
         // nil for System so SwiftUI does not pin light/dark after a forced scheme.
         .preferredColorScheme(appearance.colorScheme)
         .onAppear {
             AppearanceController.apply(rawValue: appearanceRaw)
-            AppSession.shared.register(editor: editor, store: store)
+            for editor in tabs.allEditors() {
+                AppSession.shared.register(editor: editor, store: store)
+            }
             if let pending = AppSession.shared.takePendingVaultURL() {
                 store.openVault(at: pending)
             }
@@ -61,8 +67,10 @@ struct VaultWindowRoot: View {
             AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
-            _ = editor.saveIfNeeded()
-            AppSession.shared.unregister(editor: editor)
+            for editor in tabs.allEditors() {
+                _ = editor.saveIfNeeded()
+                AppSession.shared.unregister(editor: editor)
+            }
             store.releaseAccess()
         }
     }
@@ -95,6 +103,16 @@ struct LyraApp: App {
                 Button("New Folder") {
                     NotificationCenter.default.post(name: .lyraNewFolder, object: nil)
                 }
+
+                Button("New Tab") {
+                    NotificationCenter.default.post(name: .lyraNewTab, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: .command)
+
+                Button("Close Tab") {
+                    NotificationCenter.default.post(name: .lyraCloseTab, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {

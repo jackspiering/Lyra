@@ -34,9 +34,11 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 |----------|--------|
 | ⌘O | Open vault |
 | ⌘N | New note (name dialog if enabled in Settings) |
+| ⌘T | New empty note tab (same vault sidebar) |
+| ⇧⌘W | Close current note tab (last tab becomes empty) |
 | ⌘⌫ | Move selection to Trash |
 | ↵ in sidebar | Rename selected note or folder |
-| ⌘F | Focus vault search |
+| ⌘F | Focus vault search / Go to File from empty tab |
 | ⌘E | Toggle Source ↔ Reading |
 | ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
@@ -64,13 +66,14 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Rename | Press Return, or click the name of the selected item (Finder-style); Escape cancels |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
+| Note tabs | In-window tabs share one vault sidebar; `+` / ⌘T empty tab; sidebar click opens in the active tab; empty tab: Create new note, Go to File, Close |
 | Settings | Lyra → Settings (resizable): appearance; prompt for note name; default note stem; separate note/folder Trash confirms; About (version → release tag, latest release, acks, MIT) |
 | New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
 | Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm per note or folder with “Don’t ask again” |
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
-| Status bar | Bottom of the open note: word and letter counts, created date, last saved |
+| Status bar | Bottom of the open note: word and character counts, created date, last saved |
 | Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |

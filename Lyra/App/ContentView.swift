@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Bindable var store: VaultStore
-    @Bindable var editor: EditorViewModel
+    @Bindable var tabs: NoteTabController
     /// When this window already has a vault, Open Vault can spawn another window first.
     var openNewVaultWindow: (() -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
@@ -22,6 +22,11 @@ struct ContentView: View {
         nonmutating set { noteViewModeRaw = newValue.rawValue }
     }
 
+    /// Active tab’s editor (always exists — controller keeps ≥1 tab).
+    private var editor: EditorViewModel {
+        tabs.selectedEditor
+    }
+
     @State private var hostWindowNumber: Int?
 
     var body: some View {
@@ -34,7 +39,7 @@ struct ContentView: View {
                 WindowNumberReader { hostWindowNumber = $0 }
             )
             .background(
-                DocumentEditedReader(isEdited: editor.isDirty)
+                DocumentEditedReader(isEdited: tabs.anyDirty)
             )
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
@@ -53,6 +58,8 @@ struct ContentView: View {
                 requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
                 focusVaultSearch: { vaultSearchFocusToken += 1 },
+                newTab: newTab,
+                closeTab: { closeTab(id: tabs.selectedTabID) },
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
@@ -160,11 +167,24 @@ struct ContentView: View {
 
     @ViewBuilder
     private var noteDetail: some View {
+        VStack(spacing: 0) {
+            NoteTabBar(
+                tabs: tabs,
+                onNewTab: newTab,
+                onCloseTab: { closeTab(id: $0) },
+                onSelectTab: selectTab
+            )
+            tabDetailBody
+        }
+    }
+
+    @ViewBuilder
+    private var tabDetailBody: some View {
         if editor.fileURL == nil {
-            ContentUnavailableView(
-                "Select a note",
-                systemImage: "doc.text",
-                description: Text("Choose a Markdown file from the sidebar, or create a new note.")
+            EmptyTabView(
+                onNewNote: beginNewNote,
+                onGoToFile: { vaultSearchFocusToken += 1 },
+                onCloseTab: { closeTab(id: tabs.selectedTabID) }
             )
         } else {
             VStack(spacing: 0) {
@@ -185,13 +205,16 @@ struct ContentView: View {
         switch noteViewMode {
         case .source:
             MarkdownTextView(
-                text: $editor.text,
+                text: Binding(
+                    get: { editor.text },
+                    set: { editor.text = $0 }
+                ),
                 vaultRoot: store.rootURL,
                 noteURL: editor.fileURL,
                 onEdit: { editor.noteEdited() },
                 onPasteError: { store.present(context: .pasteImage, message: $0) }
             )
-            // Per-file identity: reset selection, scroll, and undo when switching notes.
+            // Per-file identity: reset selection, scroll, and undo when switching notes/tabs.
             .id(editor.fileURL?.path)
         case .reading:
             MarkdownPreviewView(
@@ -203,13 +226,51 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Tabs
+
+    private func newTab() {
+        guard store.rootURL != nil else { return }
+        let tab = tabs.newEmptyTab()
+        AppSession.shared.register(editor: tab.editor, store: store)
+    }
+
+    private func selectTab(_ id: NoteTab.ID) {
+        tabs.select(id)
+        // Sync sidebar highlight to the note in this tab (leave selection if empty).
+        if let path = tabs.selectedTab?.editor.fileURL?.path {
+            store.selection = path
+        }
+    }
+
+    private func closeTab(id: NoteTab.ID?) {
+        guard let id else { return }
+        guard let tab = tabs.tabs.first(where: { $0.id == id }) else { return }
+        let editorRef = tab.editor
+        if tabs.close(id: id) {
+            // Unregister only when the tab was removed (not last-tab → empty).
+            if !tabs.tabs.contains(where: { $0.id == id }) {
+                AppSession.shared.unregister(editor: editorRef)
+            }
+            // After close, if a note is still active, align sidebar.
+            if let path = tabs.selectedTab?.editor.fileURL?.path {
+                store.selection = path
+            }
+        } else {
+            flushEditorError()
+        }
+    }
+
+    // MARK: - Lifecycle / vault
+
     private func handleScenePhase(_ phase: ScenePhase) {
         if phase == .active {
             if store.rootURL != nil {
                 store.refresh()
             }
         } else {
-            _ = editor.saveIfNeeded()
+            for tab in tabs.tabs {
+                _ = tab.editor.saveIfNeeded()
+            }
             flushEditorError()
         }
     }
@@ -264,11 +325,19 @@ struct ContentView: View {
     }
 
     private func performDelete() {
-        if editor.close() {
-            store.deleteSelected()
-        } else {
-            flushEditorError()
+        guard let node = store.selectedNode() else { return }
+        // Flush any tab that has this note (or a note under a deleted folder) open.
+        let path = node.url.path
+        for tab in tabs.tabs {
+            guard let openPath = tab.editor.fileURL?.path else { continue }
+            let affected = openPath == path || (node.isDirectory && openPath.hasPrefix(path + "/"))
+            guard affected else { continue }
+            if !tab.editor.close() {
+                flushEditorError()
+                return
+            }
         }
+        store.deleteSelected()
     }
 
     private func deleteConfirmSheet() -> some View {
@@ -329,31 +398,25 @@ struct ContentView: View {
         }
     }
 
-    /// Sidebar inline rename: flush editor, rename on disk, relocate open note if needed.
+    /// Sidebar inline rename: flush editors, rename on disk, relocate open notes if needed.
     private func commitSidebarRename(node: VaultNode, newName: String) -> Bool {
         let oldPath = node.url.path
-        guard editor.saveIfNeeded() else {
-            flushEditorError()
-            return false
+        for tab in tabs.tabs {
+            guard tab.editor.saveIfNeeded() else {
+                flushEditorError(for: tab.editor)
+                return false
+            }
         }
         store.selection = node.id
         guard let newURL = store.renameSelected(to: newName) else {
             return false
         }
-        if let openPath = editor.fileURL?.path {
-            if openPath == oldPath {
-                editor.relocate(to: newURL)
-            } else if openPath.hasPrefix(oldPath + "/") {
-                let suffix = String(openPath.dropFirst(oldPath.count))
-                let relocated = URL(fileURLWithPath: newURL.path + suffix)
-                editor.relocate(to: relocated)
-            }
-        }
+        tabs.relocateOpenNotes(oldPath: oldPath, newURL: newURL)
         return true
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
-        // Deselection only — close the note.
+        // Deselection only — close the active note (tab stays, becomes empty).
         guard let newValue else {
             if !editor.close() {
                 if let path = editor.fileURL?.path {
@@ -376,7 +439,7 @@ struct ContentView: View {
 
         if editor.fileURL?.path != node.url.path {
             let previousPath = editor.fileURL?.path
-            if editor.open(url: node.url) {
+            if tabs.openInActiveTab(url: node.url) {
                 flushEditorError()
             } else {
                 // Save failed or external conflict — stay on the dirty note.
@@ -387,11 +450,15 @@ struct ContentView: View {
     }
 
     private func flushEditorError() {
+        flushEditorError(for: editor)
+    }
+
+    private func flushEditorError(for ed: EditorViewModel) {
         // External conflicts / missing file use their own dialogs.
-        guard !editor.hasExternalConflict, !editor.hasMissingFile else { return }
-        guard let last = editor.lastError else { return }
+        guard !ed.hasExternalConflict, !ed.hasMissingFile else { return }
+        guard let last = ed.lastError else { return }
         store.present(error: last.error, context: last.context)
-        editor.lastError = nil
+        ed.lastError = nil
     }
 
     private func openWikiLink(_ text: String) {
@@ -401,7 +468,9 @@ struct ContentView: View {
             return
         }
         store.selection = url.path
-        if !editor.open(url: url) {
+        if tabs.openInActiveTab(url: url) {
+            flushEditorError()
+        } else {
             flushEditorError()
         }
     }
@@ -421,9 +490,9 @@ struct ContentView: View {
     private func exportNotePDF(_ node: VaultNode) {
         guard !node.isDirectory, store.rootURL != nil else { return }
         let markdown: String
-        if editor.fileURL?.path == node.url.path {
-            _ = editor.saveIfNeeded()
-            markdown = editor.text
+        if let openTab = tabs.tabs.first(where: { $0.editor.fileURL?.path == node.url.path }) {
+            _ = openTab.editor.saveIfNeeded()
+            markdown = openTab.editor.text
         } else {
             do {
                 markdown = try String(contentsOf: node.url, encoding: .utf8)
@@ -667,6 +736,8 @@ private struct ContentViewChrome: ViewModifier {
     var requestDelete: () -> Void
     var toggleViewMode: () -> Void
     var focusVaultSearch: () -> Void
+    var newTab: () -> Void
+    var closeTab: () -> Void
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
@@ -685,6 +756,8 @@ private struct ContentViewChrome: ViewModifier {
         requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
         focusVaultSearch: @escaping () -> Void,
+        newTab: @escaping () -> Void,
+        closeTab: @escaping () -> Void,
         newNoteSheet: @escaping () -> some View,
         deleteConfirmSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
@@ -702,6 +775,8 @@ private struct ContentViewChrome: ViewModifier {
         self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
         self.focusVaultSearch = focusVaultSearch
+        self.newTab = newTab
+        self.closeTab = closeTab
         self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
@@ -738,7 +813,9 @@ private struct ContentViewChrome: ViewModifier {
                     flushEditorError()
                 },
                 quitSaveFailed: flushEditorError,
-                focusVaultSearch: focusVaultSearch
+                focusVaultSearch: focusVaultSearch,
+                newTab: newTab,
+                closeTab: closeTab
             ))
     }
 }
@@ -834,6 +911,8 @@ private struct ContentViewCommands: ViewModifier {
     var save: () -> Void
     var quitSaveFailed: () -> Void
     var focusVaultSearch: () -> Void
+    var newTab: () -> Void
+    var closeTab: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -872,6 +951,14 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraFocusVaultSearch)) { _ in
                 guard shouldHandle() else { return }
                 focusVaultSearch()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraNewTab)) { _ in
+                guard shouldHandle() else { return }
+                newTab()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraCloseTab)) { _ in
+                guard shouldHandle() else { return }
+                closeTab()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
                 // All windows may surface; only key window needs UI (others already saved or clean).

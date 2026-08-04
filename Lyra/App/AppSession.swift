@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Tracks open vault windows so quit can flush every dirty editor.
+/// Tracks every open note editor (all tabs in all vault windows) so quit can flush dirty buffers.
 @MainActor
 final class AppSession {
     static let shared = AppSession()
