@@ -28,23 +28,22 @@ First open: right-click the app → **Open** if Gatekeeper blocks it.
 1. Open Lyra → **Open Vault…** (⌘O)
 2. Pick a folder of Markdown notes
 3. Select a note in the sidebar
-4. Switch **Source · Live · Reading** (or **⌘E**)
+4. Switch **Source · Reading** (or **⌘E**)
 
 | Shortcut | Action |
 |----------|--------|
 | ⌘O | Open vault |
 | ⌘N | New note |
 | ⌘S | Save now |
-| ⌘E | Cycle Source → Live → Reading |
+| ⌘E | Toggle Source ↔ Reading |
 
-Autosave runs after ~500ms idle.
+Autosave runs after ~500ms idle. If the file changed on disk while you were editing, Lyra asks whether to keep your buffer or reload.
 
 ### View modes
 
 | Mode | Behavior |
 |------|----------|
 | **Source** | Raw Markdown with syntax highlighting |
-| **Live** | Continuous Markdown editor (same as Source); click for caret, type to edit |
 | **Reading** | Full-width preview only |
 
 ## Features
@@ -54,7 +53,7 @@ Autosave runs after ~500ms idle.
 | Local vault | Any folder of UTF-8 `.md` files — disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V → vault `_attachments/` + note-relative `![](...)` (Source or Live) |
+| Paste images | ⌘V → vault `_attachments/` + note-relative `![](...)` (Source) |
 | Export PDF | **File → Export PDF…** for the open note |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts (permissions, missing files, disk full, …) |

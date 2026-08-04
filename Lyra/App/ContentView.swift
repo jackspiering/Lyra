@@ -46,6 +46,10 @@ struct ContentView: View {
                 flushEditorError()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            _ = editor.saveIfNeeded()
+            store.releaseAccess()
+        }
         .alert(
             store.errorTitle ?? "Something went wrong",
             isPresented: Binding(
@@ -56,6 +60,32 @@ struct ContentView: View {
             Button("OK", role: .cancel) { store.clearError() }
         } message: {
             Text(store.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            "Note changed on disk",
+            isPresented: Binding(
+                get: { editor.hasExternalConflict },
+                set: { if !$0 { editor.hasExternalConflict = false } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Keep Mine") {
+                if editor.saveIfNeeded(force: true) {
+                    // ok
+                } else {
+                    flushEditorError()
+                }
+            }
+            Button("Reload Theirs") {
+                if !editor.reloadFromDisk() {
+                    flushEditorError()
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                editor.hasExternalConflict = false
+            }
+        } message: {
+            Text("This file was modified outside Lyra. Saving would overwrite those changes.")
         }
         .onChange(of: store.selection) { _, newValue in
             handleSelectionChange(newValue)
@@ -135,15 +165,15 @@ struct ContentView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 280)
+                        .frame(maxWidth: 220)
 
                         Button {
                             noteViewMode = noteViewMode.next()
                         } label: {
-                            Label("Cycle View Mode", systemImage: "rectangle.split.2x1")
+                            Label("Toggle View Mode", systemImage: "rectangle.split.2x1")
                         }
                         .keyboardShortcut("e", modifiers: .command)
-                        .help("Cycle Source → Live → Reading")
+                        .help("Toggle Source ↔ Reading")
 
                         Button {
                             exportPDF()
@@ -167,7 +197,7 @@ struct ContentView: View {
             )
         } else {
             switch noteViewMode {
-            case .source, .livePreview:
+            case .source:
                 MarkdownTextView(
                     text: $editor.text,
                     vaultRoot: store.rootURL,
@@ -219,28 +249,33 @@ struct ContentView: View {
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
-        guard let newValue,
-              let root = store.rootNode,
-              let node = FileSystemVault.findNode(id: newValue, in: root),
-              !node.isDirectory else {
-            // Folder (or empty) selection: close only when there is no file selected.
-            if store.selectedFileURL() == nil {
-                if !editor.close() {
-                    // Keep the open note selected so dirty edits are not discarded.
-                    if let path = editor.fileURL?.path {
-                        store.selection = path
-                    }
-                    flushEditorError()
+        // Deselection only — close the note.
+        guard let newValue else {
+            if !editor.close() {
+                if let path = editor.fileURL?.path {
+                    store.selection = path
                 }
+                flushEditorError()
             }
             return
         }
+
+        guard let root = store.rootNode,
+              let node = FileSystemVault.findNode(id: newValue, in: root) else {
+            return
+        }
+
+        // Folder selection: leave the open note alone (sidebar navigation only).
+        if node.isDirectory {
+            return
+        }
+
         if editor.fileURL?.path != node.url.path {
             let previousPath = editor.fileURL?.path
             if editor.open(url: node.url) {
                 flushEditorError()
             } else {
-                // Save failed — stay on the dirty note and surface the error.
+                // Save failed or external conflict — stay on the dirty note.
                 store.selection = previousPath
                 flushEditorError()
             }
@@ -248,6 +283,8 @@ struct ContentView: View {
     }
 
     private func flushEditorError() {
+        // External conflicts use their own dialog, not the generic alert.
+        guard !editor.hasExternalConflict else { return }
         guard let last = editor.lastError else { return }
         store.present(error: last.error, context: last.context)
         editor.lastError = nil

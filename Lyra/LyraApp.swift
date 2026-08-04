@@ -12,10 +12,13 @@ struct LyraApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Lyra") {
+        // Single main window — multi-window document architecture is a non-goal.
+        Window("Lyra", id: "main") {
             ContentView()
         }
         .commands {
+            // Remove File → New Window so ⌘N stays unambiguously New Note (toolbar).
+            CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {
                     NotificationCenter.default.post(name: .lyraSaveNote, object: nil)

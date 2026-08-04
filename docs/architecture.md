@@ -50,11 +50,17 @@ One primary type per file when practical.
 
 **Why:** Avoid embedding a browser for the default experience.
 
-### Three note view modes (v0.5+)
+### Two note view modes (v0.5+)
 
-**Choice:** One detail surface: **Source** | **Live** | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** cycles.
+**Choice:** One detail surface: **Source** | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** toggles. (An earlier no-op “Live” mode was removed.)
 
-**Why:** Matches vault workflows without a permanent side-by-side split. Source and Live both use continuous `MarkdownTextView` over the full note string (caret on click, live typing). Reading is rendered, non-editable preview (images, wiki links).
+**Why:** Source is continuous `MarkdownTextView` (caret on click, live typing). Reading is rendered, non-editable preview (images, wiki links). A third identical editor mode was not worth the UI weight.
+
+### Single window
+
+**Choice:** `Window("Lyra")` rather than `WindowGroup`.
+
+**Why:** Multi-window document architecture is a non-goal; one vault state and one notification-driven Save/Export path stay unambiguous.
 
 ### Inter typeface (v0.5)
 
@@ -77,8 +83,9 @@ One primary type per file when practical.
 ### Concurrency
 
 - UI / stores: `@MainActor`
-- File I/O: keep large work off the main thread where it matters
+- Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
 - Autosave: ~500ms debounce; also save on note switch, background, and quit
+- External edits: mtime recorded at open/save; a dirty write against a newer mtime prompts Keep Mine / Reload
 
 ## Non-goals
 

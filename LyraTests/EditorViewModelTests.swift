@@ -21,16 +21,12 @@ final class EditorViewModelTests: XCTestCase {
         tempRoot = nil
     }
 
-    /// Point the dirty buffer at a directory path so `write(to:atomically:)` fails reliably
-    /// (chmod on a file alone does not block atomic replace when the parent dir is writable).
-    private func makeUnwritableSaveTarget() throws -> URL {
-        let blocker = tempRoot.appendingPathComponent("not-a-file-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
-        return blocker
-    }
-
     func testOpenPreservesBufferWhenSaveFails() throws {
-        let a = tempRoot.appendingPathComponent("a.md")
+        // Parent directory becomes non-writable so atomic write fails without
+        // reassigning fileURL (which would trip the external-mtime check).
+        let roDir = tempRoot.appendingPathComponent("ro", isDirectory: true)
+        try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
+        let a = roDir.appendingPathComponent("a.md")
         let b = tempRoot.appendingPathComponent("b.md")
         try "original-a".write(to: a, atomically: true, encoding: .utf8)
         try "content-b".write(to: b, atomically: true, encoding: .utf8)
@@ -39,32 +35,42 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertTrue(editor.open(url: a))
         editor.text = "unsaved edits"
         editor.isDirty = true
-        let blocked = try makeUnwritableSaveTarget()
-        editor.fileURL = blocked
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: roDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: roDir.path)
+        }
 
         XCTAssertFalse(editor.open(url: b))
         XCTAssertEqual(editor.text, "unsaved edits")
-        XCTAssertEqual(editor.fileURL?.path, blocked.path)
+        XCTAssertEqual(editor.fileURL?.path, a.path)
         XCTAssertTrue(editor.isDirty)
+        XCTAssertFalse(editor.hasExternalConflict)
         XCTAssertNotNil(editor.lastError)
         XCTAssertEqual(editor.lastError?.context, .saveNote)
     }
 
     func testClosePreservesBufferWhenSaveFails() throws {
-        let a = tempRoot.appendingPathComponent("close-me.md")
+        let roDir = tempRoot.appendingPathComponent("ro-close", isDirectory: true)
+        try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
+        let a = roDir.appendingPathComponent("close-me.md")
         try "stay".write(to: a, atomically: true, encoding: .utf8)
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
         editor.text = "dirty"
         editor.isDirty = true
-        let blocked = try makeUnwritableSaveTarget()
-        editor.fileURL = blocked
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: roDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: roDir.path)
+        }
 
         XCTAssertFalse(editor.close())
         XCTAssertEqual(editor.text, "dirty")
-        XCTAssertEqual(editor.fileURL?.path, blocked.path)
+        XCTAssertEqual(editor.fileURL?.path, a.path)
         XCTAssertTrue(editor.isDirty)
+        XCTAssertFalse(editor.hasExternalConflict)
         XCTAssertNotNil(editor.lastError)
     }
 
@@ -87,5 +93,51 @@ final class EditorViewModelTests: XCTestCase {
 
         let diskA = try String(contentsOf: a, encoding: .utf8)
         XCTAssertEqual(diskA, "a-updated")
+    }
+
+    func testSaveBlockedWhenDiskChangedExternally() throws {
+        let a = tempRoot.appendingPathComponent("ext.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+
+        editor.text = "local edits"
+        editor.isDirty = true
+
+        try "theirs".write(to: a, atomically: true, encoding: .utf8)
+        // Force mtime strictly after the value recorded at open (1s FS resolution).
+        let future = known.addingTimeInterval(5)
+        try FileManager.default.setAttributes([.modificationDate: future], ofItemAtPath: a.path)
+        let current = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        XCTAssertGreaterThan(current.timeIntervalSince(known), 0.001)
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasExternalConflict)
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertEqual(editor.text, "local edits")
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
+
+        XCTAssertTrue(editor.saveIfNeeded(force: true))
+        XCTAssertFalse(editor.hasExternalConflict)
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "local edits")
+    }
+
+    func testReloadFromDiskDiscardsLocalEdits() throws {
+        let a = tempRoot.appendingPathComponent("reload.md")
+        try "disk".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "local"
+        editor.isDirty = true
+        try "updated-on-disk".write(to: a, atomically: true, encoding: .utf8)
+
+        XCTAssertTrue(editor.reloadFromDisk())
+        XCTAssertEqual(editor.text, "updated-on-disk")
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertFalse(editor.hasExternalConflict)
     }
 }

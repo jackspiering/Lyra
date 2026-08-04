@@ -28,7 +28,7 @@ jobs:
   macos:
     name: Build & test (macOS)
     runs-on: macos-15
-    needs: smoke
+    # Run in parallel with smoke — structure checks must not gate the real test job.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
