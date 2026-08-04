@@ -61,6 +61,25 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertEqual(MarkdownPreviewBlocks.wikiLinkName(from: url), "Home Page")
     }
 
+    func testPrepareInlineSkipsWikiInsideCodeSpans() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown(
+            "Tip: click any `[[wiki link]]` now"
+        )
+        XCTAssertTrue(prepared.contains("`[[wiki link]]`"), "got: \(prepared)")
+        XCTAssertFalse(prepared.contains("lyra-wiki:"), "must not rewrite inside code: \(prepared)")
+    }
+
+    func testPrepareInlineStillRewritesBareWiki() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("See [[Home]] please")
+        XCTAssertTrue(prepared.contains("[Home](lyra-wiki:Home)"), "got: \(prepared)")
+    }
+
+    func testPrepareInlineWikiAlias() {
+        // Obsidian [[path|display]]
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("Go [[Daily Notes/2026-07-27|today]]")
+        XCTAssertTrue(prepared.contains("[today](lyra-wiki:Daily%20Notes/2026-07-27)"), "got: \(prepared)")
+    }
+
     func testParseImageBlock() {
         let blocks = MarkdownPreviewBlocks.parse("![a](_attachments/b.png)\n")
         XCTAssertEqual(blocks, [.image(alt: "a", path: "_attachments/b.png")])

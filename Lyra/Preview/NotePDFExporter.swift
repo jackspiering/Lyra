@@ -15,6 +15,8 @@ enum NotePDFExporter {
     private static let codeBackgroundColor = NSColor(calibratedWhite: 0.92, alpha: 1)
     private static let quoteBarColor = NSColor(calibratedRed: 0.85, green: 0.65, blue: 0.13, alpha: 1)
     private static let ruleColor = NSColor(calibratedWhite: 0.7, alpha: 1)
+    /// Print-safe link colour (wiki + http) so PDF matches Reading intent.
+    private static let linkColor = NSColor(calibratedRed: 0.15, green: 0.25, blue: 0.65, alpha: 1)
 
     /// One note (or section) to place into a PDF.
     struct NoteSource: Equatable {
@@ -462,6 +464,15 @@ enum NotePDFExporter {
                     face = LyraFonts.code(size: font.pointSize)
                 }
                 mutable.addAttribute(.font, value: face, range: range)
+            }
+
+            // Style link runs (wiki + http) with a print-safe blue; labels only (not raw URLs).
+            mutable.enumerateAttribute(.link, in: full) { value, range, _ in
+                guard value != nil else { return }
+                mutable.addAttributes([
+                    .foregroundColor: Self.linkColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                ], range: range)
             }
             return mutable
         }

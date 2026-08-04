@@ -95,17 +95,49 @@ enum MarkdownPreviewBlocks {
     }
 
     /// Turn `[[wiki]]` into markdown links `lyra-wiki:` so Reading can open them as clickable links.
+    /// Skips conversion inside inline code spans (`` `...` ``). Supports Obsidian `[[path|alias]]`.
     static func prepareInlineMarkdown(_ source: String) -> String {
+        // Split on `...` code spans; only transform segments outside code.
+        var result = ""
+        var i = source.startIndex
+        var inCode = false
+        var segmentStart = i
+        while i < source.endIndex {
+            if source[i] == "`" {
+                let segment = String(source[segmentStart..<i])
+                result += inCode ? segment : rewriteWikis(in: segment)
+                inCode.toggle()
+                result.append("`")
+                segmentStart = source.index(after: i)
+            }
+            i = source.index(after: i)
+        }
+        let tail = String(source[segmentStart...])
+        result += inCode ? tail : rewriteWikis(in: tail)
+        return result
+    }
+
+    /// Rewrite bare `[[…]]` wiki links (not inside code) to markdown `lyra-wiki:` links.
+    private static func rewriteWikis(in source: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return source }
         let ns = source as NSString
         var result = source
         let matches = regex.matches(in: source, range: NSRange(location: 0, length: ns.length)).reversed()
         for match in matches {
             guard match.numberOfRanges > 1 else { continue }
-            let name = ns.substring(with: match.range(at: 1))
-            let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+            let body = ns.substring(with: match.range(at: 1))
+            let target: String
+            let display: String
+            if let pipe = body.firstIndex(of: "|") {
+                target = String(body[..<pipe])
+                display = String(body[body.index(after: pipe)...])
+            } else {
+                target = body
+                display = body
+            }
+            let encoded = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
             // Escape brackets in the link label so nested markdown stays stable.
-            let label = name
+            let label = display
                 .replacingOccurrences(of: "[", with: "\\[")
                 .replacingOccurrences(of: "]", with: "\\]")
             let replacement = "[\(label)](lyra-wiki:\(encoded))"
