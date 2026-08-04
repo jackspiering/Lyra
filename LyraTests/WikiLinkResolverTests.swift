@@ -37,4 +37,16 @@ final class WikiLinkResolverTests: XCTestCase {
         let resolver = WikiLinkResolver(noteURLs: [hello])
         XCTAssertEqual(resolver.resolve("  Hello  "), hello)
     }
+
+    func testPathStyleFallsBackToLastComponentStem() {
+        let resolver = WikiLinkResolver(noteURLs: [world])
+        XCTAssertEqual(resolver.resolve("Daily Notes/World"), world)
+        XCTAssertEqual(resolver.resolve("sub/World"), world)
+        XCTAssertEqual(resolver.resolve("folder/World.md"), world)
+    }
+
+    func testPathStyleMissingLastComponentReturnsNil() {
+        let resolver = WikiLinkResolver(noteURLs: [hello])
+        XCTAssertNil(resolver.resolve("Daily Notes/Missing"))
+    }
 }

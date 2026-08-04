@@ -3,65 +3,135 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
+    @AppStorage(GeneralPreferences.promptForNewNoteNameKey) private var promptForNewNoteName = true
+    @AppStorage(GeneralPreferences.defaultNoteStemKey) private var defaultNoteStem = "Untitled"
+    @AppStorage(GeneralPreferences.confirmDeleteKey) private var confirmDelete = true
+
+    private var appearancePreference: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .system
+    }
 
     private var appearance: Binding<AppearancePreference> {
         Binding(
             get: { AppearancePreference(rawValue: appearanceRaw) ?? .system },
-            set: { appearanceRaw = $0.rawValue }
+            set: {
+                appearanceRaw = $0.rawValue
+                AppearanceController.apply($0)
+            }
         )
     }
 
     var body: some View {
         TabView {
-            Form {
-                Picker("Appearance", selection: appearance) {
-                    ForEach(AppearancePreference.allCases) { pref in
-                        Text(pref.label).tag(pref)
-                    }
+            generalTab
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
                 }
-                .pickerStyle(.inline)
-                Text("Applies to all Lyra windows. PDF export always uses print-safe light colours.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .formStyle(.grouped)
-            .padding()
-            .frame(width: 420, height: 180)
-            .tabItem {
-                Label("General", systemImage: "gearshape")
-            }
 
-            Form {
-                HStack(spacing: 16) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 64, height: 64)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Lyra")
-                            .font(.title2.weight(.semibold))
-                        Text(versionLine)
-                            .foregroundStyle(.secondary)
-                        Text("Native macOS Markdown vault editor.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
+            aboutTab
+                .tabItem {
+                    Label("About", systemImage: "info.circle")
                 }
-                .padding(.vertical, 4)
-
-                Text("Notes stay as plain UTF-8 `.md` files on disk. No cloud account, no proprietary store.")
-                    .font(.callout)
-
-                Text("MIT License")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .formStyle(.grouped)
-            .padding()
-            .frame(width: 420, height: 240)
-            .tabItem {
-                Label("About", systemImage: "info.circle")
-            }
         }
+        .preferredColorScheme(appearancePreference.colorScheme)
+        .onAppear {
+            AppearanceController.apply(rawValue: appearanceRaw)
+        }
+    }
+
+    // MARK: - General
+
+    private var generalTab: some View {
+        Form {
+            Picker("Appearance", selection: appearance) {
+                ForEach(AppearancePreference.allCases) { pref in
+                    Text(pref.label).tag(pref)
+                }
+            }
+            .pickerStyle(.inline)
+            Text("Applies to all Lyra windows. PDF export always uses print-safe light colours.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("Ask for name when creating a note", isOn: $promptForNewNoteName)
+
+            TextField("Default note name", text: $defaultNoteStem)
+                .onSubmit { commitDefaultNoteStem() }
+            Text("Used when creating notes. Extension .md is added automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("Confirm before moving notes or folders to Trash", isOn: $confirmDelete)
+        }
+        .formStyle(.grouped)
+        .padding()
+        .frame(minWidth: 420, minHeight: 300)
+        .onDisappear { commitDefaultNoteStem() }
+    }
+
+    /// Reject illegal chars, strip trailing `.md`, empty → `"Untitled"`.
+    private func commitDefaultNoteStem() {
+        defaultNoteStem = FilenameValidation.sanitizeNoteStem(defaultNoteStem)
+    }
+
+    // MARK: - About
+
+    /// Static legal/about page — not a Form, so default content does not scroll.
+    private var aboutTab: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lyra")
+                        .font(.title2.weight(.semibold))
+                    Text(versionLine)
+                        .foregroundStyle(.secondary)
+                    Text("Native macOS Markdown vault editor.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Acknowledgments")
+                    .font(.headline)
+                Text("Inter font by Rasmus Andersson, licensed under the SIL Open Font License 1.1.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Link("rsms.me/inter", destination: URL(string: "https://rsms.me/inter/")!)
+                    .font(.callout)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("License")
+                    .font(.headline)
+                Text("MIT License")
+                    .font(.callout)
+                Text("Copyright (c) 2026 Jack Spiering")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Link(
+                    "MIT License on GitHub",
+                    destination: URL(string: "https://github.com/jackspiering/Lyra/blob/main/LICENSE")!
+                )
+                .font(.callout)
+            }
+
+            Link(
+                "Latest release",
+                destination: URL(string: "https://github.com/jackspiering/Lyra/releases/latest")!
+            )
+            .font(.callout)
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(minWidth: 420, minHeight: 320, alignment: .topLeading)
     }
 
     private var versionLine: String {

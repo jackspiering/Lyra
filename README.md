@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.7.0-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.8.0-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -33,16 +33,19 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | Shortcut | Action |
 |----------|--------|
 | ⌘O | Open vault |
-| ⌘N | New note |
-| ⌘S | Save now |
+| ⌘N | New note (name dialog if enabled in Settings) |
+| ⌘⌫ | Move selection to Trash |
+| ↵ in sidebar | Rename selected note or folder |
+| ⌘F | Focus vault search |
 | ⌘E | Toggle Source ↔ Reading |
+| ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
 
-Autosave runs after about 500ms of idle time. The toolbar shows **Unsaved**, **Save failed**, or **Autosave paused** when relevant.
+Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
 
 If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk. **Cancel** pauses autosave so the dialog does not loop; press ⌘S when you are ready to resolve. Quit is blocked while a save is refused (conflict, missing file, or I/O error).
 
-If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog — save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
+If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog. You can save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
 
 ### View modes
 
@@ -57,12 +60,17 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
+| Vault search | Magnifying glass filters the tree by note/folder name or path (not full-text); ⌘F focuses the field |
+| Rename | Press Return, or click the name of the selected item (Finder-style); Escape cancels |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
-| Settings | Lyra → Settings: appearance (System / Light / Dark) and About |
+| Settings | Lyra → Settings: appearance; prompt for note name; default note stem; confirm before Trash; About (acks, MIT, latest release) |
+| New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
+| Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm with “Don’t ask again” |
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
+| Status bar | Bottom of the open note: word and letter counts, created date, last saved |
 | Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |
@@ -93,16 +101,16 @@ bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 <details>
 <summary>Ship a release DMG</summary>
 
-Marketing version in Xcode must match the tag (`0.7.0` ↔ `v0.7.0`):
+Marketing version in Xcode must match the tag (`0.8.0` ↔ `v0.8.0`):
 
 ```bash
-git tag v0.7.0 && git push origin v0.7.0
+git tag v0.8.0 && git push origin v0.8.0
 ```
 
-CI builds an **ad-hoc signed** `Lyra-0.7.0.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
+CI builds an **ad-hoc signed** `Lyra-0.8.0.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.7.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
+VERSION=0.8.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
 
 More: [docs/ci.md](docs/ci.md)
@@ -136,6 +144,8 @@ More: [docs/ci.md](docs/ci.md)
 See [CONTRIBUTING.md](CONTRIBUTING.md). Prefer small PRs. Update this README when user-facing behavior changes.
 
 ## Acknowledgments
+
+Also listed in Settings → About:
 
 - [Inter](https://rsms.me/inter/) by Rasmus Andersson, SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
 

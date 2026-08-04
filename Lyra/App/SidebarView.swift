@@ -2,27 +2,88 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var store: VaultStore
-    @Binding var renameTarget: VaultNode?
-    @Binding var showDeleteConfirm: Bool
+    /// Save editor, `renameSelected`, relocate open note. Returns `true` on success.
+    var onCommitRename: (VaultNode, String) -> Bool = { _, _ in false }
+    var onRequestDelete: () -> Void = {}
+    var onNewNote: () -> Void = {}
     var onExportNotePDF: (VaultNode) -> Void = { _ in }
     var onExportFolderSeparate: (VaultNode) -> Void = { _ in }
     var onExportFolderCombined: (VaultNode) -> Void = { _ in }
+    /// Bumped by ContentView when ⌘F / Find in Vault targets this window.
+    var searchFocusToken: Int = 0
+
+    @State private var query: String = ""
+    @State private var renamingID: VaultNode.ID?
+    @State private var renameDraft: String = ""
+    @State private var selectionBecameCurrentAt: Date = .distantPast
+    /// When true, focus-loss must not commit (Escape / selection change / successful commit cleanup).
+    @State private var suppressFocusCommit = false
+    @FocusState private var renameFieldFocused: Bool
+    @FocusState private var searchFieldFocused: Bool
+
+    private var displayRoot: VaultNode? {
+        guard let root = store.rootNode else { return nil }
+        return VaultSearch.filteredTree(root: root, query: query)
+    }
 
     var body: some View {
+        VStack(spacing: 0) {
+            searchField
+            Divider()
+            treeList
+        }
+        .onChange(of: searchFocusToken) { _, _ in
+            searchFieldFocused = true
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searchFieldFocused)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    private var treeList: some View {
         List(selection: $store.selection) {
-            if let root = store.rootNode {
+            if let root = displayRoot {
                 Section(root.name) {
                     OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
-                        Label(
-                            node.name,
-                            systemImage: node.isDirectory ? "folder" : "doc.text"
-                        )
-                        .tag(node.id)
+                        row(for: node)
+                            .tag(node.id)
                     }
                 }
             }
         }
         .listStyle(.sidebar)
+        .onKeyPress(.return) {
+            handleReturnKey()
+        }
+        .onChange(of: store.selection) { _, newValue in
+            selectionBecameCurrentAt = Date()
+            if let renamingID, renamingID != newValue {
+                cancelRename()
+            }
+        }
+        .onChange(of: renameFieldFocused) { _, focused in
+            // Finder commits when the field loses focus (click elsewhere), not only on Return.
+            guard !focused else { return }
+            if suppressFocusCommit {
+                suppressFocusCommit = false
+                return
+            }
+            guard let id = renamingID,
+                  let root = store.rootNode,
+                  let node = FileSystemVault.findNode(id: id, in: root) else {
+                return
+            }
+            commitRename(node)
+        }
         .contextMenu(forSelectionType: VaultNode.ID.self) { ids in
             if let id = ids.first,
                let root = store.rootNode,
@@ -30,7 +91,7 @@ struct SidebarView: View {
                 if node.isDirectory {
                     Button("New Note") {
                         store.selection = id
-                        store.createNote()
+                        onNewNote()
                     }
                     Button("New Folder") {
                         store.selection = id
@@ -54,13 +115,104 @@ struct SidebarView: View {
                     Divider()
                 }
                 Button("Rename…") {
-                    store.selection = id
-                    renameTarget = node
+                    beginRename(node)
                 }
                 Button("Delete…", role: .destructive) {
                     store.selection = id
-                    showDeleteConfirm = true
+                    onRequestDelete()
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(for node: VaultNode) -> some View {
+        if renamingID == node.id {
+            HStack(spacing: 6) {
+                Image(systemName: node.isDirectory ? "folder" : "doc.text")
+                    .foregroundStyle(.secondary)
+                TextField("", text: $renameDraft)
+                    .textFieldStyle(.plain)
+                    .focused($renameFieldFocused)
+                    .onSubmit { commitRename(node) }
+                    .onExitCommand { cancelRename() }
+            }
+        } else {
+            Label(
+                node.name,
+                systemImage: node.isDirectory ? "folder" : "doc.text"
+            )
+            // Finder-style: click the name of an already-selected row after a short delay → rename.
+            // Simultaneous so List still owns selection on first click.
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    attemptDelayedNameClickRename(for: node)
+                }
+            )
+        }
+    }
+
+    private func handleReturnKey() -> KeyPress.Result {
+        if renamingID != nil {
+            // TextField owns Return while editing (onSubmit).
+            return .ignored
+        }
+        guard let id = store.selection,
+              let root = store.rootNode,
+              let node = FileSystemVault.findNode(id: id, in: root) else {
+            return .ignored
+        }
+        beginRename(node)
+        return .handled
+    }
+
+    private func attemptDelayedNameClickRename(for node: VaultNode) {
+        guard renamingID == nil else { return }
+        guard store.selection == node.id else { return }
+        // Avoid racing the first click that establishes selection / a double-click.
+        let elapsed = Date().timeIntervalSince(selectionBecameCurrentAt)
+        guard elapsed >= 0.5 else { return }
+        beginRename(node)
+    }
+
+    private func beginRename(_ node: VaultNode) {
+        suppressFocusCommit = false
+        store.selection = node.id
+        renameDraft = node.name
+        renamingID = node.id
+        DispatchQueue.main.async {
+            renameFieldFocused = true
+        }
+    }
+
+    private func cancelRename() {
+        // Only suppress the upcoming focus-loss if the field currently has focus.
+        if renameFieldFocused {
+            suppressFocusCommit = true
+        }
+        renamingID = nil
+        renameFieldFocused = false
+    }
+
+    private func commitRename(_ node: VaultNode) {
+        let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            // Return with empty keeps the field; focus-loss with empty cancels.
+            if !renameFieldFocused {
+                cancelRename()
+            }
+            return
+        }
+        if trimmed == node.name {
+            cancelRename()
+            return
+        }
+        if onCommitRename(node, trimmed) {
+            cancelRename()
+        } else {
+            // Keep the field open so the user can fix the name or retry after an error.
+            DispatchQueue.main.async {
+                renameFieldFocused = true
             }
         }
     }

@@ -17,6 +17,10 @@ final class EditorViewModel {
     private(set) var lastSaveFailed = false
     /// User dismissed the conflict dialog; autosave stays off until Keep Mine / Reload / ⌘S.
     private(set) var conflictDeferred = false
+    /// File creation date from disk attributes (status bar).
+    private(set) var createdAt: Date?
+    /// Last successful save time, or file mtime after open/reload when clean.
+    private(set) var lastSavedAt: Date?
 
     /// True while there is an error the UI has not yet flushed.
     var hasError: Bool { lastError != nil }
@@ -40,12 +44,15 @@ final class EditorViewModel {
             hasMissingFile = false
             conflictDeferred = false
             rememberDiskSnapshot(for: url)
+            refreshFileDates(for: url, markSavedNow: false)
             return true
         } catch {
             fileURL = nil
             text = ""
             isDirty = false
             diskSnapshot = nil
+            createdAt = nil
+            lastSavedAt = nil
             lastError = (.openNote, error)
             return false
         }
@@ -60,6 +67,7 @@ final class EditorViewModel {
         hasExternalConflict = false
         conflictDeferred = false
         rememberDiskSnapshot(for: newURL)
+        refreshFileDates(for: newURL, markSavedNow: false)
     }
 
     /// Cancel on the conflict dialog: stop autosaving without treating Cancel as overwrite.
@@ -137,6 +145,7 @@ final class EditorViewModel {
             hasMissingFile = false
             conflictDeferred = false
             rememberDiskSnapshot(for: url)
+            refreshFileDates(for: url, markSavedNow: false)
             return true
         } catch {
             lastError = (.openNote, error)
@@ -159,6 +168,7 @@ final class EditorViewModel {
             hasMissingFile = false
             conflictDeferred = false
             rememberDiskSnapshot(for: url)
+            refreshFileDates(for: url, markSavedNow: true)
             return true
         } catch {
             // Leave dirty so user can retry with ⌘S.
@@ -180,6 +190,22 @@ final class EditorViewModel {
         conflictDeferred = false
         lastError = nil
         lastSaveFailed = false
+        createdAt = nil
+        lastSavedAt = nil
+    }
+
+    /// Reads creation date; sets `lastSavedAt` to now after a write, else disk mtime.
+    private func refreshFileDates(for url: URL, markSavedNow: Bool) {
+        var fresh = url
+        fresh.removeCachedResourceValue(forKey: .creationDateKey)
+        fresh.removeCachedResourceValue(forKey: .contentModificationDateKey)
+        let values = try? fresh.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+        createdAt = values?.creationDate
+        if markSavedNow {
+            lastSavedAt = Date()
+        } else {
+            lastSavedAt = values?.contentModificationDate
+        }
     }
 
     private func hasDiskChanged(relativeTo url: URL) -> Bool {

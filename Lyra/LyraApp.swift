@@ -9,6 +9,10 @@ extension Notification.Name {
     static let lyraOpenVault = Notification.Name("lyraOpenVault")
     static let lyraToggleViewMode = Notification.Name("lyraToggleViewMode")
     static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
+    /// Move the sidebar selection to the Trash (⌘⌫).
+    static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
+    /// Focus the sidebar vault name search field (⌘F). No in-note find yet.
+    static let lyraFocusVaultSearch = Notification.Name("lyraFocusVaultSearch")
     /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
@@ -46,10 +50,14 @@ struct VaultWindowRoot: View {
         })
         .preferredColorScheme(appearance.colorScheme)
         .onAppear {
+            AppearanceController.apply(rawValue: appearanceRaw)
             AppSession.shared.register(editor: editor, store: store)
             if let pending = AppSession.shared.takePendingVaultURL() {
                 store.openVault(at: pending)
             }
+        }
+        .onChange(of: appearanceRaw) { _, new in
+            AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
             _ = editor.saveIfNeeded()
@@ -107,6 +115,13 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraRefreshVault, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: .command)
+
+                Divider()
+
+                Button("Move to Trash") {
+                    NotificationCenter.default.post(name: .lyraDeleteSelection, object: nil)
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {
@@ -114,10 +129,18 @@ struct LyraApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
             }
+            // `.find` is not a CommandGroupPlacement; hang vault search after text editing.
+            CommandGroup(after: .textEditing) {
+                Button("Find in Vault") {
+                    NotificationCenter.default.post(name: .lyraFocusVaultSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
+            }
         }
 
         Settings {
             SettingsView()
+                .frame(minWidth: 420, minHeight: 280)
         }
     }
 }

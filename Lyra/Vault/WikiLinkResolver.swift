@@ -15,6 +15,15 @@ struct WikiLinkResolver {
         if name.lowercased().hasSuffix(".md") {
             name = String(name.dropLast(3))
         }
-        return notesByStem[name.lowercased()]
+        // Exact stem (or full link text treated as stem)
+        if let url = notesByStem[name.lowercased()] {
+            return url
+        }
+        // Path-style wiki links e.g. `Daily Notes/2026-07-27` → stem of last component
+        if name.contains("/") {
+            let last = (name as NSString).lastPathComponent
+            return notesByStem[last.lowercased()]
+        }
+        return nil
     }
 }

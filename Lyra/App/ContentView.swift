@@ -8,10 +8,13 @@ struct ContentView: View {
     /// When this window already has a vault, Open Vault can spawn another window first.
     var openNewVaultWindow: (() -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
-    @State private var renameTarget: VaultNode?
-    @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var deleteDontAskAgain = false
+    @State private var showNewNoteSheet = false
+    @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
+    /// Bumped when ⌘F / Find in Vault targets this window so the sidebar focuses search.
+    @State private var vaultSearchFocusToken = 0
     @Environment(\.scenePhase) private var scenePhase
 
     private var noteViewMode: NoteViewMode {
@@ -28,21 +31,28 @@ struct ContentView: View {
             .background(
                 WindowNumberReader { hostWindowNumber = $0 }
             )
+            .background(
+                DocumentEditedReader(isEdited: editor.isDirty)
+            )
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }
             .modifier(ContentViewChrome(
                 store: store,
                 editor: editor,
-                renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
+                showNewNoteSheet: $showNewNoteSheet,
                 onSelectionChange: handleSelectionChange,
                 onHasErrorChange: handleHasErrorChange,
                 flushEditorError: flushEditorError,
                 exportPDF: exportPDF,
                 openVault: openVault,
+                beginNewNote: beginNewNote,
+                requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
-                renameSheet: renameSheet,
+                focusVaultSearch: { vaultSearchFocusToken += 1 },
+                newNoteSheet: newNoteSheet,
+                deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
                     guard let hostWindowNumber else { return true }
                     return NSApp.keyWindow?.windowNumber == hostWindowNumber
@@ -72,20 +82,30 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(
                 store: store,
-                renameTarget: $renameTarget,
-                showDeleteConfirm: $showDeleteConfirm,
+                onCommitRename: commitSidebarRename,
+                onRequestDelete: requestDelete,
+                onNewNote: beginNewNote,
                 onExportNotePDF: exportNotePDF,
                 onExportFolderSeparate: exportFolderSeparatePDFs,
-                onExportFolderCombined: exportFolderCombinedPDF
+                onExportFolderCombined: exportFolderCombinedPDF,
+                searchFocusToken: vaultSearchFocusToken
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
-                ToolbarItemGroup {
+                ToolbarItemGroup(placement: .primaryAction) {
                     Button {
-                        store.createNote()
+                        openVault()
+                    } label: {
+                        Label("Open Vault", systemImage: "folder")
+                    }
+                    .help("Open Vault…")
+
+                    Button {
+                        beginNewNote()
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
+                    .help("New Note")
                 }
             }
         } detail: {
@@ -136,11 +156,8 @@ struct ContentView: View {
             Label("Autosave paused", systemImage: "pause.circle")
                 .foregroundStyle(.orange)
                 .help("Conflict deferred — press ⌘S to resolve")
-        } else if editor.isDirty {
-            Label("Unsaved", systemImage: "circle.fill")
-                .foregroundStyle(.secondary)
-                .help("Unsaved changes")
         }
+        // Dirty state: traffic-light close button via DocumentEditedReader (no grey Unsaved label).
     }
 
     @ViewBuilder
@@ -152,25 +169,39 @@ struct ContentView: View {
                 description: Text("Choose a Markdown file from the sidebar, or create a new note.")
             )
         } else {
-            switch noteViewMode {
-            case .source:
-                MarkdownTextView(
-                    text: $editor.text,
-                    vaultRoot: store.rootURL,
-                    noteURL: editor.fileURL,
-                    onEdit: { editor.noteEdited() },
-                    onPasteError: { store.present(context: .pasteImage, message: $0) }
-                )
-                // Per-file identity: reset selection, scroll, and undo when switching notes.
-                .id(editor.fileURL?.path)
-            case .reading:
-                MarkdownPreviewView(
-                    text: editor.text,
-                    noteDirectory: editor.fileURL?.deletingLastPathComponent(),
-                    vaultRoot: store.rootURL,
-                    onWikiLink: { openWikiLink($0) }
+            VStack(spacing: 0) {
+                noteContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EditorStatusBar(
+                    wordCount: NoteStats.wordCount(editor.text),
+                    letterCount: NoteStats.letterCount(editor.text),
+                    created: editor.createdAt,
+                    lastSaved: editor.lastSavedAt
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private var noteContent: some View {
+        switch noteViewMode {
+        case .source:
+            MarkdownTextView(
+                text: $editor.text,
+                vaultRoot: store.rootURL,
+                noteURL: editor.fileURL,
+                onEdit: { editor.noteEdited() },
+                onPasteError: { store.present(context: .pasteImage, message: $0) }
+            )
+            // Per-file identity: reset selection, scroll, and undo when switching notes.
+            .id(editor.fileURL?.path)
+        case .reading:
+            MarkdownPreviewView(
+                text: editor.text,
+                noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                vaultRoot: store.rootURL,
+                onWikiLink: { openWikiLink($0) }
+            )
         }
     }
 
@@ -209,40 +240,110 @@ struct ContentView: View {
         openNewVaultWindow?()
     }
 
-    private func renameSheet(_ node: VaultNode) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Rename").font(LyraFonts.headline)
-            TextField("Name", text: $renameText)
-                .onAppear { renameText = node.name }
+    private func beginNewNote() {
+        guard store.rootURL != nil else { return }
+        if GeneralPreferences.promptForNewNoteName {
+            let stem = GeneralPreferences.defaultNoteStem
+            newNoteName = "\(stem).md"
+            showNewNoteSheet = true
+        } else {
+            store.createNote(named: nil)
+        }
+    }
+
+    /// ⌘⌫, File → Move to Trash, or context Delete. Respects confirm preference.
+    private func requestDelete() {
+        guard store.selectedNode() != nil else { return }
+        if GeneralPreferences.confirmDelete {
+            deleteDontAskAgain = false
+            showDeleteConfirm = true
+        } else {
+            performDelete()
+        }
+    }
+
+    private func performDelete() {
+        if editor.close() {
+            store.deleteSelected()
+        } else {
+            flushEditorError()
+        }
+    }
+
+    private func deleteConfirmSheet() -> some View {
+        let name = store.selectedNode()?.name ?? "this item"
+        return VStack(alignment: .leading, spacing: 16) {
+            Text("Move to Trash").font(LyraFonts.headline)
+            Text("Move “\(name)” to the Trash?")
+            Toggle("Don’t ask again", isOn: $deleteDontAskAgain)
             HStack {
                 Spacer()
-                Button("Cancel") { renameTarget = nil }
-                Button("Rename") {
-                    let oldPath = node.url.path
-                    guard editor.saveIfNeeded() else {
-                        flushEditorError()
-                        return
+                Button("Cancel") { showDeleteConfirm = false }
+                Button("Move to Trash", role: .destructive) {
+                    if deleteDontAskAgain {
+                        UserDefaults.standard.set(false, forKey: GeneralPreferences.confirmDeleteKey)
                     }
-                    guard let newURL = store.renameSelected(to: renameText) else {
-                        return
-                    }
-                    if let openPath = editor.fileURL?.path {
-                        if openPath == oldPath {
-                            editor.relocate(to: newURL)
-                        } else if openPath.hasPrefix(oldPath + "/") {
-                            let suffix = String(openPath.dropFirst(oldPath.count))
-                            let relocated = URL(fileURLWithPath: newURL.path + suffix)
-                            editor.relocate(to: relocated)
-                        }
-                    }
-                    renameTarget = nil
+                    showDeleteConfirm = false
+                    performDelete()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding()
         .frame(width: 360)
+    }
+
+    private var newNoteNameIsValid: Bool {
+        if case .ok = FilenameValidation.validate(newNoteName, isDirectory: false) {
+            return true
+        }
+        return false
+    }
+
+    private func newNoteSheet() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("New Note").font(LyraFonts.headline)
+            NewNoteNameField(text: $newNoteName, onSubmit: submitNewNote)
+            HStack {
+                Spacer()
+                Button("Cancel") { showNewNoteSheet = false }
+                Button("Create", action: submitNewNote)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!newNoteNameIsValid)
+            }
+        }
+        .padding()
+        .frame(width: 360)
+    }
+
+    private func submitNewNote() {
+        guard newNoteNameIsValid else { return }
+        if store.createNote(named: newNoteName) {
+            showNewNoteSheet = false
+        }
+    }
+
+    /// Sidebar inline rename: flush editor, rename on disk, relocate open note if needed.
+    private func commitSidebarRename(node: VaultNode, newName: String) -> Bool {
+        let oldPath = node.url.path
+        guard editor.saveIfNeeded() else {
+            flushEditorError()
+            return false
+        }
+        store.selection = node.id
+        guard let newURL = store.renameSelected(to: newName) else {
+            return false
+        }
+        if let openPath = editor.fileURL?.path {
+            if openPath == oldPath {
+                editor.relocate(to: newURL)
+            } else if openPath.hasPrefix(oldPath + "/") {
+                let suffix = String(openPath.dropFirst(oldPath.count))
+                let relocated = URL(fileURLWithPath: newURL.path + suffix)
+                editor.relocate(to: relocated)
+            }
+        }
+        return true
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
@@ -464,47 +565,139 @@ private struct WindowNumberReader: NSViewRepresentable {
     }
 }
 
+// MARK: - Standard macOS dirty state on the close button
+
+private struct DocumentEditedReader: NSViewRepresentable {
+    var isEdited: Bool
+
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        view.window?.isDocumentEdited = isEdited
+    }
+}
+
+// MARK: - New-note name field (selects stem before `.md` on first focus)
+
+private struct NewNoteNameField: NSViewRepresentable {
+    @Binding var text: String
+    /// Called on Return while the field is focused (Create default action may not fire then).
+    var onSubmit: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = "Name"
+        field.delegate = context.coordinator
+        field.isBordered = true
+        field.isBezeled = true
+        field.bezelStyle = .roundedBezel
+        field.focusRingType = .default
+        DispatchQueue.main.async {
+            selectStem(in: field)
+        }
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+
+    private func selectStem(in field: NSTextField) {
+        field.window?.makeFirstResponder(field)
+        let value = field.stringValue as NSString
+        let length = value.length
+        if (value as String).lowercased().hasSuffix(".md"), length > 3 {
+            field.currentEditor()?.selectedRange = NSRange(location: 0, length: length - 3)
+        } else {
+            field.currentEditor()?.selectedRange = NSRange(location: 0, length: length)
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: NewNoteNameField
+
+        init(_ parent: NewNoteNameField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        /// Return while focused → Create (SwiftUI `.defaultAction` often does not fire for NSTextField).
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onSubmit()
+                return true
+            }
+            return false
+        }
+    }
+}
+
 // MARK: - Chrome (dialogs + commands) — kept out of `body` so the type-checker stays happy
 
 private struct ContentViewChrome: ViewModifier {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
-    @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
+    @Binding var showNewNoteSheet: Bool
     var onSelectionChange: (VaultNode.ID?) -> Void
     var onHasErrorChange: (Bool) -> Void
     var flushEditorError: () -> Void
     var exportPDF: () -> Void
     var openVault: () -> Void
+    var beginNewNote: () -> Void
+    var requestDelete: () -> Void
     var toggleViewMode: () -> Void
-    var renameSheet: (VaultNode) -> AnyView
+    var focusVaultSearch: () -> Void
+    var newNoteSheet: () -> AnyView
+    var deleteConfirmSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
 
     init(
         store: VaultStore,
         editor: EditorViewModel,
-        renameTarget: Binding<VaultNode?>,
         showDeleteConfirm: Binding<Bool>,
+        showNewNoteSheet: Binding<Bool>,
         onSelectionChange: @escaping (VaultNode.ID?) -> Void,
         onHasErrorChange: @escaping (Bool) -> Void,
         flushEditorError: @escaping () -> Void,
         exportPDF: @escaping () -> Void,
         openVault: @escaping () -> Void,
+        beginNewNote: @escaping () -> Void,
+        requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
-        renameSheet: @escaping (VaultNode) -> some View,
+        focusVaultSearch: @escaping () -> Void,
+        newNoteSheet: @escaping () -> some View,
+        deleteConfirmSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
     ) {
         self.store = store
         self.editor = editor
-        self._renameTarget = renameTarget
         self._showDeleteConfirm = showDeleteConfirm
+        self._showNewNoteSheet = showNewNoteSheet
         self.onSelectionChange = onSelectionChange
         self.onHasErrorChange = onHasErrorChange
         self.flushEditorError = flushEditorError
         self.exportPDF = exportPDF
         self.openVault = openVault
+        self.beginNewNote = beginNewNote
+        self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
-        self.renameSheet = { AnyView(renameSheet($0)) }
+        self.focusVaultSearch = focusVaultSearch
+        self.newNoteSheet = { AnyView(newNoteSheet()) }
+        self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
     }
 
@@ -513,10 +706,11 @@ private struct ContentViewChrome: ViewModifier {
             .modifier(ContentViewDialogs(
                 store: store,
                 editor: editor,
-                renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
+                showNewNoteSheet: $showNewNoteSheet,
                 flushEditorError: flushEditorError,
-                renameSheet: renameSheet
+                newNoteSheet: newNoteSheet,
+                deleteConfirmSheet: deleteConfirmSheet
             ))
             .onChange(of: store.selection) { _, newValue in
                 onSelectionChange(newValue)
@@ -529,14 +723,16 @@ private struct ContentViewChrome: ViewModifier {
                 exportPDF: exportPDF,
                 openVault: openVault,
                 toggleViewMode: toggleViewMode,
-                createNote: { store.createNote() },
+                createNote: beginNewNote,
                 createFolder: { store.createFolder() },
+                requestDelete: requestDelete,
                 refresh: { store.refresh() },
                 save: {
                     _ = editor.saveIfNeeded()
                     flushEditorError()
                 },
-                quitSaveFailed: flushEditorError
+                quitSaveFailed: flushEditorError,
+                focusVaultSearch: focusVaultSearch
             ))
     }
 }
@@ -544,10 +740,11 @@ private struct ContentViewChrome: ViewModifier {
 private struct ContentViewDialogs: ViewModifier {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
-    @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
+    @Binding var showNewNoteSheet: Bool
     var flushEditorError: () -> Void
-    var renameSheet: (VaultNode) -> AnyView
+    var newNoteSheet: () -> AnyView
+    var deleteConfirmSheet: () -> AnyView
 
     func body(content: Content) -> some View {
         content
@@ -610,24 +807,11 @@ private struct ContentViewDialogs: ViewModifier {
             } message: {
                 Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")
             }
-            .sheet(item: $renameTarget) { node in
-                renameSheet(node)
+            .sheet(isPresented: $showNewNoteSheet) {
+                newNoteSheet()
             }
-            .confirmationDialog(
-                "Move to Trash?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Move to Trash", role: .destructive) {
-                    if editor.close() {
-                        store.deleteSelected()
-                    } else {
-                        flushEditorError()
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This item will be moved to the Trash.")
+            .sheet(isPresented: $showDeleteConfirm) {
+                deleteConfirmSheet()
             }
     }
 }
@@ -639,9 +823,11 @@ private struct ContentViewCommands: ViewModifier {
     var toggleViewMode: () -> Void
     var createNote: () -> Void
     var createFolder: () -> Void
+    var requestDelete: () -> Void
     var refresh: () -> Void
     var save: () -> Void
     var quitSaveFailed: () -> Void
+    var focusVaultSearch: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -672,6 +858,14 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
                 guard shouldHandle() else { return }
                 refresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraDeleteSelection)) { _ in
+                guard shouldHandle() else { return }
+                requestDelete()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraFocusVaultSearch)) { _ in
+                guard shouldHandle() else { return }
+                focusVaultSearch()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
                 // All windows may surface; only key window needs UI (others already saved or clean).
