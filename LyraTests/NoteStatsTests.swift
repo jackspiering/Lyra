@@ -4,7 +4,8 @@ import XCTest
 final class NoteStatsTests: XCTestCase {
     func testWordCountSimple() {
         XCTAssertEqual(NoteStats.wordCount("hello world"), 2)
-        XCTAssertEqual(NoteStats.wordCount("  a   b\nc  "), 2)
+        // a, b, c — three whitespace-separated tokens (including newline)
+        XCTAssertEqual(NoteStats.wordCount("  a   b\nc  "), 3)
     }
 
     func testWordCountEmpty() {
