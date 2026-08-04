@@ -58,7 +58,9 @@ for path in \
   LyraTests/FileSystemVaultTests.swift \
   LyraTests/AttachmentStoreTests.swift \
   LyraTests/MarkdownImagePathTests.swift \
-  LyraTests/NotePDFExporterTests.swift
+  LyraTests/NotePDFExporterTests.swift \
+  LyraTests/EditorViewModelTests.swift \
+  LyraTests/MarkdownHighlighterTests.swift
 do
   if [[ -e "$path" ]]; then
     echo "  ok: $path"
@@ -79,7 +81,7 @@ for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Edi
 done
 
 echo "-- pbxproj references"
-for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks MarkdownImagePath AttachmentStore AttachmentStoreTests MarkdownImagePathTests NotePDFExporter NotePDFExporterTests NoteViewMode MarkdownBlockRow UserFacingError LyraFonts UserFacingErrorTests; do
+for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks MarkdownImagePath AttachmentStore AttachmentStoreTests MarkdownImagePathTests NotePDFExporter NotePDFExporterTests NoteViewMode MarkdownBlockRow UserFacingError LyraFonts UserFacingErrorTests EditorViewModelTests MarkdownHighlighterTests; do
   if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
     echo "  ok: pbxproj lists $name.swift"
   else

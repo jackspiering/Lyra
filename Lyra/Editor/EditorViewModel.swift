@@ -12,26 +12,34 @@ final class EditorViewModel {
 
     private var saveTask: Task<Void, Never>?
 
-    func open(url: URL) {
-        _ = saveIfNeeded()
+    /// Opens `url` after flushing dirty state. Returns `false` if a dirty save failed;
+    /// in that case `text` / `fileURL` / `isDirty` are left unchanged so the user can retry.
+    @discardableResult
+    func open(url: URL) -> Bool {
+        guard saveIfNeeded() else { return false }
         do {
             text = try String(contentsOf: url, encoding: .utf8)
             fileURL = url
             isDirty = false
             lastError = nil
+            return true
         } catch {
             fileURL = nil
             text = ""
             isDirty = false
             lastError = (.openNote, error)
+            return false
         }
     }
 
-    func close() {
-        _ = saveIfNeeded()
+    /// Closes the current note after flushing dirty state. Returns `false` if save failed.
+    @discardableResult
+    func close() -> Bool {
+        guard saveIfNeeded() else { return false }
         fileURL = nil
         text = ""
         isDirty = false
+        return true
     }
 
     /// Call after `text` has already been updated (e.g. via Binding).

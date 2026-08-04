@@ -3,21 +3,24 @@ import Foundation
 /// Resolve Markdown image paths and parse image-only lines for preview / PDF.
 enum MarkdownImagePath {
     /// Absolute path if the file exists; else note-relative if present; else vault-relative if present; else `nil`.
+    /// Percent-encoded destinations (e.g. from paste) are decoded before lookup.
     static func resolve(path: String, noteDirectory: URL, vaultRoot: URL) -> URL? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        let decoded = trimmed.removingPercentEncoding ?? trimmed
 
-        if let absolute = absoluteFileURL(from: trimmed) {
+        if let absolute = absoluteFileURL(from: decoded) {
             return FileManager.default.fileExists(atPath: absolute.path) ? absolute : nil
         }
 
-        // `appending(path:)` keeps multi-segment relatives (e.g. `_attachments/a.png`).
-        let noteURL = noteDirectory.appending(path: trimmed)
+        // `appending(path:)` keeps multi-segment relatives (e.g. `_attachments/a.png`, `../_attachments/a.png`).
+        let noteURL = noteDirectory.appending(path: decoded)
         if FileManager.default.fileExists(atPath: noteURL.path) {
             return noteURL
         }
 
-        let vaultURL = vaultRoot.appending(path: trimmed)
+        // Vault-root fallback keeps older notes that used `_attachments/…` from nested folders.
+        let vaultURL = vaultRoot.appending(path: decoded)
         if FileManager.default.fileExists(atPath: vaultURL.path) {
             return vaultURL
         }

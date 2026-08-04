@@ -18,7 +18,7 @@ enum FileSystemVault {
 
         let contents = try FileManager.default.contentsOfDirectory(
             at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
             options: [.skipsPackageDescendants]
         )
 
@@ -27,7 +27,13 @@ enum FileSystemVault {
             let childName = childURL.lastPathComponent
             guard shouldInclude(name: childName) else { continue }
 
-            let childIsDir = (try childURL.resourceValues(forKeys: [.isDirectoryKey])).isDirectory ?? false
+            let values = try childURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            // Skip directory symlinks to avoid ancestor loops (e.g. `ln -s .. loop`).
+            if values.isSymbolicLink == true, values.isDirectory == true {
+                continue
+            }
+
+            let childIsDir = values.isDirectory ?? false
             if childIsDir {
                 if childName == AttachmentStore.folderName { continue }
                 children.append(try scan(root: childURL))
