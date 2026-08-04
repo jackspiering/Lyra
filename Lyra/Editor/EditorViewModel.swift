@@ -12,8 +12,8 @@ final class EditorViewModel {
     /// Disk mtime changed under us while dirty — UI offers Keep Mine / Reload.
     var hasExternalConflict = false
 
-    /// Modification date observed at last successful open/save/reload.
-    private var diskModificationDate: Date?
+    /// Path + mtime observed at last successful open/save/reload.
+    private var diskSnapshot: (path: String, date: Date)?
     private var saveTask: Task<Void, Never>?
 
     /// Opens `url` after flushing dirty state. Returns `false` if a dirty save failed;
@@ -27,13 +27,13 @@ final class EditorViewModel {
             isDirty = false
             lastError = nil
             hasExternalConflict = false
-            diskModificationDate = Self.modificationDate(of: url)
+            rememberDiskSnapshot(for: url)
             return true
         } catch {
             fileURL = nil
             text = ""
             isDirty = false
-            diskModificationDate = nil
+            diskSnapshot = nil
             lastError = (.openNote, error)
             return false
         }
@@ -46,7 +46,7 @@ final class EditorViewModel {
         fileURL = nil
         text = ""
         isDirty = false
-        diskModificationDate = nil
+        diskSnapshot = nil
         hasExternalConflict = false
         return true
     }
@@ -77,7 +77,7 @@ final class EditorViewModel {
             isDirty = false
             lastError = nil
             hasExternalConflict = false
-            diskModificationDate = Self.modificationDate(of: url)
+            rememberDiskSnapshot(for: url)
             return true
         } catch {
             // Leave dirty so user can retry with ⌘S.
@@ -97,7 +97,7 @@ final class EditorViewModel {
             isDirty = false
             lastError = nil
             hasExternalConflict = false
-            diskModificationDate = Self.modificationDate(of: url)
+            rememberDiskSnapshot(for: url)
             return true
         } catch {
             lastError = (.openNote, error)
@@ -106,10 +106,18 @@ final class EditorViewModel {
     }
 
     private func hasDiskChanged(relativeTo url: URL) -> Bool {
-        guard let known = diskModificationDate else { return false }
+        guard let known = diskSnapshot, known.path == url.path else { return false }
         guard let current = Self.modificationDate(of: url) else { return false }
         // Small epsilon: filesystem mtime resolution can be coarse.
-        return current.timeIntervalSince(known) > 0.001
+        return current.timeIntervalSince(known.date) > 0.001
+    }
+
+    private func rememberDiskSnapshot(for url: URL) {
+        if let date = Self.modificationDate(of: url) {
+            diskSnapshot = (url.path, date)
+        } else {
+            diskSnapshot = nil
+        }
     }
 
     static func modificationDate(of url: URL) -> Date? {
