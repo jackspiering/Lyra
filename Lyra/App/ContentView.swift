@@ -31,6 +31,9 @@ struct ContentView: View {
             .background(
                 WindowNumberReader { hostWindowNumber = $0 }
             )
+            .background(
+                DocumentEditedReader(isEdited: editor.isDirty)
+            )
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }
@@ -153,11 +156,8 @@ struct ContentView: View {
             Label("Autosave paused", systemImage: "pause.circle")
                 .foregroundStyle(.orange)
                 .help("Conflict deferred — press ⌘S to resolve")
-        } else if editor.isDirty {
-            Label("Unsaved", systemImage: "circle.fill")
-                .foregroundStyle(.secondary)
-                .help("Unsaved changes")
         }
+        // Dirty state: traffic-light close button via DocumentEditedReader (no grey Unsaved label).
     }
 
     @ViewBuilder
@@ -562,6 +562,20 @@ private struct WindowNumberReader: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async { onChange(nsView.window?.windowNumber) }
+    }
+}
+
+// MARK: - Standard macOS dirty state on the close button
+
+private struct DocumentEditedReader: NSViewRepresentable {
+    var isEdited: Bool
+
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        view.window?.isDocumentEdited = isEdited
     }
 }
 

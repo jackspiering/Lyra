@@ -39,7 +39,7 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | ⌘R | Refresh vault from disk |
 | ⌘F | Focus sidebar vault search |
 
-Autosave runs after about 500ms of idle time. The toolbar shows **Unsaved**, **Save failed**, or **Autosave paused** when relevant.
+Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
 
 If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk. **Cancel** pauses autosave so the dialog does not loop; press ⌘S when you are ready to resolve. Quit is blocked while a save is refused (conflict, missing file, or I/O error).
 
