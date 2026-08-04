@@ -26,7 +26,7 @@
 
 | Trigger | What |
 |---------|------|
-| Push tag `v*` (e.g. `v0.6.2`) | Release build → DMG → GitHub Release asset |
+| Push tag `v*` (e.g. `v0.7.0`) | Release build → DMG → GitHub Release asset |
 | Manual **workflow_dispatch** | Same DMG build; artifact only (no Release unless tagged) |
 
 Version guard: the tag (or dispatch input) must be three-part semver and match `MARKETING_VERSION` in the Xcode project. The packaging script also checks `CFBundleShortVersionString` inside the built app.
@@ -45,21 +45,21 @@ Dependabot (`.github/dependabot.yml`) opens monthly PRs for GitHub Actions updat
 ```bash
 bash Scripts/smoke.sh
 bash Scripts/xcode-test.sh                              # Mac + Xcode
-VERSION=0.6.2 bash Scripts/package-dmg.sh               # → build/dist/Lyra-0.6.2.dmg
+VERSION=0.7.0 bash Scripts/package-dmg.sh               # → build/dist/Lyra-0.7.0.dmg
 ```
 
 ## Ship a DMG
 
-1. Merge to `main` with marketing version matching the intended tag (`0.6.2`).
+1. Merge to `main` with marketing version matching the intended tag (`0.7.0`).
 2. Tag and push:
 
 ```bash
 git checkout main && git pull
-git tag v0.6.2
-git push origin v0.6.2
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
-3. When **Actions → Release** is green, download `Lyra-0.6.2.dmg` from [Releases](https://github.com/jackspiering/Lyra/releases).
+3. When **Actions → Release** is green, download `Lyra-0.7.0.dmg` from [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ### Gatekeeper / signing
 

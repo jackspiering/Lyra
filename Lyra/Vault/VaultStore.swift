@@ -23,7 +23,10 @@ final class VaultStore {
     private var refreshGeneration = 0
 
     init() {
-        restoreLastVaultIfPossible()
+        // Multi-window: only the first store restores the last vault bookmark.
+        if AppSession.shared.claimLaunchVaultRestore() {
+            restoreLastVaultIfPossible()
+        }
     }
 
     func present(error: Error, context: UserFacingError.Context) {

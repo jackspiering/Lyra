@@ -32,7 +32,7 @@ PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](do
 - Update `docs/architecture.md` when structure or invariants change
 - Do not expand into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke (v0.6)
+## Manual smoke (v0.7)
 
 Required (~10 minutes):
 

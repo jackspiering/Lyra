@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
+    /// When this window already has a vault, Open Vault can spawn another window first.
+    var openNewVaultWindow: (() -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
@@ -17,10 +19,15 @@ struct ContentView: View {
         nonmutating set { noteViewModeRaw = newValue.rawValue }
     }
 
+    @State private var hostWindowNumber: Int?
+
     var body: some View {
         rootShell
             .frame(minWidth: 900, minHeight: 560)
             .font(LyraFonts.body)
+            .background(
+                WindowNumberReader { hostWindowNumber = $0 }
+            )
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }
@@ -35,7 +42,11 @@ struct ContentView: View {
                 exportPDF: exportPDF,
                 openVault: openVault,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
-                renameSheet: renameSheet
+                renameSheet: renameSheet,
+                shouldHandleCommands: {
+                    guard let hostWindowNumber else { return true }
+                    return NSApp.keyWindow?.windowNumber == hostWindowNumber
+                }
             ))
     }
 
@@ -62,7 +73,10 @@ struct ContentView: View {
             SidebarView(
                 store: store,
                 renameTarget: $renameTarget,
-                showDeleteConfirm: $showDeleteConfirm
+                showDeleteConfirm: $showDeleteConfirm,
+                onExportNotePDF: exportNotePDF,
+                onExportFolderSeparate: exportFolderSeparatePDFs,
+                onExportFolderCombined: exportFolderCombinedPDF
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
@@ -71,12 +85,6 @@ struct ContentView: View {
                         store.createNote()
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
-                    }
-
-                    Button {
-                        store.createFolder()
-                    } label: {
-                        Label("New Folder", systemImage: "folder.badge.plus")
                     }
                 }
             }
@@ -105,13 +113,7 @@ struct ContentView: View {
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 220)
-
-        Button {
-            noteViewMode = noteViewMode.next()
-        } label: {
-            Label("Toggle View Mode", systemImage: "rectangle.split.2x1")
-        }
-        .help("Toggle Source ↔ Reading")
+        .help("Source or Reading (⌘E)")
 
         Button {
             exportPDF()
@@ -195,16 +197,16 @@ struct ContentView: View {
     }
 
     private func openVault() {
-        let message = store.rootURL == nil
-            ? "Choose a folder to use as a Lyra vault"
-            : nil
-        if let url = VaultFolderPicker.pick(message: message ?? "Choose a folder to use as a Lyra vault") {
-            if store.rootURL == nil || editor.close() {
-                store.openVault(at: url)
-            } else {
-                flushEditorError()
-            }
+        guard let url = VaultFolderPicker.pick(message: "Choose a folder to use as a Lyra vault") else {
+            return
         }
+        if store.rootURL == nil {
+            store.openVault(at: url)
+            return
+        }
+        // Already have a vault — open the chosen folder in a new window.
+        AppSession.shared.setPendingVaultURL(url)
+        openNewVaultWindow?()
     }
 
     private func renameSheet(_ node: VaultNode) -> some View {
@@ -298,19 +300,110 @@ struct ContentView: View {
     }
 
     private func exportPDF() {
-        guard let noteURL = editor.fileURL, let vault = store.rootURL else { return }
+        guard let noteURL = editor.fileURL else { return }
         _ = editor.saveIfNeeded()
         flushEditorError()
+        exportMarkdown(
+            editor.text,
+            noteDirectory: noteURL.deletingLastPathComponent(),
+            suggestedName: noteURL.deletingPathExtension().lastPathComponent + ".pdf",
+            directoryURL: noteURL.deletingLastPathComponent()
+        )
+    }
+
+    private func exportNotePDF(_ node: VaultNode) {
+        guard !node.isDirectory, store.rootURL != nil else { return }
+        let markdown: String
+        if editor.fileURL?.path == node.url.path {
+            _ = editor.saveIfNeeded()
+            markdown = editor.text
+        } else {
+            do {
+                markdown = try String(contentsOf: node.url, encoding: .utf8)
+            } catch {
+                store.present(error: error, context: .exportPDF)
+                return
+            }
+        }
+        exportMarkdown(
+            markdown,
+            noteDirectory: node.url.deletingLastPathComponent(),
+            suggestedName: node.url.deletingPathExtension().lastPathComponent + ".pdf",
+            directoryURL: node.url.deletingLastPathComponent()
+        )
+    }
+
+    private func exportFolderSeparatePDFs(_ folder: VaultNode) {
+        guard folder.isDirectory, let vault = store.rootURL else { return }
+        let notes = FileSystemVault.collectNoteURLs(from: folder)
+        guard !notes.isEmpty else {
+            store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        panel.message = "Choose a folder for \(notes.count) PDF file(s)."
+        panel.begin { resp in
+            guard resp == .OK, let dest = panel.url else { return }
+            var failures = 0
+            for noteURL in notes {
+                do {
+                    let md = try String(contentsOf: noteURL, encoding: .utf8)
+                    let data = try NotePDFExporter.pdfData(
+                        markdown: md,
+                        noteDirectory: noteURL.deletingLastPathComponent(),
+                        vaultRoot: vault
+                    )
+                    let base = noteURL.deletingPathExtension().lastPathComponent
+                    var out = dest.appendingPathComponent("\(base).pdf")
+                    var n = 2
+                    while FileManager.default.fileExists(atPath: out.path) {
+                        out = dest.appendingPathComponent("\(base)-\(n).pdf")
+                        n += 1
+                    }
+                    try data.write(to: out, options: .atomic)
+                } catch {
+                    failures += 1
+                }
+            }
+            if failures > 0 {
+                store.present(
+                    context: .exportPDF,
+                    message: "Exported with \(failures) failure(s). Check permissions and disk space."
+                )
+            }
+        }
+    }
+
+    private func exportFolderCombinedPDF(_ folder: VaultNode) {
+        guard folder.isDirectory, let vault = store.rootURL else { return }
+        let notes = FileSystemVault.collectNoteURLs(from: folder).sorted {
+            $0.path.localizedStandardCompare($1.path) == .orderedAscending
+        }
+        guard !notes.isEmpty else {
+            store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
+            return
+        }
         do {
-            let data = try NotePDFExporter.pdfData(
-                markdown: editor.text,
-                noteDirectory: noteURL.deletingLastPathComponent(),
-                vaultRoot: vault
-            )
+            var sources: [NotePDFExporter.NoteSource] = []
+            for noteURL in notes {
+                let md = try String(contentsOf: noteURL, encoding: .utf8)
+                sources.append(
+                    NotePDFExporter.NoteSource(
+                        title: noteURL.deletingPathExtension().lastPathComponent,
+                        markdown: md,
+                        noteDirectory: noteURL.deletingLastPathComponent()
+                    )
+                )
+            }
+            let data = try NotePDFExporter.pdfData(notes: sources, vaultRoot: vault)
             let panel = NSSavePanel()
             panel.allowedContentTypes = [.pdf]
-            panel.nameFieldStringValue = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
-            panel.directoryURL = noteURL.deletingLastPathComponent()
+            panel.nameFieldStringValue = folder.name + ".pdf"
+            panel.directoryURL = folder.url
             panel.begin { resp in
                 guard resp == .OK, let url = panel.url else { return }
                 do {
@@ -322,6 +415,52 @@ struct ContentView: View {
         } catch {
             store.present(error: error, context: .exportPDF)
         }
+    }
+
+    private func exportMarkdown(
+        _ markdown: String,
+        noteDirectory: URL,
+        suggestedName: String,
+        directoryURL: URL?
+    ) {
+        guard let vault = store.rootURL else { return }
+        do {
+            let data = try NotePDFExporter.pdfData(
+                markdown: markdown,
+                noteDirectory: noteDirectory,
+                vaultRoot: vault
+            )
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.pdf]
+            panel.nameFieldStringValue = suggestedName
+            panel.directoryURL = directoryURL
+            panel.begin { resp in
+                guard resp == .OK, let url = panel.url else { return }
+                do {
+                    try data.write(to: url, options: .atomic)
+                } catch {
+                    store.present(error: error, context: .exportPDF)
+                }
+            }
+        } catch {
+            store.present(error: error, context: .exportPDF)
+        }
+    }
+}
+
+// MARK: - Key-window tracking for multi-window menus
+
+private struct WindowNumberReader: NSViewRepresentable {
+    var onChange: (Int?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { onChange(view.window?.windowNumber) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { onChange(nsView.window?.windowNumber) }
     }
 }
 
@@ -339,6 +478,7 @@ private struct ContentViewChrome: ViewModifier {
     var openVault: () -> Void
     var toggleViewMode: () -> Void
     var renameSheet: (VaultNode) -> AnyView
+    var shouldHandleCommands: () -> Bool
 
     init(
         store: VaultStore,
@@ -351,7 +491,8 @@ private struct ContentViewChrome: ViewModifier {
         exportPDF: @escaping () -> Void,
         openVault: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
-        renameSheet: @escaping (VaultNode) -> some View
+        renameSheet: @escaping (VaultNode) -> some View,
+        shouldHandleCommands: @escaping () -> Bool
     ) {
         self.store = store
         self.editor = editor
@@ -364,6 +505,7 @@ private struct ContentViewChrome: ViewModifier {
         self.openVault = openVault
         self.toggleViewMode = toggleViewMode
         self.renameSheet = { AnyView(renameSheet($0)) }
+        self.shouldHandleCommands = shouldHandleCommands
     }
 
     func body(content: Content) -> some View {
@@ -383,6 +525,7 @@ private struct ContentViewChrome: ViewModifier {
                 onHasErrorChange(has)
             }
             .modifier(ContentViewCommands(
+                shouldHandle: shouldHandleCommands,
                 exportPDF: exportPDF,
                 openVault: openVault,
                 toggleViewMode: toggleViewMode,
@@ -490,6 +633,7 @@ private struct ContentViewDialogs: ViewModifier {
 }
 
 private struct ContentViewCommands: ViewModifier {
+    var shouldHandle: () -> Bool
     var exportPDF: () -> Void
     var openVault: () -> Void
     var toggleViewMode: () -> Void
@@ -502,27 +646,36 @@ private struct ContentViewCommands: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
+                guard shouldHandle() else { return }
                 save()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
+                guard shouldHandle() else { return }
                 exportPDF()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraNewNote)) { _ in
+                guard shouldHandle() else { return }
                 createNote()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraNewFolder)) { _ in
+                guard shouldHandle() else { return }
                 createFolder()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraOpenVault)) { _ in
+                guard shouldHandle() else { return }
                 openVault()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraToggleViewMode)) { _ in
+                guard shouldHandle() else { return }
                 toggleViewMode()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
+                guard shouldHandle() else { return }
                 refresh()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
+                // All windows may surface; only key window needs UI (others already saved or clean).
+                guard shouldHandle() else { return }
                 quitSaveFailed()
             }
     }

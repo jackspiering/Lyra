@@ -98,4 +98,19 @@ final class NotePDFExporterTests: XCTestCase {
         XCTAssertFalse(text.contains("]("), "raw link syntax remains: \(text)")
         XCTAssertTrue(text.contains("bold"), "got: \(text)")
     }
+
+    func testCombinedNotesPDFContainsBothTitles() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let data = try NotePDFExporter.pdfData(
+            notes: [
+                .init(title: "AlphaNote", markdown: "body-a", noteDirectory: root),
+                .init(title: "BetaNote", markdown: "body-b", noteDirectory: root),
+            ],
+            vaultRoot: root
+        )
+        let text = try extractedText(from: data)
+        XCTAssertTrue(text.contains("AlphaNote"), "got: \(text)")
+        XCTAssertTrue(text.contains("BetaNote"), "got: \(text)")
+    }
 }

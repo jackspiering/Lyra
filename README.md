@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.2-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.7.0-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -49,7 +49,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Mode | Behavior |
 |------|----------|
 | Source | Raw Markdown with syntax highlighting |
-| Reading | Full-width preview |
+| Reading | Full-width preview (task checkboxes, clickable `[[wiki]]` links) |
 
 ## Features
 
@@ -58,6 +58,9 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
+| Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
+| Settings | Lyra → Settings: appearance (System / Light / Dark) and About |
+| Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
 | Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
@@ -90,16 +93,16 @@ bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 <details>
 <summary>Ship a release DMG</summary>
 
-Marketing version in Xcode must match the tag (`0.6.2` ↔ `v0.6.2`):
+Marketing version in Xcode must match the tag (`0.7.0` ↔ `v0.7.0`):
 
 ```bash
-git tag v0.6.2 && git push origin v0.6.2
+git tag v0.7.0 && git push origin v0.7.0
 ```
 
-CI builds an **ad-hoc signed** `Lyra-0.6.2.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
+CI builds an **ad-hoc signed** `Lyra-0.7.0.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.6.2 bash Scripts/package-dmg.sh   # local Mac → build/dist/
+VERSION=0.7.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
 
 More: [docs/ci.md](docs/ci.md)

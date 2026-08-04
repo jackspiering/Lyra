@@ -6,7 +6,8 @@ enum MarkdownPreviewBlocks {
         case heading(level: Int, text: String)
         case paragraph(String)
         /// `ordinal` is nil for bullets; present for ordered lists. `depth` is leading-spaces/2 (preview heuristic).
-        case listItem(text: String, ordinal: Int?, depth: Int)
+        /// `taskChecked` is non-nil for GitHub-style task list items (`- [ ]` / `- [x]`).
+        case listItem(text: String, ordinal: Int?, depth: Int, taskChecked: Bool?)
         case quote(String)
         case code(String)
         case thematicBreak
@@ -93,7 +94,7 @@ enum MarkdownPreviewBlocks {
         return blocks
     }
 
-    /// Protect `[[wiki]]` from CommonMark link parsing, then render inline markdown.
+    /// Turn `[[wiki]]` into markdown links `lyra-wiki:` so Reading can open them as clickable links.
     static func prepareInlineMarkdown(_ source: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return source }
         let ns = source as NSString
@@ -102,11 +103,26 @@ enum MarkdownPreviewBlocks {
         for match in matches {
             guard match.numberOfRanges > 1 else { continue }
             let name = ns.substring(with: match.range(at: 1))
-            let replacement = "**⟦\(name)⟧**"
+            let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+            // Escape brackets in the link label so nested markdown stays stable.
+            let label = name
+                .replacingOccurrences(of: "[", with: "\\[")
+                .replacingOccurrences(of: "]", with: "\\]")
+            let replacement = "[\(label)](lyra-wiki:\(encoded))"
             guard let range = Range(match.range, in: result) else { continue }
             result.replaceSubrange(range, with: replacement)
         }
         return result
+    }
+
+    /// Decode a `lyra-wiki:` URL produced by `prepareInlineMarkdown` back to the note name.
+    static func wikiLinkName(from url: URL) -> String? {
+        guard url.scheme == "lyra-wiki" else { return nil }
+        // lyra-wiki:Note%20Name — host is empty; path or resourceSpecifier holds the rest.
+        let raw = url.absoluteString
+        guard let colon = raw.firstIndex(of: ":") else { return nil }
+        let encoded = String(raw[raw.index(after: colon)...])
+        return encoded.removingPercentEncoding ?? encoded
     }
 
     // MARK: - Line split (UTF-16 offsets)
@@ -166,7 +182,24 @@ enum MarkdownPreviewBlocks {
         let depth = leading / 2
 
         if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
-            return .listItem(text: String(trimmed.dropFirst(2)), ordinal: nil, depth: depth)
+            let body = String(trimmed.dropFirst(2))
+            if body.hasPrefix("[ ] ") {
+                return .listItem(
+                    text: String(body.dropFirst(4)),
+                    ordinal: nil,
+                    depth: depth,
+                    taskChecked: false
+                )
+            }
+            if body.hasPrefix("[x] ") || body.hasPrefix("[X] ") {
+                return .listItem(
+                    text: String(body.dropFirst(4)),
+                    ordinal: nil,
+                    depth: depth,
+                    taskChecked: true
+                )
+            }
+            return .listItem(text: body, ordinal: nil, depth: depth, taskChecked: nil)
         }
         guard let regex = try? NSRegularExpression(pattern: #"^(\d+)\.\s+(.*)$"#) else { return nil }
         let ns = trimmed as NSString
@@ -174,6 +207,6 @@ enum MarkdownPreviewBlocks {
               match.numberOfRanges > 2 else { return nil }
         let ordinal = Int(ns.substring(with: match.range(at: 1)))
         let text = ns.substring(with: match.range(at: 2))
-        return .listItem(text: text, ordinal: ordinal, depth: depth)
+        return .listItem(text: text, ordinal: ordinal, depth: depth, taskChecked: nil)
     }
 }

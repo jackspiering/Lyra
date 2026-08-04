@@ -56,11 +56,13 @@ One primary type per file when practical.
 
 **Why:** Source is continuous `MarkdownTextView` (caret on click, live typing). Reading is rendered, non-editable preview (images, wiki links). A third identical editor mode was not worth the UI weight.
 
-### Single window
+### Multi-window vaults (v0.7+)
 
-**Choice:** `Window("Lyra")` rather than `WindowGroup`.
+**Choice:** `WindowGroup` — one vault (`VaultStore` + `EditorViewModel`) per window.
 
-**Why:** Multi-window document architecture is a non-goal; one vault state and one notification-driven Save/Export path stay unambiguous.
+**Why:** Users need two folders open at once without a multi-vault tab bar. Menu commands target the key window only; quit flushes every open editor via `AppSession`.
+
+**Consequence:** Opening a vault while one is already open creates a new window for the chosen folder.
 
 ### Inter typeface (v0.5)
 
