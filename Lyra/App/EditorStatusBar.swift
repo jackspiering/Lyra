@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Bottom strip under the note detail: word/letter counts and file dates.
+/// Bottom strip under the note detail: word/character counts and file dates.
 struct EditorStatusBar: View {
     let wordCount: Int
-    let letterCount: Int
+    let characterCount: Int
     let created: Date?
     let lastSaved: Date?
 
@@ -15,19 +15,23 @@ struct EditorStatusBar: View {
     }()
 
     var body: some View {
-        HStack(spacing: 16) {
-            stat("Words", value: "\(wordCount)")
-            stat("Letters", value: "\(letterCount)")
+        HStack(spacing: 0) {
+            Text("Words \(wordCount)")
+            sep
+            Text("Characters \(characterCount)")
             if let created {
-                stat("Created", value: Self.dateFormatter.string(from: created))
+                sep
+                Text("Created \(Self.dateFormatter.string(from: created))")
             }
             if let lastSaved {
-                stat("Saved", value: Self.dateFormatter.string(from: lastSaved))
+                sep
+                Text("Saved \(Self.dateFormatter.string(from: lastSaved))")
             }
             Spacer(minLength: 0)
         }
         .font(LyraFonts.caption)
         .foregroundStyle(.secondary)
+        .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -36,8 +40,7 @@ struct EditorStatusBar: View {
         }
     }
 
-    private func stat(_ label: String, value: String) -> some View {
-        Text("\(label) \(value)")
-            .lineLimit(1)
+    private var sep: some View {
+        Text("  |  ").foregroundStyle(.tertiary)
     }
 }

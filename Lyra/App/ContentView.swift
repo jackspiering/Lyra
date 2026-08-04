@@ -172,7 +172,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 EditorStatusBar(
                     wordCount: NoteStats.wordCount(editor.text),
-                    letterCount: NoteStats.letterCount(editor.text),
+                    characterCount: NoteStats.characterCount(editor.text),
                     created: editor.createdAt,
                     lastSaved: editor.lastSavedAt
                 )
