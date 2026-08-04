@@ -15,6 +15,8 @@ final class VaultStore {
     var errorMessage: String?
     private var isAccessingSecurityScope = false
     private var wikiResolver = WikiLinkResolver(noteURLs: [])
+    /// Drops stale async scan results when a newer refresh was requested.
+    private var refreshGeneration = 0
 
     init() {
         restoreLastVaultIfPossible()
@@ -41,30 +43,31 @@ final class VaultStore {
         stopAccessingIfNeeded()
         clearError()
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
-
-        do {
-            let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
-        } catch {
-            present(error: error, context: .rememberVault)
-        }
-
+        persistBookmark(for: url)
         rootURL = url
         refresh()
     }
 
+    /// Scan the vault off the main actor so large trees don't beachball the UI.
     func refresh() {
         guard let rootURL else { return }
-        do {
-            let node = try FileSystemVault.scan(root: rootURL)
-            rootNode = node
-            wikiResolver = WikiLinkResolver(noteURLs: FileSystemVault.collectNoteURLs(from: node))
-        } catch {
-            present(error: error, context: .readVault)
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let url = rootURL
+        Task { [weak self] in
+            do {
+                let node = try await Task.detached(priority: .userInitiated) {
+                    try FileSystemVault.scan(root: url)
+                }.value
+                guard let self, generation == self.refreshGeneration else { return }
+                self.rootNode = node
+                self.wikiResolver = WikiLinkResolver(
+                    noteURLs: FileSystemVault.collectNoteURLs(from: node)
+                )
+            } catch {
+                guard let self, generation == self.refreshGeneration else { return }
+                self.present(error: error, context: .readVault)
+            }
         }
     }
 
@@ -116,16 +119,44 @@ final class VaultStore {
 
     func renameSelected(to newName: String) {
         guard let node = selectedNode() else { return }
-        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let dest = node.url.deletingLastPathComponent().appendingPathComponent(trimmed)
-        do {
-            try FileManager.default.moveItem(at: node.url, to: dest)
-            refresh()
-            selection = dest.path
-        } catch {
-            present(error: error, context: .rename)
+        switch Self.validatedRename(newName, isDirectory: node.isDirectory) {
+        case .failure(let detail):
+            present(
+                context: .rename,
+                message: UserFacingError.message(context: .rename, detail: detail)
+            )
+            return
+        case .success(let name):
+            let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
+            do {
+                try FileManager.default.moveItem(at: node.url, to: dest)
+                refresh()
+                selection = dest.path
+            } catch {
+                present(error: error, context: .rename)
+            }
         }
+    }
+
+    /// Pure rename rules for notes/folders. Used by the sheet and unit tests.
+    static func validatedRename(_ newName: String, isDirectory: Bool) -> Result<String, String> {
+        var trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .failure("Name can't be empty.")
+        }
+        if trimmed.contains("/") || trimmed.contains(":") {
+            return .failure("Names can't contain / or :.")
+        }
+        if trimmed.hasPrefix(".") {
+            return .failure("Names can't start with a period (they'd be hidden).")
+        }
+        if trimmed == ".." || trimmed == "." {
+            return .failure("That name isn't valid.")
+        }
+        if !isDirectory, !trimmed.lowercased().hasSuffix(".md") {
+            trimmed += ".md"
+        }
+        return .success(trimmed)
     }
 
     func deleteSelected() {
@@ -139,6 +170,11 @@ final class VaultStore {
         }
     }
 
+    /// Balance `startAccessingSecurityScopedResource` (e.g. on quit).
+    func releaseAccess() {
+        stopAccessingIfNeeded()
+    }
+
     private func restoreLastVaultIfPossible() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
         var isStale = false
@@ -149,6 +185,23 @@ final class VaultStore {
             bookmarkDataIsStale: &isStale
         ) else { return }
         openVault(at: url)
+        // openVault already re-persists; if the resolved bookmark was stale, rewrite it.
+        if isStale {
+            persistBookmark(for: url)
+        }
+    }
+
+    private func persistBookmark(for url: URL) {
+        do {
+            let bookmark = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+        } catch {
+            present(error: error, context: .rememberVault)
+        }
     }
 
     private func stopAccessingIfNeeded() {

@@ -88,4 +88,46 @@ final class EditorViewModelTests: XCTestCase {
         let diskA = try String(contentsOf: a, encoding: .utf8)
         XCTAssertEqual(diskA, "a-updated")
     }
+
+    func testSaveBlockedWhenDiskChangedExternally() throws {
+        let a = tempRoot.appendingPathComponent("ext.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "local edits"
+        editor.isDirty = true
+
+        try "theirs".write(to: a, atomically: true, encoding: .utf8)
+        // Force a newer mtime so detection is reliable across filesystems.
+        let future = Date().addingTimeInterval(3600)
+        try FileManager.default.setAttributes([.modificationDate: future], ofItemAtPath: a.path)
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasExternalConflict)
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertEqual(editor.text, "local edits")
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
+
+        XCTAssertTrue(editor.saveIfNeeded(force: true))
+        XCTAssertFalse(editor.hasExternalConflict)
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "local edits")
+    }
+
+    func testReloadFromDiskDiscardsLocalEdits() throws {
+        let a = tempRoot.appendingPathComponent("reload.md")
+        try "disk".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "local"
+        editor.isDirty = true
+        try "updated-on-disk".write(to: a, atomically: true, encoding: .utf8)
+
+        XCTAssertTrue(editor.reloadFromDisk())
+        XCTAssertEqual(editor.text, "updated-on-disk")
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertFalse(editor.hasExternalConflict)
+    }
 }

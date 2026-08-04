@@ -29,6 +29,29 @@ DMG_PATH="${OUT_DIR}/${DMG_NAME}"
 
 echo "Packaging Lyra ${VERSION} → ${DMG_PATH}"
 
+# Refuse to rm -rf paths that are empty or outside the repo (caller-overridable env vars).
+assert_under_root() {
+  local label="$1"
+  local path="$2"
+  if [[ -z "$path" ]]; then
+    echo "error: $label is empty" >&2
+    exit 1
+  fi
+  local resolved
+  resolved="$(cd "$(dirname "$path")" 2>/dev/null && pwd)/$(basename "$path")" || resolved="$path"
+  case "$resolved" in
+    "$ROOT"|"$ROOT"/*) ;;
+    *)
+      echo "error: $label must be under $ROOT (got: $path)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+assert_under_root DERIVED_DATA "$DERIVED_DATA"
+assert_under_root STAGE "$STAGE"
+assert_under_root OUT_DIR "$OUT_DIR"
+
 rm -rf "$DERIVED_DATA" "$STAGE" "$OUT_DIR"
 mkdir -p "$STAGE" "$OUT_DIR"
 

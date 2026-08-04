@@ -37,16 +37,18 @@ PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](do
 1. Open a vault with nested `.md` files
 2. Sidebar shows folders + Markdown only (no `.git` / hidden)
 3. **Source:** edit, wait ~1s, quit/reopen — content persisted
-4. **⌘E** / segmented control: Source → Live → Reading; mode survives relaunch
-5. **Live:** click in the note — blinking caret; type — content updates; no Done/Cancel
-6. Create, rename, delete note and folder
-7. `[[Other Note]]` opens from Reading when the file exists
-8. **Source:** paste image → `_attachments/` + link; shows in Live/Reading
-9. **Live:** paste image (same as Source) → `_attachments/` + link; shows in Reading
+4. **⌘E** / segmented control: Source ↔ Reading; mode survives relaunch
+5. **Source:** click in the note — blinking caret; type — content updates
+6. Create, rename, delete note and folder (rename without `.md` still keeps a Markdown file)
+7. Selecting a **folder** does not close the open note
+8. `[[Other Note]]` opens from Reading when the file exists
+9. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading
 10. **Export PDF…** from each mode
 11. **⌘S** saves immediately
-12. A failed save/paste shows a plain-language alert (not raw Cocoa codes)
-13. Body text uses Inter; code fences stay monospaced
+12. Edit a note, change the file on disk (e.g. another editor), type again → Keep Mine / Reload dialog
+13. A failed save/paste shows a plain-language alert (not raw Cocoa codes)
+14. Body text uses Inter; code fences stay monospaced
+15. No File → New Window (single main window)
 
 ## License
 
