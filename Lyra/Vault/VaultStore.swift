@@ -120,13 +120,13 @@ final class VaultStore {
     func renameSelected(to newName: String) {
         guard let node = selectedNode() else { return }
         switch Self.validatedRename(newName, isDirectory: node.isDirectory) {
-        case .failure(let detail):
+        case .invalid(let detail):
             present(
                 context: .rename,
                 message: UserFacingError.message(context: .rename, detail: detail)
             )
             return
-        case .success(let name):
+        case .ok(let name):
             let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
             do {
                 try FileManager.default.moveItem(at: node.url, to: dest)
@@ -139,24 +139,29 @@ final class VaultStore {
     }
 
     /// Pure rename rules for notes/folders. Used by the sheet and unit tests.
-    static func validatedRename(_ newName: String, isDirectory: Bool) -> Result<String, String> {
+    enum ValidatedRename: Equatable {
+        case ok(String)
+        case invalid(String)
+    }
+
+    static func validatedRename(_ newName: String, isDirectory: Bool) -> ValidatedRename {
         var trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return .failure("Name can't be empty.")
+            return .invalid("Name can't be empty.")
         }
         if trimmed.contains("/") || trimmed.contains(":") {
-            return .failure("Names can't contain / or :.")
+            return .invalid("Names can't contain / or :.")
         }
         if trimmed.hasPrefix(".") {
-            return .failure("Names can't start with a period (they'd be hidden).")
+            return .invalid("Names can't start with a period (they'd be hidden).")
         }
         if trimmed == ".." || trimmed == "." {
-            return .failure("That name isn't valid.")
+            return .invalid("That name isn't valid.")
         }
         if !isDirectory, !trimmed.lowercased().hasSuffix(".md") {
             trimmed += ".md"
         }
-        return .success(trimmed)
+        return .ok(trimmed)
     }
 
     func deleteSelected() {
