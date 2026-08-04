@@ -26,6 +26,8 @@ struct ContentView: View {
 
     var body: some View {
         rootShell
+            // Vault folder name when open; empty when none — no center “Lyra” brand.
+            .navigationTitle(store.rootURL?.lastPathComponent ?? "")
             .frame(minWidth: 900, minHeight: 560)
             .font(LyraFonts.body)
             .background(
@@ -120,11 +122,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailToolbar: some View {
-        Button {
-            openVault()
-        } label: {
-            Label("Open Vault", systemImage: "folder")
-        }
+        // Open Vault stays in the sidebar toolbar and File menu only.
 
         Picker("View", selection: $noteViewModeRaw) {
             ForEach(NoteViewMode.allCases) { mode in
