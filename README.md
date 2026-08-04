@@ -33,17 +33,19 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | Shortcut | Action |
 |----------|--------|
 | ⌘O | Open vault |
-| ⌘N | New note |
-| ⌘S | Save now |
+| ⌘N | New note (name dialog if enabled in Settings) |
+| ⌘⌫ | Move selection to Trash |
+| ↵ in sidebar | Rename selected note or folder |
+| ⌘F | Focus vault search |
 | ⌘E | Toggle Source ↔ Reading |
+| ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
-| ⌘F | Focus sidebar vault search |
 
 Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
 
 If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk. **Cancel** pauses autosave so the dialog does not loop; press ⌘S when you are ready to resolve. Quit is blocked while a save is refused (conflict, missing file, or I/O error).
 
-If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog — save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
+If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog. You can save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
 
 ### View modes
 
@@ -62,9 +64,9 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Rename | Press Return, or click the name of the selected item (Finder-style); Escape cancels |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
-| Settings | Lyra → Settings: appearance; ask-for-name when creating notes; default note stem; confirm before Trash; About |
-| New note | ⌘N / toolbar / context menu — optional name dialog (stem selected); unique Untitled.md when prompt is off |
-| Move to Trash | ⌘⌫ / File menu / context Delete — optional confirm with “Don’t ask again” |
+| Settings | Lyra → Settings: appearance; prompt for note name; default note stem; confirm before Trash; About (acks, MIT, latest release) |
+| New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
+| Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm with “Don’t ask again” |
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
@@ -142,6 +144,8 @@ More: [docs/ci.md](docs/ci.md)
 See [CONTRIBUTING.md](CONTRIBUTING.md). Prefer small PRs. Update this README when user-facing behavior changes.
 
 ## Acknowledgments
+
+Also listed in Settings → About:
 
 - [Inter](https://rsms.me/inter/) by Rasmus Andersson, SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
 
