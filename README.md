@@ -68,6 +68,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
+| Status bar | Bottom of the open note: word and letter counts, created date, last saved |
 | Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |

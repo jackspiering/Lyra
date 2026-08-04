@@ -169,25 +169,39 @@ struct ContentView: View {
                 description: Text("Choose a Markdown file from the sidebar, or create a new note.")
             )
         } else {
-            switch noteViewMode {
-            case .source:
-                MarkdownTextView(
-                    text: $editor.text,
-                    vaultRoot: store.rootURL,
-                    noteURL: editor.fileURL,
-                    onEdit: { editor.noteEdited() },
-                    onPasteError: { store.present(context: .pasteImage, message: $0) }
-                )
-                // Per-file identity: reset selection, scroll, and undo when switching notes.
-                .id(editor.fileURL?.path)
-            case .reading:
-                MarkdownPreviewView(
-                    text: editor.text,
-                    noteDirectory: editor.fileURL?.deletingLastPathComponent(),
-                    vaultRoot: store.rootURL,
-                    onWikiLink: { openWikiLink($0) }
+            VStack(spacing: 0) {
+                noteContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EditorStatusBar(
+                    wordCount: NoteStats.wordCount(editor.text),
+                    letterCount: NoteStats.letterCount(editor.text),
+                    created: editor.createdAt,
+                    lastSaved: editor.lastSavedAt
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private var noteContent: some View {
+        switch noteViewMode {
+        case .source:
+            MarkdownTextView(
+                text: $editor.text,
+                vaultRoot: store.rootURL,
+                noteURL: editor.fileURL,
+                onEdit: { editor.noteEdited() },
+                onPasteError: { store.present(context: .pasteImage, message: $0) }
+            )
+            // Per-file identity: reset selection, scroll, and undo when switching notes.
+            .id(editor.fileURL?.path)
+        case .reading:
+            MarkdownPreviewView(
+                text: editor.text,
+                noteDirectory: editor.fileURL?.deletingLastPathComponent(),
+                vaultRoot: store.rootURL,
+                onWikiLink: { openWikiLink($0) }
+            )
         }
     }
 

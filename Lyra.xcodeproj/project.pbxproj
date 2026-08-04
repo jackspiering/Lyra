@@ -55,6 +55,9 @@
 		A10000000000000000000036 /* FilenameValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000036 /* FilenameValidationTests.swift */; };
 		A10000000000000000000037 /* VaultSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* VaultSearch.swift */; };
 		A10000000000000000000038 /* VaultSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* VaultSearchTests.swift */; };
+		A10000000000000000000039 /* NoteStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000039 /* NoteStats.swift */; };
+		A1000000000000000000003A /* EditorStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003A /* EditorStatusBar.swift */; };
+		A1000000000000000000003B /* NoteStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003B /* NoteStatsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -120,6 +123,9 @@
 		B10000000000000000000036 /* FilenameValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameValidationTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000037 /* VaultSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSearch.swift; sourceTree = "<group>"; };
 		B10000000000000000000038 /* VaultSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSearchTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000039 /* NoteStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStats.swift; sourceTree = "<group>"; };
+		B1000000000000000000003A /* EditorStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorStatusBar.swift; sourceTree = "<group>"; };
+		B1000000000000000000003B /* NoteStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStatsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +187,7 @@
 				B1000000000000000000002F /* VaultStoreRenameTests.swift */,
 				B10000000000000000000036 /* FilenameValidationTests.swift */,
 				B10000000000000000000038 /* VaultSearchTests.swift */,
+				B1000000000000000000003B /* NoteStatsTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -210,6 +217,8 @@
 				B10000000000000000000032 /* AppSession.swift */,
 				B10000000000000000000034 /* GeneralPreferences.swift */,
 				B10000000000000000000035 /* FilenameValidation.swift */,
+				B10000000000000000000039 /* NoteStats.swift */,
+				B1000000000000000000003A /* EditorStatusBar.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -401,6 +410,8 @@
 				A10000000000000000000034 /* GeneralPreferences.swift in Sources */,
 				A10000000000000000000035 /* FilenameValidation.swift in Sources */,
 				A10000000000000000000037 /* VaultSearch.swift in Sources */,
+				A10000000000000000000039 /* NoteStats.swift in Sources */,
+				A1000000000000000000003A /* EditorStatusBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,6 +432,7 @@
 				A1000000000000000000002F /* VaultStoreRenameTests.swift in Sources */,
 				A10000000000000000000036 /* FilenameValidationTests.swift in Sources */,
 				A10000000000000000000038 /* VaultSearchTests.swift in Sources */,
+				A1000000000000000000003B /* NoteStatsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
