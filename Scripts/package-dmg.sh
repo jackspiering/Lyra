@@ -30,6 +30,7 @@ DMG_PATH="${OUT_DIR}/${DMG_NAME}"
 echo "Packaging Lyra ${VERSION} → ${DMG_PATH}"
 
 # Refuse to rm -rf paths that are empty or outside the repo (caller-overridable env vars).
+# Do not require the path (or its parent) to exist yet — CI starts with no build/ tree.
 assert_under_root() {
   local label="$1"
   local path="$2"
@@ -37,9 +38,11 @@ assert_under_root() {
     echo "error: $label is empty" >&2
     exit 1
   fi
-  local resolved
-  resolved="$(cd "$(dirname "$path")" 2>/dev/null && pwd)/$(basename "$path")" || resolved="$path"
-  case "$resolved" in
+  local abs="$path"
+  if [[ "$abs" != /* ]]; then
+    abs="$ROOT/$abs"
+  fi
+  case "$abs" in
     "$ROOT"|"$ROOT"/*) ;;
     *)
       echo "error: $label must be under $ROOT (got: $path)" >&2
