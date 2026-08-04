@@ -18,155 +18,42 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Group {
-            if store.rootURL == nil {
-                ContentUnavailableView {
-                    Label("No Vault Open", systemImage: "folder.badge.questionmark")
-                } description: {
-                    Text("Open a folder of Markdown files to begin.")
-                } actions: {
-                    Button("Open Vault…") {
-                        openVault()
-                    }
-                    .buttonStyle(.borderedProminent)
+        rootShell
+            .frame(minWidth: 900, minHeight: 560)
+            .font(LyraFonts.body)
+            .onChange(of: scenePhase) { _, phase in
+                handleScenePhase(phase)
+            }
+            .modifier(ContentViewChrome(
+                store: store,
+                editor: editor,
+                renameTarget: $renameTarget,
+                showDeleteConfirm: $showDeleteConfirm,
+                onSelectionChange: handleSelectionChange,
+                onHasErrorChange: handleHasErrorChange,
+                flushEditorError: flushEditorError,
+                exportPDF: exportPDF,
+                openVault: openVault,
+                toggleViewMode: { noteViewMode = noteViewMode.next() },
+                renameSheet: renameSheet
+            ))
+    }
+
+    @ViewBuilder
+    private var rootShell: some View {
+        if store.rootURL == nil {
+            ContentUnavailableView {
+                Label("No Vault Open", systemImage: "folder.badge.questionmark")
+            } description: {
+                Text("Open a folder of Markdown files to begin.")
+            } actions: {
+                Button("Open Vault…") {
+                    openVault()
                 }
-            } else {
-                vaultWorkspace
+                .buttonStyle(.borderedProminent)
             }
-        }
-        .frame(minWidth: 900, minHeight: 560)
-        .font(LyraFonts.body)
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                if store.rootURL != nil {
-                    store.refresh()
-                }
-            } else {
-                _ = editor.saveIfNeeded()
-                flushEditorError()
-            }
-        }
-        .alert(
-            store.errorTitle ?? "Something went wrong",
-            isPresented: Binding(
-                get: { store.errorMessage != nil },
-                set: { if !$0 { store.clearError() } }
-            )
-        ) {
-            Button("OK", role: .cancel) { store.clearError() }
-        } message: {
-            Text(store.errorMessage ?? "")
-        }
-        .confirmationDialog(
-            "Note changed on disk",
-            isPresented: Binding(
-                get: { editor.hasExternalConflict },
-                set: { if !$0 { editor.hasExternalConflict = false } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Keep Mine") {
-                if editor.saveIfNeeded(force: true) {
-                    // ok
-                } else {
-                    flushEditorError()
-                }
-            }
-            Button("Reload Theirs") {
-                if !editor.reloadFromDisk() {
-                    flushEditorError()
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                editor.deferConflict()
-            }
-        } message: {
-            Text("This file was modified outside Lyra. Saving would overwrite those changes.")
-        }
-        .confirmationDialog(
-            "Note moved or deleted",
-            isPresented: Binding(
-                get: { editor.hasMissingFile },
-                set: { if !$0 { editor.hasMissingFile = false } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Save Here") {
-                if !editor.saveIfNeeded(force: true) {
-                    flushEditorError()
-                }
-            }
-            Button("Close Note", role: .destructive) {
-                // close() allows escape when the path is gone (no silent trap).
-                _ = editor.close()
-                store.selection = nil
-            }
-            Button("Cancel", role: .cancel) {
-                editor.hasMissingFile = false
-                // Suspend autosave so we do not recreate the file every 500ms.
-                editor.deferConflict()
-            }
-        } message: {
-            Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")
-        }
-        .onChange(of: store.selection) { _, newValue in
-            handleSelectionChange(newValue)
-        }
-        .onChange(of: editor.hasError) { _, has in
-            // Surface autosave failures once; the toolbar indicator covers the ongoing state.
-            if has && !didAlertSaveFailure {
-                didAlertSaveFailure = true
-                flushEditorError()
-            }
-            if !has {
-                didAlertSaveFailure = false
-            }
-        }
-        .sheet(item: $renameTarget) { node in
-            renameSheet(node)
-        }
-        .confirmationDialog(
-            "Move to Trash?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Move to Trash", role: .destructive) {
-                if editor.close() {
-                    store.deleteSelected()
-                } else {
-                    flushEditorError()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This item will be moved to the Trash.")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
-            _ = editor.saveIfNeeded()
-            flushEditorError()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
-            exportPDF()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraNewNote)) { _ in
-            store.createNote()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraNewFolder)) { _ in
-            store.createFolder()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraOpenVault)) { _ in
-            openVault()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraToggleViewMode)) { _ in
-            noteViewMode = noteViewMode.next()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
-            store.refresh()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
-            flushEditorError()
-            // Re-surface conflict / missing-file dialogs if those blocked the quit.
-            // Flags are already set by saveIfNeeded; confirmationDialogs bind to them.
+        } else {
+            vaultWorkspace
         }
     }
 
@@ -197,50 +84,60 @@ struct ContentView: View {
             noteDetail
                 .toolbar {
                     ToolbarItemGroup {
-                        Button {
-                            openVault()
-                        } label: {
-                            Label("Open Vault", systemImage: "folder")
-                        }
-
-                        Picker("View", selection: $noteViewModeRaw) {
-                            ForEach(NoteViewMode.allCases) { mode in
-                                Text(mode.label).tag(mode.rawValue)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 220)
-
-                        Button {
-                            noteViewMode = noteViewMode.next()
-                        } label: {
-                            Label("Toggle View Mode", systemImage: "rectangle.split.2x1")
-                        }
-                        .help("Toggle Source ↔ Reading")
-
-                        Button {
-                            exportPDF()
-                        } label: {
-                            Label("Export PDF", systemImage: "doc.richtext")
-                        }
-                        .disabled(editor.fileURL == nil)
-                        .help("Export current note to PDF")
-
-                        if editor.lastSaveFailed {
-                            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                                .help("Last save failed — press ⌘S to retry")
-                        } else if editor.conflictDeferred {
-                            Label("Autosave paused", systemImage: "pause.circle")
-                                .foregroundStyle(.orange)
-                                .help("Conflict deferred — press ⌘S to resolve")
-                        } else if editor.isDirty {
-                            Label("Unsaved", systemImage: "circle.fill")
-                                .foregroundStyle(.secondary)
-                                .help("Unsaved changes")
-                        }
+                        detailToolbar
                     }
                 }
+        }
+    }
+
+    @ViewBuilder
+    private var detailToolbar: some View {
+        Button {
+            openVault()
+        } label: {
+            Label("Open Vault", systemImage: "folder")
+        }
+
+        Picker("View", selection: $noteViewModeRaw) {
+            ForEach(NoteViewMode.allCases) { mode in
+                Text(mode.label).tag(mode.rawValue)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 220)
+
+        Button {
+            noteViewMode = noteViewMode.next()
+        } label: {
+            Label("Toggle View Mode", systemImage: "rectangle.split.2x1")
+        }
+        .help("Toggle Source ↔ Reading")
+
+        Button {
+            exportPDF()
+        } label: {
+            Label("Export PDF", systemImage: "doc.richtext")
+        }
+        .disabled(editor.fileURL == nil)
+        .help("Export current note to PDF")
+
+        saveStatusLabel
+    }
+
+    @ViewBuilder
+    private var saveStatusLabel: some View {
+        if editor.lastSaveFailed {
+            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .help("Last save failed — press ⌘S to retry")
+        } else if editor.conflictDeferred {
+            Label("Autosave paused", systemImage: "pause.circle")
+                .foregroundStyle(.orange)
+                .help("Conflict deferred — press ⌘S to resolve")
+        } else if editor.isDirty {
+            Label("Unsaved", systemImage: "circle.fill")
+                .foregroundStyle(.secondary)
+                .help("Unsaved changes")
         }
     }
 
@@ -272,6 +169,28 @@ struct ContentView: View {
                     onWikiLink: { openWikiLink($0) }
                 )
             }
+        }
+    }
+
+    private func handleScenePhase(_ phase: ScenePhase) {
+        if phase == .active {
+            if store.rootURL != nil {
+                store.refresh()
+            }
+        } else {
+            _ = editor.saveIfNeeded()
+            flushEditorError()
+        }
+    }
+
+    private func handleHasErrorChange(_ has: Bool) {
+        // Surface autosave failures once; the toolbar indicator covers the ongoing state.
+        if has && !didAlertSaveFailure {
+            didAlertSaveFailure = true
+            flushEditorError()
+        }
+        if !has {
+            didAlertSaveFailure = false
         }
     }
 
@@ -403,5 +322,208 @@ struct ContentView: View {
         } catch {
             store.present(error: error, context: .exportPDF)
         }
+    }
+}
+
+// MARK: - Chrome (dialogs + commands) — kept out of `body` so the type-checker stays happy
+
+private struct ContentViewChrome: ViewModifier {
+    @Bindable var store: VaultStore
+    @Bindable var editor: EditorViewModel
+    @Binding var renameTarget: VaultNode?
+    @Binding var showDeleteConfirm: Bool
+    var onSelectionChange: (VaultNode.ID?) -> Void
+    var onHasErrorChange: (Bool) -> Void
+    var flushEditorError: () -> Void
+    var exportPDF: () -> Void
+    var openVault: () -> Void
+    var toggleViewMode: () -> Void
+    var renameSheet: (VaultNode) -> AnyView
+
+    init(
+        store: VaultStore,
+        editor: EditorViewModel,
+        renameTarget: Binding<VaultNode?>,
+        showDeleteConfirm: Binding<Bool>,
+        onSelectionChange: @escaping (VaultNode.ID?) -> Void,
+        onHasErrorChange: @escaping (Bool) -> Void,
+        flushEditorError: @escaping () -> Void,
+        exportPDF: @escaping () -> Void,
+        openVault: @escaping () -> Void,
+        toggleViewMode: @escaping () -> Void,
+        renameSheet: @escaping (VaultNode) -> some View
+    ) {
+        self.store = store
+        self.editor = editor
+        self._renameTarget = renameTarget
+        self._showDeleteConfirm = showDeleteConfirm
+        self.onSelectionChange = onSelectionChange
+        self.onHasErrorChange = onHasErrorChange
+        self.flushEditorError = flushEditorError
+        self.exportPDF = exportPDF
+        self.openVault = openVault
+        self.toggleViewMode = toggleViewMode
+        self.renameSheet = { AnyView(renameSheet($0)) }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(ContentViewDialogs(
+                store: store,
+                editor: editor,
+                renameTarget: $renameTarget,
+                showDeleteConfirm: $showDeleteConfirm,
+                flushEditorError: flushEditorError,
+                renameSheet: renameSheet
+            ))
+            .onChange(of: store.selection) { _, newValue in
+                onSelectionChange(newValue)
+            }
+            .onChange(of: editor.hasError) { _, has in
+                onHasErrorChange(has)
+            }
+            .modifier(ContentViewCommands(
+                exportPDF: exportPDF,
+                openVault: openVault,
+                toggleViewMode: toggleViewMode,
+                createNote: { store.createNote() },
+                createFolder: { store.createFolder() },
+                refresh: { store.refresh() },
+                save: {
+                    _ = editor.saveIfNeeded()
+                    flushEditorError()
+                },
+                quitSaveFailed: flushEditorError
+            ))
+    }
+}
+
+private struct ContentViewDialogs: ViewModifier {
+    @Bindable var store: VaultStore
+    @Bindable var editor: EditorViewModel
+    @Binding var renameTarget: VaultNode?
+    @Binding var showDeleteConfirm: Bool
+    var flushEditorError: () -> Void
+    var renameSheet: (VaultNode) -> AnyView
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                store.errorTitle ?? "Something went wrong",
+                isPresented: Binding(
+                    get: { store.errorMessage != nil },
+                    set: { if !$0 { store.clearError() } }
+                )
+            ) {
+                Button("OK", role: .cancel) { store.clearError() }
+            } message: {
+                Text(store.errorMessage ?? "")
+            }
+            .confirmationDialog(
+                "Note changed on disk",
+                isPresented: Binding(
+                    get: { editor.hasExternalConflict },
+                    set: { if !$0 { editor.hasExternalConflict = false } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Keep Mine") {
+                    if !editor.saveIfNeeded(force: true) {
+                        flushEditorError()
+                    }
+                }
+                Button("Reload Theirs") {
+                    if !editor.reloadFromDisk() {
+                        flushEditorError()
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    editor.deferConflict()
+                }
+            } message: {
+                Text("This file was modified outside Lyra. Saving would overwrite those changes.")
+            }
+            .confirmationDialog(
+                "Note moved or deleted",
+                isPresented: Binding(
+                    get: { editor.hasMissingFile },
+                    set: { if !$0 { editor.hasMissingFile = false } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Save Here") {
+                    if !editor.saveIfNeeded(force: true) {
+                        flushEditorError()
+                    }
+                }
+                Button("Close Note", role: .destructive) {
+                    _ = editor.close()
+                    store.selection = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    editor.hasMissingFile = false
+                    editor.deferConflict()
+                }
+            } message: {
+                Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")
+            }
+            .sheet(item: $renameTarget) { node in
+                renameSheet(node)
+            }
+            .confirmationDialog(
+                "Move to Trash?",
+                isPresented: $showDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Move to Trash", role: .destructive) {
+                    if editor.close() {
+                        store.deleteSelected()
+                    } else {
+                        flushEditorError()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This item will be moved to the Trash.")
+            }
+    }
+}
+
+private struct ContentViewCommands: ViewModifier {
+    var exportPDF: () -> Void
+    var openVault: () -> Void
+    var toggleViewMode: () -> Void
+    var createNote: () -> Void
+    var createFolder: () -> Void
+    var refresh: () -> Void
+    var save: () -> Void
+    var quitSaveFailed: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .lyraSaveNote)) { _ in
+                save()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
+                exportPDF()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraNewNote)) { _ in
+                createNote()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraNewFolder)) { _ in
+                createFolder()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraOpenVault)) { _ in
+                openVault()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraToggleViewMode)) { _ in
+                toggleViewMode()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
+                refresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
+                quitSaveFailed()
+            }
     }
 }
