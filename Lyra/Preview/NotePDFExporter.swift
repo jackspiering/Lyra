@@ -417,9 +417,9 @@ enum NotePDFExporter {
                 if intent.contains(.stronglyEmphasized) {
                     face = LyraFonts.ui(size: font.pointSize, weight: .bold)
                 } else if intent.contains(.emphasized) {
-                    if let italic = font.fontDescriptor.withSymbolicTraits(.italic) {
-                        face = NSFont(descriptor: italic, size: font.pointSize) ?? font
-                    }
+                    // NSFontDescriptor.withSymbolicTraits is non-optional on macOS (unlike UIKit).
+                    let italic = font.fontDescriptor.withSymbolicTraits(.italic)
+                    face = NSFont(descriptor: italic, size: font.pointSize) ?? font
                 }
                 if intent.contains(.code) {
                     face = LyraFonts.code(size: font.pointSize)
