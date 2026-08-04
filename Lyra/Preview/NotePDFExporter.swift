@@ -16,26 +16,41 @@ enum NotePDFExporter {
     private static let quoteBarColor = NSColor(calibratedRed: 0.85, green: 0.65, blue: 0.13, alpha: 1)
     private static let ruleColor = NSColor(calibratedWhite: 0.7, alpha: 1)
 
+    /// One note (or section) to place into a PDF.
+    struct NoteSource: Equatable {
+        var title: String
+        var markdown: String
+        var noteDirectory: URL
+    }
+
     static func pdfData(markdown: String, noteDirectory: URL, vaultRoot: URL) throws -> Data {
-        try Renderer(markdown: markdown, noteDirectory: noteDirectory, vaultRoot: vaultRoot).run()
+        try pdfData(
+            notes: [NoteSource(title: "", markdown: markdown, noteDirectory: noteDirectory)],
+            vaultRoot: vaultRoot
+        )
+    }
+
+    /// Multiple notes in one PDF (each optional title as H1; page break between notes).
+    static func pdfData(notes: [NoteSource], vaultRoot: URL) throws -> Data {
+        try Renderer(notes: notes, vaultRoot: vaultRoot).run()
     }
 
     // MARK: - Renderer
 
     private final class Renderer {
-        let markdown: String
-        let noteDirectory: URL
+        let notes: [NoteSource]
         let vaultRoot: URL
 
         private var ctx: CGContext!
         private var y: CGFloat = 0
         private var pageNumber = 1
+        private var noteDirectory: URL
         private let contentBottom = NotePDFExporter.pageHeight - NotePDFExporter.margin
 
-        init(markdown: String, noteDirectory: URL, vaultRoot: URL) {
-            self.markdown = markdown
-            self.noteDirectory = noteDirectory
+        init(notes: [NoteSource], vaultRoot: URL) {
+            self.notes = notes
             self.vaultRoot = vaultRoot
+            self.noteDirectory = notes.first?.noteDirectory ?? vaultRoot
         }
 
         func run() throws -> Data {
@@ -55,8 +70,18 @@ enum NotePDFExporter {
             ctx = context
 
             beginPage()
-            for block in MarkdownPreviewBlocks.parse(markdown) {
-                draw(block)
+            for (index, note) in notes.enumerated() {
+                if index > 0 {
+                    endPage()
+                    beginPage()
+                }
+                noteDirectory = note.noteDirectory
+                if !note.title.isEmpty {
+                    drawTextSpanning(note.title, font: headingFont(1), color: NotePDFExporter.bodyColor)
+                }
+                for block in MarkdownPreviewBlocks.parse(note.markdown) {
+                    draw(block)
+                }
             }
             endPage()
             ctx.closePDF()
@@ -67,6 +92,11 @@ enum NotePDFExporter {
 
         private func beginPage() {
             ctx.beginPDFPage(nil)
+            // PDF media box is bottom-up. Map layout coords (origin top-left, y down) onto it
+            // so AppKit text/images are upright in Preview.app.
+            ctx.saveGState()
+            ctx.translateBy(x: 0, y: NotePDFExporter.pageHeight)
+            ctx.scaleBy(x: 1, y: -1)
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
             y = NotePDFExporter.margin
         }
@@ -74,6 +104,7 @@ enum NotePDFExporter {
         private func endPage() {
             drawPageNumber()
             NSGraphicsContext.current = nil
+            ctx.restoreGState()
             ctx.endPDFPage()
             pageNumber += 1
         }
@@ -87,7 +118,8 @@ enum NotePDFExporter {
             let attr = NSAttributedString(string: text, attributes: attrs)
             let size = attr.size()
             let x = (NotePDFExporter.pageWidth - size.width) / 2
-            let pageY = NotePDFExporter.pageHeight - NotePDFExporter.margin + 18
+            // Footer just above the bottom margin (top-down layout coords).
+            let pageY = NotePDFExporter.pageHeight - 36
             attr.draw(at: CGPoint(x: x, y: pageY))
         }
 
@@ -111,8 +143,8 @@ enum NotePDFExporter {
             case .paragraph(let text):
                 drawTextSpanning(text, font: bodyFont, color: NotePDFExporter.bodyColor)
 
-            case .listItem(let text, let ordinal, let depth):
-                drawListItem(text, ordinal: ordinal, depth: depth)
+            case .listItem(let text, let ordinal, let depth, let taskChecked):
+                drawListItem(text, ordinal: ordinal, depth: depth, taskChecked: taskChecked)
 
             case .quote(let text):
                 drawQuote(text)
@@ -206,16 +238,21 @@ enum NotePDFExporter {
             return max(1, low)
         }
 
-        private func drawListItem(_ text: String, ordinal: Int?, depth: Int) {
+        private func drawListItem(_ text: String, ordinal: Int?, depth: Int, taskChecked: Bool?) {
             let indent = CGFloat(depth) * 16
-            let marker = ordinal.map { "\($0)." } ?? "•"
+            let marker: String
+            if let taskChecked {
+                marker = taskChecked ? "☑" : "☐"
+            } else {
+                marker = ordinal.map { "\($0)." } ?? "•"
+            }
             let bulletAttrs: [NSAttributedString.Key: Any] = [
                 .font: bodyFont,
                 .foregroundColor: NotePDFExporter.secondaryColor,
             ]
             let bullet = NSAttributedString(string: marker, attributes: bulletAttrs)
             let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.bodyColor)
-            let bulletWidth: CGFloat = ordinal == nil ? 16 : 28
+            let bulletWidth: CGFloat = (ordinal != nil || taskChecked != nil) ? 28 : 16
             let x = NotePDFExporter.margin + indent
             let bodyWidth = NotePDFExporter.contentWidth - indent - bulletWidth
             let height = max(measure(body, width: bodyWidth), bodyFont.ascender - bodyFont.descender)
@@ -426,13 +463,6 @@ enum NotePDFExporter {
                 }
                 mutable.addAttribute(.font, value: face, range: range)
             }
-            // Drop wiki-link placeholder brackets that Inter lacks.
-            mutable.mutableString.replaceOccurrences(
-                of: "⟦", with: "", options: [], range: NSRange(location: 0, length: mutable.length)
-            )
-            mutable.mutableString.replaceOccurrences(
-                of: "⟧", with: "", options: [], range: NSRange(location: 0, length: mutable.length)
-            )
             return mutable
         }
 

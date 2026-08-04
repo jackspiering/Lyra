@@ -16,56 +16,75 @@ extension Notification.Name {
 /// Coordinates quit-time save so unsaved work is not discarded silently.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    weak var editor: EditorViewModel?
-    weak var store: VaultStore?
-
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let editor else { return .terminateNow }
-        if editor.saveIfNeeded() {
+        if AppSession.shared.saveAllEditors() {
             return .terminateNow
         }
-        // Save blocked (conflict, missing file, or I/O error) — cancel quit and let UI react.
         NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: nil)
         return .terminateCancel
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        store?.releaseAccess()
+        AppSession.shared.releaseAllVaultAccess()
+    }
+}
+
+/// One vault window: own store + editor (multi-vault = multiple windows).
+struct VaultWindowRoot: View {
+    @State private var store = VaultStore()
+    @State private var editor = EditorViewModel()
+    @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
+    @Environment(\.openWindow) private var openWindow
+
+    private var appearance: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .system
+    }
+
+    var body: some View {
+        ContentView(store: store, editor: editor, openNewVaultWindow: {
+            openWindow(id: "vault")
+        })
+        .preferredColorScheme(appearance.colorScheme)
+        .onAppear {
+            AppSession.shared.register(editor: editor, store: store)
+            if let pending = AppSession.shared.takePendingVaultURL() {
+                store.openVault(at: pending)
+            }
+        }
+        .onDisappear {
+            _ = editor.saveIfNeeded()
+            AppSession.shared.unregister(editor: editor)
+            store.releaseAccess()
+        }
     }
 }
 
 @main
 struct LyraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var store = VaultStore()
-    @State private var editor = EditorViewModel()
 
     init() {
         LyraFonts.registerBundledFonts()
     }
 
     var body: some Scene {
-        // Single main window — multi-window document architecture is a non-goal.
-        Window("Lyra", id: "main") {
-            ContentView(store: store, editor: editor)
-                .onAppear {
-                    appDelegate.editor = editor
-                    appDelegate.store = store
-                }
+        // One vault per window — open multiple windows for multiple vaults.
+        WindowGroup(id: "vault") {
+            VaultWindowRoot()
         }
+        .defaultSize(width: 1100, height: 700)
         .commands {
-            // Replace File → New Window with New Note / New Folder.
             CommandGroup(replacing: .newItem) {
+                NewVaultWindowButton()
+
                 Button("New Note") {
                     NotificationCenter.default.post(name: .lyraNewNote, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
-                .disabled(store.rootURL == nil)
 
                 Button("New Folder") {
                     NotificationCenter.default.post(name: .lyraNewFolder, object: nil)
                 }
-                .disabled(store.rootURL == nil)
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {
@@ -77,7 +96,6 @@ struct LyraApp: App {
                 Button("Export PDF…") {
                     NotificationCenter.default.post(name: .lyraExportPDF, object: nil)
                 }
-                .disabled(editor.fileURL == nil)
             }
             CommandGroup(after: .newItem) {
                 Button("Open Vault…") {
@@ -89,15 +107,29 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraRefreshVault, object: nil)
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(store.rootURL == nil)
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {
                     NotificationCenter.default.post(name: .lyraToggleViewMode, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: .command)
-                .disabled(store.rootURL == nil)
             }
         }
+
+        Settings {
+            SettingsView()
+        }
+    }
+}
+
+/// File → New Window needs `openWindow` from the environment.
+private struct NewVaultWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("New Window") {
+            openWindow(id: "vault")
+        }
+        .keyboardShortcut("n", modifiers: [.command, .shift])
     }
 }

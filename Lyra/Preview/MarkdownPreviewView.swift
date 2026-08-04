@@ -22,7 +22,6 @@ struct MarkdownPreviewView: View {
                             vaultRoot: vaultRoot
                         )
                     }
-                    WikiLinksSection(text: text, onWikiLink: onWikiLink)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,5 +29,12 @@ struct MarkdownPreviewView: View {
             .textSelection(.enabled)
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .environment(\.openURL, OpenURLAction { url in
+            if let name = MarkdownPreviewBlocks.wikiLinkName(from: url) {
+                onWikiLink?(name)
+                return .handled
+            }
+            return .systemAction
+        })
     }
 }
