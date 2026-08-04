@@ -8,8 +8,6 @@ struct ContentView: View {
     /// When this window already has a vault, Open Vault can spawn another window first.
     var openNewVaultWindow: (() -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
-    @State private var renameTarget: VaultNode?
-    @State private var renameText = ""
     @State private var showDeleteConfirm = false
     @State private var deleteDontAskAgain = false
     @State private var showNewNoteSheet = false
@@ -37,7 +35,6 @@ struct ContentView: View {
             .modifier(ContentViewChrome(
                 store: store,
                 editor: editor,
-                renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
                 showNewNoteSheet: $showNewNoteSheet,
                 onSelectionChange: handleSelectionChange,
@@ -48,7 +45,6 @@ struct ContentView: View {
                 beginNewNote: beginNewNote,
                 requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
-                renameSheet: renameSheet,
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
@@ -80,7 +76,7 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(
                 store: store,
-                renameTarget: $renameTarget,
+                onCommitRename: commitSidebarRename,
                 onRequestDelete: requestDelete,
                 onNewNote: beginNewNote,
                 onExportNotePDF: exportNotePDF,
@@ -309,40 +305,27 @@ struct ContentView: View {
         }
     }
 
-    private func renameSheet(_ node: VaultNode) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Rename").font(LyraFonts.headline)
-            TextField("Name", text: $renameText)
-                .onAppear { renameText = node.name }
-            HStack {
-                Spacer()
-                Button("Cancel") { renameTarget = nil }
-                Button("Rename") {
-                    let oldPath = node.url.path
-                    guard editor.saveIfNeeded() else {
-                        flushEditorError()
-                        return
-                    }
-                    guard let newURL = store.renameSelected(to: renameText) else {
-                        return
-                    }
-                    if let openPath = editor.fileURL?.path {
-                        if openPath == oldPath {
-                            editor.relocate(to: newURL)
-                        } else if openPath.hasPrefix(oldPath + "/") {
-                            let suffix = String(openPath.dropFirst(oldPath.count))
-                            let relocated = URL(fileURLWithPath: newURL.path + suffix)
-                            editor.relocate(to: relocated)
-                        }
-                    }
-                    renameTarget = nil
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    /// Sidebar inline rename: flush editor, rename on disk, relocate open note if needed.
+    private func commitSidebarRename(node: VaultNode, newName: String) -> Bool {
+        let oldPath = node.url.path
+        guard editor.saveIfNeeded() else {
+            flushEditorError()
+            return false
+        }
+        store.selection = node.id
+        guard let newURL = store.renameSelected(to: newName) else {
+            return false
+        }
+        if let openPath = editor.fileURL?.path {
+            if openPath == oldPath {
+                editor.relocate(to: newURL)
+            } else if openPath.hasPrefix(oldPath + "/") {
+                let suffix = String(openPath.dropFirst(oldPath.count))
+                let relocated = URL(fileURLWithPath: newURL.path + suffix)
+                editor.relocate(to: relocated)
             }
         }
-        .padding()
-        .frame(width: 360)
+        return true
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
@@ -635,7 +618,6 @@ private struct NewNoteNameField: NSViewRepresentable {
 private struct ContentViewChrome: ViewModifier {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
-    @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
     @Binding var showNewNoteSheet: Bool
     var onSelectionChange: (VaultNode.ID?) -> Void
@@ -646,7 +628,6 @@ private struct ContentViewChrome: ViewModifier {
     var beginNewNote: () -> Void
     var requestDelete: () -> Void
     var toggleViewMode: () -> Void
-    var renameSheet: (VaultNode) -> AnyView
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
@@ -654,7 +635,6 @@ private struct ContentViewChrome: ViewModifier {
     init(
         store: VaultStore,
         editor: EditorViewModel,
-        renameTarget: Binding<VaultNode?>,
         showDeleteConfirm: Binding<Bool>,
         showNewNoteSheet: Binding<Bool>,
         onSelectionChange: @escaping (VaultNode.ID?) -> Void,
@@ -665,14 +645,12 @@ private struct ContentViewChrome: ViewModifier {
         beginNewNote: @escaping () -> Void,
         requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
-        renameSheet: @escaping (VaultNode) -> some View,
         newNoteSheet: @escaping () -> some View,
         deleteConfirmSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
     ) {
         self.store = store
         self.editor = editor
-        self._renameTarget = renameTarget
         self._showDeleteConfirm = showDeleteConfirm
         self._showNewNoteSheet = showNewNoteSheet
         self.onSelectionChange = onSelectionChange
@@ -683,7 +661,6 @@ private struct ContentViewChrome: ViewModifier {
         self.beginNewNote = beginNewNote
         self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
-        self.renameSheet = { AnyView(renameSheet($0)) }
         self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
@@ -694,11 +671,9 @@ private struct ContentViewChrome: ViewModifier {
             .modifier(ContentViewDialogs(
                 store: store,
                 editor: editor,
-                renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
                 showNewNoteSheet: $showNewNoteSheet,
                 flushEditorError: flushEditorError,
-                renameSheet: renameSheet,
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet
             ))
@@ -729,11 +704,9 @@ private struct ContentViewChrome: ViewModifier {
 private struct ContentViewDialogs: ViewModifier {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
-    @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
     @Binding var showNewNoteSheet: Bool
     var flushEditorError: () -> Void
-    var renameSheet: (VaultNode) -> AnyView
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
 
@@ -797,9 +770,6 @@ private struct ContentViewDialogs: ViewModifier {
                 }
             } message: {
                 Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")
-            }
-            .sheet(item: $renameTarget) { node in
-                renameSheet(node)
             }
             .sheet(isPresented: $showNewNoteSheet) {
                 newNoteSheet()

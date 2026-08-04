@@ -57,6 +57,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
+| Rename | Press Return, or click the name of the selected item (Finder-style); Escape cancels |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
 | Settings | Lyra → Settings: appearance; ask-for-name when creating notes; default note stem; confirm before Trash; About |

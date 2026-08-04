@@ -212,7 +212,7 @@ final class VaultStore {
         }
     }
 
-    /// Pure rename rules for notes/folders. Used by the sheet and unit tests.
+    /// Pure rename rules for notes/folders. Used by sidebar rename and unit tests.
     enum ValidatedRename: Equatable, Sendable {
         case ok(String)
         case invalid(String)
