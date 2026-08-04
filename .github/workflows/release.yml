@@ -47,6 +47,33 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Resolved version: '${V:-from project}'"
 
+      - name: Guard version matches project
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          if [[ -z "$V" ]]; then
+            echo "No explicit version (workflow_dispatch without input) — package-dmg will use MARKETING_VERSION."
+            exit 0
+          fi
+          # Require three-part semver so a tag like v0.6 cannot ship with ambiguous marketing version.
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: version must be three-part semver (e.g. 0.6.2), got '$V'" >&2
+            exit 1
+          fi
+          PROJ="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
+          COUNT="$(printf '%s\n' "$PROJ" | grep -c . || true)"
+          if [[ "$COUNT" -ne 1 ]]; then
+            echo "error: MARKETING_VERSION diverges in project.pbxproj:" >&2
+            printf '%s\n' "$PROJ" >&2
+            exit 1
+          fi
+          if [[ "$PROJ" != "$V" ]]; then
+            echo "error: tag/version $V does not match MARKETING_VERSION $PROJ" >&2
+            echo "       Bump MARKETING_VERSION in the Xcode project before tagging." >&2
+            exit 1
+          fi
+          echo "ok: $V matches MARKETING_VERSION"
+
       - name: Build DMG
         env:
           VERSION: ${{ steps.ver.outputs.version }}

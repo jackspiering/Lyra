@@ -50,8 +50,12 @@ enum MarkdownHighlighter {
         let full = NSRange(location: 0, length: length)
         let target: NSRange
         if let range {
-            let clamped = NSIntersectionRange(range, full)
-            guard clamped.length > 0 || clamped.location < length else { return }
+            // NSIntersectionRange collapses a zero-length caret at `length` to {0,0},
+            // which restyles the first paragraph instead of the one being typed.
+            let loc = min(max(0, range.location), length)
+            let maxLen = length - loc
+            let len = min(max(0, range.length), maxLen)
+            let clamped = NSRange(location: loc, length: len)
             target = (storage.string as NSString).paragraphRange(for: clamped)
         } else {
             target = full

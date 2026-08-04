@@ -14,11 +14,12 @@ DESTINATION="${DESTINATION:-platform=macOS}"
 SCHEME="${SCHEME:-Lyra}"
 
 set -x
+# Ad-hoc sign so sandbox entitlements apply; do not inject get-task-allow into the app.
 xcodebuild \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
   -configuration Debug \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   build test

@@ -1,108 +1,50 @@
 #!/usr/bin/env bash
 # Structural smoke checks that run anywhere (Linux CI included).
 # Full build/test requires macOS + Xcode (see Scripts/xcode-test.sh).
+#
+# Intentionally does NOT re-list every Swift source — the macOS build job is the
+# real compiler. This script checks invariants the compiler cannot: docs, fonts,
+# entitlements source, deployment target, bundle id, and (when present) that a
+# built app is ad-hoc signed with the sandbox entitlement.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 fail=0
 
-check() {
-  if "$@"; then
-    echo "  ok: $*"
+check_exists() {
+  if [[ -e "$1" ]]; then
+    echo "  ok: $1"
   else
-    echo "  FAIL: $*"
+    echo "  FAIL: missing $1"
     fail=1
   fi
 }
 
 echo "== Lyra smoke =="
 
-echo "-- required paths"
+echo "-- required non-code paths"
 for path in \
   README.md AGENTS.md CONTRIBUTING.md LICENSE \
-  docs/architecture.md \
+  docs/architecture.md docs/ci.md \
   Lyra.xcodeproj/project.pbxproj \
   Lyra.xcodeproj/xcshareddata/xcschemes/Lyra.xcscheme \
-  Lyra/LyraApp.swift \
-  Lyra/App/ContentView.swift \
-  Lyra/App/VaultFolderPicker.swift \
-  Lyra/Vault/FileSystemVault.swift \
-  Lyra/Vault/VaultStore.swift \
-  Lyra/Vault/WikiLinkResolver.swift \
-  Lyra/Vault/UntitledName.swift \
-  Lyra/Vault/AttachmentStore.swift \
-  Lyra/Editor/EditorViewModel.swift \
-  Lyra/Editor/MarkdownTextView.swift \
-  Lyra/Editor/MarkdownHighlighter.swift \
-  Lyra/Preview/MarkdownPreviewView.swift \
-  Lyra/Preview/MarkdownPreviewBlocks.swift \
-  Lyra/Preview/MarkdownImagePath.swift \
-  Lyra/Preview/NotePDFExporter.swift \
-  Lyra/Preview/MarkdownBlockRow.swift \
-  Lyra/App/LyraTheme.swift \
-  Lyra/App/NoteViewMode.swift \
-  Lyra/App/UserFacingError.swift \
-  Lyra/App/LyraFonts.swift \
+  Lyra/Lyra.entitlements \
+  Lyra/Info.plist \
   Lyra/Resources/Fonts/Inter-Regular.ttf \
   Lyra/Resources/Fonts/Inter-SemiBold.ttf \
   Lyra/Resources/Fonts/Inter-Bold.ttf \
   Lyra/Resources/Fonts/Inter-OFL.txt \
-  LyraTests/UserFacingErrorTests.swift \
-  Lyra/Models/VaultNode.swift \
-  LyraTests/MarkdownPreviewBlocksTests.swift \
-  Lyra/Lyra.entitlements \
-  Lyra/Info.plist \
-  LyraTests/WikiLinkResolverTests.swift \
-  LyraTests/UntitledNameTests.swift \
-  LyraTests/FileSystemVaultTests.swift \
-  LyraTests/AttachmentStoreTests.swift \
-  LyraTests/MarkdownImagePathTests.swift \
-  LyraTests/NotePDFExporterTests.swift \
-  LyraTests/EditorViewModelTests.swift \
-  LyraTests/MarkdownHighlighterTests.swift \
-  LyraTests/VaultStoreRenameTests.swift
+  Scripts/package-dmg.sh \
+  Scripts/xcode-test.sh
 do
-  if [[ -e "$path" ]]; then
-    echo "  ok: $path"
-  else
-    echo "  FAIL: missing $path"
-    fail=1
-  fi
+  check_exists "$path"
 done
 
-echo "-- removed / unwanted paths"
-for path in Lyra/App/OpenVaultView.swift Lyra/Models/NoteDocument.swift Lyra/Editor/EditorView.swift Lyra/Preview/LivePreviewView.swift; do
-  if [[ -e "$path" ]]; then
-    echo "  FAIL: should not exist: $path"
-    fail=1
-  else
-    echo "  ok: absent $path"
-  fi
-done
-
-echo "-- pbxproj references"
-for name in LyraApp ContentView VaultStore WikiLinkResolver MarkdownTextView VaultFolderPicker LyraTheme MarkdownPreviewBlocks MarkdownImagePath AttachmentStore AttachmentStoreTests MarkdownImagePathTests NotePDFExporter NotePDFExporterTests NoteViewMode MarkdownBlockRow UserFacingError LyraFonts UserFacingErrorTests EditorViewModelTests MarkdownHighlighterTests VaultStoreRenameTests; do
-  if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
-    echo "  ok: pbxproj lists $name.swift"
-  else
-    echo "  FAIL: pbxproj missing $name.swift"
-    fail=1
-  fi
-done
-for name in OpenVaultView NoteDocument EditorView LivePreviewView; do
-  if grep -q "$name.swift" Lyra.xcodeproj/project.pbxproj; then
-    echo "  FAIL: pbxproj still lists $name.swift"
-    fail=1
-  else
-    echo "  ok: pbxproj omits $name.swift"
-  fi
-done
-
-echo "-- entitlements"
+echo "-- entitlements source"
 if grep -q "com.apple.security.app-sandbox" Lyra/Lyra.entitlements \
   && grep -q "com.apple.security.files.user-selected.read-write" Lyra/Lyra.entitlements; then
-  echo "  ok: sandbox + user-selected files"
+  echo "  ok: sandbox + user-selected files in entitlements file"
 else
   echo "  FAIL: entitlements incomplete"
   fail=1
@@ -122,6 +64,37 @@ if grep -q "PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra" Lyra.xcodeproj/project.pb
 else
   echo "  FAIL: bundle id"
   fail=1
+fi
+
+echo "-- marketing version consistency"
+versions="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
+count="$(printf '%s\n' "$versions" | grep -c . || true)"
+if [[ "$count" -eq 1 ]]; then
+  echo "  ok: single MARKETING_VERSION ($versions)"
+else
+  echo "  FAIL: MARKETING_VERSION diverges across configs:"
+  printf '%s\n' "$versions"
+  fail=1
+fi
+
+# Optional: if a built app is sitting in the usual place, assert real sandbox entitlements.
+APP_CANDIDATES=(
+  "build/DerivedData/Build/Products/Release/Lyra.app"
+  "build/DerivedData/Build/Products/Debug/Lyra.app"
+)
+if command -v codesign >/dev/null 2>&1; then
+  for app in "${APP_CANDIDATES[@]}"; do
+    if [[ -d "$app" ]]; then
+      echo "-- built app entitlements ($app)"
+      if codesign -d --entitlements - "$app" 2>/dev/null | grep -q "com.apple.security.app-sandbox"; then
+        echo "  ok: sandbox present on signed app"
+      else
+        echo "  FAIL: built app missing sandbox entitlement (unsigned or wrong flags?)"
+        fail=1
+      fi
+      break
+    fi
+  done
 fi
 
 if [[ "$fail" -ne 0 ]]; then

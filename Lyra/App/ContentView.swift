@@ -3,12 +3,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @State private var store = VaultStore()
-    @State private var editor = EditorViewModel()
+    @Bindable var store: VaultStore
+    @Bindable var editor: EditorViewModel
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var didAlertSaveFailure = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var noteViewMode: NoteViewMode {
@@ -25,13 +26,8 @@ struct ContentView: View {
                     Text("Open a folder of Markdown files to begin.")
                 } actions: {
                     Button("Open Vault…") {
-                        if let url = VaultFolderPicker.pick(
-                            message: "Choose a folder to use as a Lyra vault"
-                        ) {
-                            store.openVault(at: url)
-                        }
+                        openVault()
                     }
-                    .keyboardShortcut("o", modifiers: .command)
                     .buttonStyle(.borderedProminent)
                 }
             } else {
@@ -41,14 +37,14 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 560)
         .font(LyraFonts.body)
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
+            if phase == .active {
+                if store.rootURL != nil {
+                    store.refresh()
+                }
+            } else {
                 _ = editor.saveIfNeeded()
                 flushEditorError()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            _ = editor.saveIfNeeded()
-            store.releaseAccess()
         }
         .alert(
             store.errorTitle ?? "Something went wrong",
@@ -82,13 +78,49 @@ struct ContentView: View {
                 }
             }
             Button("Cancel", role: .cancel) {
-                editor.hasExternalConflict = false
+                editor.deferConflict()
             }
         } message: {
             Text("This file was modified outside Lyra. Saving would overwrite those changes.")
         }
+        .confirmationDialog(
+            "Note moved or deleted",
+            isPresented: Binding(
+                get: { editor.hasMissingFile },
+                set: { if !$0 { editor.hasMissingFile = false } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Save Here") {
+                if !editor.saveIfNeeded(force: true) {
+                    flushEditorError()
+                }
+            }
+            Button("Close Note", role: .destructive) {
+                // close() allows escape when the path is gone (no silent trap).
+                _ = editor.close()
+                store.selection = nil
+            }
+            Button("Cancel", role: .cancel) {
+                editor.hasMissingFile = false
+                // Suspend autosave so we do not recreate the file every 500ms.
+                editor.deferConflict()
+            }
+        } message: {
+            Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")
+        }
         .onChange(of: store.selection) { _, newValue in
             handleSelectionChange(newValue)
+        }
+        .onChange(of: editor.hasError) { _, has in
+            // Surface autosave failures once; the toolbar indicator covers the ongoing state.
+            if has && !didAlertSaveFailure {
+                didAlertSaveFailure = true
+                flushEditorError()
+            }
+            if !has {
+                didAlertSaveFailure = false
+            }
         }
         .sheet(item: $renameTarget) { node in
             renameSheet(node)
@@ -116,6 +148,26 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .lyraExportPDF)) { _ in
             exportPDF()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraNewNote)) { _ in
+            store.createNote()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraNewFolder)) { _ in
+            store.createFolder()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraOpenVault)) { _ in
+            openVault()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraToggleViewMode)) { _ in
+            noteViewMode = noteViewMode.next()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraRefreshVault)) { _ in
+            store.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
+            flushEditorError()
+            // Re-surface conflict / missing-file dialogs if those blocked the quit.
+            // Flags are already set by saveIfNeeded; confirmationDialogs bind to them.
+        }
     }
 
     private var vaultWorkspace: some View {
@@ -133,7 +185,6 @@ struct ContentView: View {
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
-                    .keyboardShortcut("n", modifiers: .command)
 
                     Button {
                         store.createFolder()
@@ -147,17 +198,10 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItemGroup {
                         Button {
-                            if let url = VaultFolderPicker.pick() {
-                                if editor.close() {
-                                    store.openVault(at: url)
-                                } else {
-                                    flushEditorError()
-                                }
-                            }
+                            openVault()
                         } label: {
                             Label("Open Vault", systemImage: "folder")
                         }
-                        .keyboardShortcut("o", modifiers: .command)
 
                         Picker("View", selection: $noteViewModeRaw) {
                             ForEach(NoteViewMode.allCases) { mode in
@@ -172,7 +216,6 @@ struct ContentView: View {
                         } label: {
                             Label("Toggle View Mode", systemImage: "rectangle.split.2x1")
                         }
-                        .keyboardShortcut("e", modifiers: .command)
                         .help("Toggle Source ↔ Reading")
 
                         Button {
@@ -182,6 +225,20 @@ struct ContentView: View {
                         }
                         .disabled(editor.fileURL == nil)
                         .help("Export current note to PDF")
+
+                        if editor.lastSaveFailed {
+                            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                                .help("Last save failed — press ⌘S to retry")
+                        } else if editor.conflictDeferred {
+                            Label("Autosave paused", systemImage: "pause.circle")
+                                .foregroundStyle(.orange)
+                                .help("Conflict deferred — press ⌘S to resolve")
+                        } else if editor.isDirty {
+                            Label("Unsaved", systemImage: "circle.fill")
+                                .foregroundStyle(.secondary)
+                                .help("Unsaved changes")
+                        }
                     }
                 }
         }
@@ -218,6 +275,19 @@ struct ContentView: View {
         }
     }
 
+    private func openVault() {
+        let message = store.rootURL == nil
+            ? "Choose a folder to use as a Lyra vault"
+            : nil
+        if let url = VaultFolderPicker.pick(message: message ?? "Choose a folder to use as a Lyra vault") {
+            if store.rootURL == nil || editor.close() {
+                store.openVault(at: url)
+            } else {
+                flushEditorError()
+            }
+        }
+    }
+
     private func renameSheet(_ node: VaultNode) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Rename").font(LyraFonts.headline)
@@ -232,10 +302,16 @@ struct ContentView: View {
                         flushEditorError()
                         return
                     }
-                    store.renameSelected(to: renameText)
-                    if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
-                        if !editor.open(url: newURL) {
-                            flushEditorError()
+                    guard let newURL = store.renameSelected(to: renameText) else {
+                        return
+                    }
+                    if let openPath = editor.fileURL?.path {
+                        if openPath == oldPath {
+                            editor.relocate(to: newURL)
+                        } else if openPath.hasPrefix(oldPath + "/") {
+                            let suffix = String(openPath.dropFirst(oldPath.count))
+                            let relocated = URL(fileURLWithPath: newURL.path + suffix)
+                            editor.relocate(to: relocated)
                         }
                     }
                     renameTarget = nil
@@ -283,8 +359,8 @@ struct ContentView: View {
     }
 
     private func flushEditorError() {
-        // External conflicts use their own dialog, not the generic alert.
-        guard !editor.hasExternalConflict else { return }
+        // External conflicts / missing file use their own dialogs.
+        guard !editor.hasExternalConflict, !editor.hasMissingFile else { return }
         guard let last = editor.lastError else { return }
         store.present(error: last.error, context: last.context)
         editor.lastError = nil

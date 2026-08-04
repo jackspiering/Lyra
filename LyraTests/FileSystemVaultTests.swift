@@ -118,4 +118,39 @@ final class FileSystemVaultTests: XCTestCase {
         XCTAssertTrue(names.contains("note.md"))
         XCTAssertFalse(names.contains("loop"))
     }
+
+    func testScanSkipsUnreadableChildButKeepsSiblings() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer {
+            // Restore perms so cleanup can delete.
+            let locked = root.appendingPathComponent("locked")
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        FileManager.default.createFile(
+            atPath: root.appendingPathComponent("keeper.md").path,
+            contents: Data("# K".utf8),
+            attributes: nil
+        )
+        let locked = root.appendingPathComponent("locked", isDirectory: true)
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        FileManager.default.createFile(
+            atPath: locked.appendingPathComponent("secret.md").path,
+            contents: Data("# S".utf8),
+            attributes: nil
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+
+        let tree = try FileSystemVault.scan(root: root)
+        let names = Set((tree.children ?? []).map(\.name))
+        XCTAssertTrue(names.contains("keeper.md"))
+        // locked may be absent (skipped on recurse) or present empty — either way keeper survives.
+        XCTAssertFalse(names.contains("secret.md"))
+    }
 }

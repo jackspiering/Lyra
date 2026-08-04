@@ -9,6 +9,10 @@ final class VaultStore {
     var rootURL: URL?
     var rootNode: VaultNode?
     var selection: VaultNode.ID?
+    /// Applied after the next successful scan lands (so the tree contains the new path).
+    private var pendingSelection: String?
+    /// Parent directory used for the last successful create (survives stale tree snapshots).
+    private var lastCreateParentPath: String?
     /// Alert title (short).
     var errorTitle: String?
     /// Alert body (plain language).
@@ -45,6 +49,10 @@ final class VaultStore {
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
         persistBookmark(for: url)
         rootURL = url
+        pendingSelection = nil
+        lastCreateParentPath = nil
+        selection = nil
+        rootNode = nil
         refresh()
     }
 
@@ -64,6 +72,11 @@ final class VaultStore {
                 self.wikiResolver = WikiLinkResolver(
                     noteURLs: FileSystemVault.collectNoteURLs(from: node)
                 )
+                // Apply pending selection only after the tree contains the new path.
+                if let pending = self.pendingSelection {
+                    self.selection = pending
+                    self.pendingSelection = nil
+                }
             } catch {
                 guard let self, generation == self.refreshGeneration else { return }
                 self.present(error: error, context: .readVault)
@@ -87,7 +100,7 @@ final class VaultStore {
 
     func createNote() {
         guard let rootURL else { return }
-        let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
+        let parent = createParentDirectory(vaultRoot: rootURL)
         let url = parent.appendingPathComponent(UntitledName.next(in: parent))
         let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
         if !ok {
@@ -100,40 +113,67 @@ final class VaultStore {
             )
             return
         }
+        lastCreateParentPath = parent.path
+        pendingSelection = url.path
         refresh()
-        selection = url.path
     }
 
     func createFolder() {
         guard let rootURL else { return }
-        let parent = FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: rootURL)
+        let parent = createParentDirectory(vaultRoot: rootURL)
         let url = parent.appendingPathComponent(UntitledName.next(base: "New Folder", ext: nil, in: parent))
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            lastCreateParentPath = parent.path
+            pendingSelection = url.path
             refresh()
-            selection = url.path
         } catch {
             present(error: error, context: .createFolder)
         }
     }
 
-    func renameSelected(to newName: String) {
-        guard let node = selectedNode() else { return }
+    /// Parent for new notes/folders. Prefers the remembered create parent (avoids race with
+    /// async refresh), then the selected node, then the vault root.
+    private func createParentDirectory(vaultRoot: URL) -> URL {
+        if let path = lastCreateParentPath {
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+                return URL(fileURLWithPath: path, isDirectory: true)
+            }
+        }
+        return FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: vaultRoot)
+    }
+
+    /// Renames the selected node. Returns the destination URL immediately (usable before
+    /// the async tree refresh lands).
+    @discardableResult
+    func renameSelected(to newName: String) -> URL? {
+        guard let node = selectedNode() else { return nil }
         switch Self.validatedRename(newName, isDirectory: node.isDirectory) {
         case .invalid(let detail):
             present(
                 context: .rename,
                 message: UserFacingError.message(context: .rename, detail: detail)
             )
-            return
+            return nil
         case .ok(let name):
             let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
             do {
                 try FileManager.default.moveItem(at: node.url, to: dest)
+                // Keep create-parent coherent if we renamed the folder we last created into.
+                if let last = lastCreateParentPath {
+                    if last == node.url.path {
+                        lastCreateParentPath = dest.path
+                    } else if last.hasPrefix(node.url.path + "/") {
+                        lastCreateParentPath = dest.path + last.dropFirst(node.url.path.count)
+                    }
+                }
+                pendingSelection = dest.path
                 refresh()
-                selection = dest.path
+                return dest
             } catch {
                 present(error: error, context: .rename)
+                return nil
             }
         }
     }
@@ -168,7 +208,12 @@ final class VaultStore {
         guard let node = selectedNode() else { return }
         do {
             try FileManager.default.trashItem(at: node.url, resultingItemURL: nil)
+            if let last = lastCreateParentPath,
+               last == node.url.path || last.hasPrefix(node.url.path + "/") {
+                lastCreateParentPath = nil
+            }
             selection = nil
+            pendingSelection = nil
             refresh()
         } catch {
             present(error: error, context: .delete)
@@ -189,11 +234,8 @@ final class VaultStore {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else { return }
+        // openVault re-persists the bookmark, including when the resolved one was stale.
         openVault(at: url)
-        // openVault already re-persists; if the resolved bookmark was stale, rewrite it.
-        if isStale {
-            persistBookmark(for: url)
-        }
     }
 
     private func persistBookmark(for url: URL) {
