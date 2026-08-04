@@ -59,4 +59,20 @@ final class FilenameValidationTests: XCTestCase {
             FilenameValidation.validate("a/b", isDirectory: false)
         )
     }
+
+    func testSanitizeNoteStem() {
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("Note"), "Note")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("  Note  "), "Note")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("Note.md"), "Note")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("Note.MD"), "Note")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("   "), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem(""), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("a/b"), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("a:b"), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("note\u{0000}"), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem(".hidden"), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("."), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem(".."), "Untitled")
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem(".md"), "Untitled")
+    }
 }

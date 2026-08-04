@@ -26,4 +26,22 @@ enum FilenameValidation {
         }
         return .ok(trimmed)
     }
+
+    /// Sanitizes a preferred note stem (no extension) for auto-create / Settings.
+    /// Strips a trailing `.md` so `"Note.md"` does not become `Note.md.md`.
+    /// Illegal or empty after trim falls back to `"Untitled"`.
+    static func sanitizeNoteStem(_ raw: String) -> String {
+        var stem = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if stem.lowercased().hasSuffix(".md") {
+            stem = String(stem.dropLast(3)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !stem.isEmpty else { return "Untitled" }
+        if stem.contains("/") || stem.contains(":") { return "Untitled" }
+        if stem.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
+            return "Untitled"
+        }
+        if stem.hasPrefix(".") { return "Untitled" }
+        if stem == ".." || stem == "." { return "Untitled" }
+        return stem
+    }
 }

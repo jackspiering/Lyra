@@ -15,11 +15,10 @@ enum GeneralPreferences {
     }
 
     /// Stem for auto-named notes (no extension). Default `"Untitled"`.
+    /// Always sanitized: illegal characters / empty / trailing `.md` stripped.
     static var defaultNoteStem: String {
-        let raw = UserDefaults.standard.string(forKey: defaultNoteStemKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let raw, !raw.isEmpty { return raw }
-        return "Untitled"
+        let raw = UserDefaults.standard.string(forKey: defaultNoteStemKey) ?? "Untitled"
+        return FilenameValidation.sanitizeNoteStem(raw)
     }
 
     /// Confirm before moving items to Trash. Default `true`.

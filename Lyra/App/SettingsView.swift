@@ -55,6 +55,7 @@ struct SettingsView: View {
             Toggle("Ask for name when creating a note", isOn: $promptForNewNoteName)
 
             TextField("Default note name", text: $defaultNoteStem)
+                .onSubmit { commitDefaultNoteStem() }
             Text("Used when creating notes. Extension .md is added automatically.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -62,6 +63,12 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(minWidth: 420, minHeight: 280)
+        .onDisappear { commitDefaultNoteStem() }
+    }
+
+    /// Reject illegal chars, strip trailing `.md`, empty → `"Untitled"`.
+    private func commitDefaultNoteStem() {
+        defaultNoteStem = FilenameValidation.sanitizeNoteStem(defaultNoteStem)
     }
 
     // MARK: - About

@@ -244,21 +244,24 @@ struct ContentView: View {
     private func newNoteSheet() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("New Note").font(LyraFonts.headline)
-            NewNoteNameField(text: $newNoteName)
+            NewNoteNameField(text: $newNoteName, onSubmit: submitNewNote)
             HStack {
                 Spacer()
                 Button("Cancel") { showNewNoteSheet = false }
-                Button("Create") {
-                    if store.createNote(named: newNoteName) {
-                        showNewNoteSheet = false
-                    }
-                }
+                Button("Create", action: submitNewNote)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!newNoteNameIsValid)
             }
         }
         .padding()
         .frame(width: 360)
+    }
+
+    private func submitNewNote() {
+        guard newNoteNameIsValid else { return }
+        if store.createNote(named: newNoteName) {
+            showNewNoteSheet = false
+        }
     }
 
     private func renameSheet(_ node: VaultNode) -> some View {
@@ -520,6 +523,8 @@ private struct WindowNumberReader: NSViewRepresentable {
 
 private struct NewNoteNameField: NSViewRepresentable {
     @Binding var text: String
+    /// Called on Return while the field is focused (Create default action may not fire then).
+    var onSubmit: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -567,6 +572,15 @@ private struct NewNoteNameField: NSViewRepresentable {
         func controlTextDidChange(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
             parent.text = field.stringValue
+        }
+
+        /// Return while focused → Create (SwiftUI `.defaultAction` often does not fire for NSTextField).
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onSubmit()
+                return true
+            }
+            return false
         }
     }
 }
