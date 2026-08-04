@@ -11,10 +11,10 @@ final class NoteTab: Identifiable {
     /// Mirrors `editor.fileURL`; `nil` means empty tab.
     var fileURL: URL? { editor.fileURL }
 
-    /// Tab bar label (filename stem, or “New Tab”).
+    /// Tab bar label: H1 or filename stem via `NoteTitle`, or “New Tab” when empty.
     var title: String {
-        if let url = editor.fileURL {
-            return url.deletingPathExtension().lastPathComponent
+        if editor.fileURL != nil {
+            return NoteTitle.displayTitle(markdown: editor.text, fileURL: editor.fileURL)
         }
         return "New Tab"
     }

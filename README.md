@@ -67,6 +67,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
 | Note tabs | In-window tabs share one vault sidebar; `+` / ⌘T empty tab; sidebar click opens in the active tab; empty tab: Create new note, Go to File, Close |
+| Note title | Editable title above Source/Reading; tab chip matches. Leading `# H1` drives the title; otherwise the filename. Editing syncs the H1 when present, else renames the file |
 | Settings | Lyra → Settings (resizable): appearance; prompt for note name; default note stem; separate note/folder Trash confirms; About (version → release tag, latest release, acks, MIT) |
 | New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
 | Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm per note or folder with “Don’t ask again” |

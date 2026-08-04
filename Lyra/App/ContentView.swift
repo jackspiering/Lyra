@@ -188,6 +188,11 @@ struct ContentView: View {
             )
         } else {
             VStack(spacing: 0) {
+                NoteTitleBar(
+                    title: NoteTitle.displayTitle(markdown: editor.text, fileURL: editor.fileURL),
+                    onCommit: commitNoteTitle
+                )
+                .id(editor.fileURL?.path)
                 noteContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 EditorStatusBar(
@@ -426,6 +431,30 @@ struct ContentView: View {
         }
         tabs.relocateOpenNotes(oldPath: oldPath, newURL: newURL)
         return true
+    }
+
+    /// Title field commit: sync leading H1 when present; otherwise rename the file stem.
+    private func commitNoteTitle(_ newTitle: String) {
+        guard editor.fileURL != nil else { return }
+        let result = NoteTitle.applyingTitle(newTitle, to: editor.text)
+        if result.markdown != editor.text {
+            editor.text = result.markdown
+            editor.noteEdited()
+        }
+        guard let stem = result.renamedStem, let url = editor.fileURL else { return }
+        let currentStem = url.deletingPathExtension().lastPathComponent
+        guard stem != currentStem else { return }
+        // Flush this note (and siblings) before the path changes.
+        for tab in tabs.tabs {
+            guard tab.editor.saveIfNeeded() else {
+                flushEditorError(for: tab.editor)
+                return
+            }
+        }
+        let oldPath = url.path
+        store.selection = oldPath
+        guard let newURL = store.renameSelected(to: stem + ".md") else { return }
+        tabs.relocateOpenNotes(oldPath: oldPath, newURL: newURL)
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
