@@ -46,10 +46,14 @@ struct VaultWindowRoot: View {
         })
         .preferredColorScheme(appearance.colorScheme)
         .onAppear {
+            AppearanceController.apply(rawValue: appearanceRaw)
             AppSession.shared.register(editor: editor, store: store)
             if let pending = AppSession.shared.takePendingVaultURL() {
                 store.openVault(at: pending)
             }
+        }
+        .onChange(of: appearanceRaw) { _, new in
+            AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
             _ = editor.saveIfNeeded()

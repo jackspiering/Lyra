@@ -4,10 +4,17 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
 
+    private var appearancePreference: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .system
+    }
+
     private var appearance: Binding<AppearancePreference> {
         Binding(
             get: { AppearancePreference(rawValue: appearanceRaw) ?? .system },
-            set: { appearanceRaw = $0.rawValue }
+            set: {
+                appearanceRaw = $0.rawValue
+                AppearanceController.apply($0)
+            }
         )
     }
 
@@ -61,6 +68,10 @@ struct SettingsView: View {
             .tabItem {
                 Label("About", systemImage: "info.circle")
             }
+        }
+        .preferredColorScheme(appearancePreference.colorScheme)
+        .onAppear {
+            AppearanceController.apply(rawValue: appearanceRaw)
         }
     }
 
