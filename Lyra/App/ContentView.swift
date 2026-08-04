@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var renameTarget: VaultNode?
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var showNewNoteSheet = false
+    @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -36,13 +38,16 @@ struct ContentView: View {
                 editor: editor,
                 renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
+                showNewNoteSheet: $showNewNoteSheet,
                 onSelectionChange: handleSelectionChange,
                 onHasErrorChange: handleHasErrorChange,
                 flushEditorError: flushEditorError,
                 exportPDF: exportPDF,
                 openVault: openVault,
+                beginNewNote: beginNewNote,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
                 renameSheet: renameSheet,
+                newNoteSheet: newNoteSheet,
                 shouldHandleCommands: {
                     guard let hostWindowNumber else { return true }
                     return NSApp.keyWindow?.windowNumber == hostWindowNumber
@@ -74,6 +79,7 @@ struct ContentView: View {
                 store: store,
                 renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
+                onNewNote: beginNewNote,
                 onExportNotePDF: exportNotePDF,
                 onExportFolderSeparate: exportFolderSeparatePDFs,
                 onExportFolderCombined: exportFolderCombinedPDF
@@ -89,7 +95,7 @@ struct ContentView: View {
                     .help("Open Vault…")
 
                     Button {
-                        store.createNote()
+                        beginNewNote()
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
@@ -215,6 +221,44 @@ struct ContentView: View {
         // Already have a vault — open the chosen folder in a new window.
         AppSession.shared.setPendingVaultURL(url)
         openNewVaultWindow?()
+    }
+
+    private func beginNewNote() {
+        guard store.rootURL != nil else { return }
+        if GeneralPreferences.promptForNewNoteName {
+            let stem = GeneralPreferences.defaultNoteStem
+            newNoteName = "\(stem).md"
+            showNewNoteSheet = true
+        } else {
+            store.createNote(named: nil)
+        }
+    }
+
+    private var newNoteNameIsValid: Bool {
+        if case .ok = FilenameValidation.validate(newNoteName, isDirectory: false) {
+            return true
+        }
+        return false
+    }
+
+    private func newNoteSheet() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("New Note").font(LyraFonts.headline)
+            NewNoteNameField(text: $newNoteName)
+            HStack {
+                Spacer()
+                Button("Cancel") { showNewNoteSheet = false }
+                Button("Create") {
+                    if store.createNote(named: newNoteName) {
+                        showNewNoteSheet = false
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!newNoteNameIsValid)
+            }
+        }
+        .padding()
+        .frame(width: 360)
     }
 
     private func renameSheet(_ node: VaultNode) -> some View {
@@ -472,6 +516,61 @@ private struct WindowNumberReader: NSViewRepresentable {
     }
 }
 
+// MARK: - New-note name field (selects stem before `.md` on first focus)
+
+private struct NewNoteNameField: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = "Name"
+        field.delegate = context.coordinator
+        field.isBordered = true
+        field.isBezeled = true
+        field.bezelStyle = .roundedBezel
+        field.focusRingType = .default
+        DispatchQueue.main.async {
+            selectStem(in: field)
+        }
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+
+    private func selectStem(in field: NSTextField) {
+        field.window?.makeFirstResponder(field)
+        let value = field.stringValue as NSString
+        let length = value.length
+        if (value as String).lowercased().hasSuffix(".md"), length > 3 {
+            field.currentEditor()?.selectedRange = NSRange(location: 0, length: length - 3)
+        } else {
+            field.currentEditor()?.selectedRange = NSRange(location: 0, length: length)
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: NewNoteNameField
+
+        init(_ parent: NewNoteNameField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+    }
+}
+
 // MARK: - Chrome (dialogs + commands) — kept out of `body` so the type-checker stays happy
 
 private struct ContentViewChrome: ViewModifier {
@@ -479,13 +578,16 @@ private struct ContentViewChrome: ViewModifier {
     @Bindable var editor: EditorViewModel
     @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
+    @Binding var showNewNoteSheet: Bool
     var onSelectionChange: (VaultNode.ID?) -> Void
     var onHasErrorChange: (Bool) -> Void
     var flushEditorError: () -> Void
     var exportPDF: () -> Void
     var openVault: () -> Void
+    var beginNewNote: () -> Void
     var toggleViewMode: () -> Void
     var renameSheet: (VaultNode) -> AnyView
+    var newNoteSheet: () -> AnyView
     var shouldHandleCommands: () -> Bool
 
     init(
@@ -493,26 +595,32 @@ private struct ContentViewChrome: ViewModifier {
         editor: EditorViewModel,
         renameTarget: Binding<VaultNode?>,
         showDeleteConfirm: Binding<Bool>,
+        showNewNoteSheet: Binding<Bool>,
         onSelectionChange: @escaping (VaultNode.ID?) -> Void,
         onHasErrorChange: @escaping (Bool) -> Void,
         flushEditorError: @escaping () -> Void,
         exportPDF: @escaping () -> Void,
         openVault: @escaping () -> Void,
+        beginNewNote: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
         renameSheet: @escaping (VaultNode) -> some View,
+        newNoteSheet: @escaping () -> some View,
         shouldHandleCommands: @escaping () -> Bool
     ) {
         self.store = store
         self.editor = editor
         self._renameTarget = renameTarget
         self._showDeleteConfirm = showDeleteConfirm
+        self._showNewNoteSheet = showNewNoteSheet
         self.onSelectionChange = onSelectionChange
         self.onHasErrorChange = onHasErrorChange
         self.flushEditorError = flushEditorError
         self.exportPDF = exportPDF
         self.openVault = openVault
+        self.beginNewNote = beginNewNote
         self.toggleViewMode = toggleViewMode
         self.renameSheet = { AnyView(renameSheet($0)) }
+        self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.shouldHandleCommands = shouldHandleCommands
     }
 
@@ -523,8 +631,10 @@ private struct ContentViewChrome: ViewModifier {
                 editor: editor,
                 renameTarget: $renameTarget,
                 showDeleteConfirm: $showDeleteConfirm,
+                showNewNoteSheet: $showNewNoteSheet,
                 flushEditorError: flushEditorError,
-                renameSheet: renameSheet
+                renameSheet: renameSheet,
+                newNoteSheet: newNoteSheet
             ))
             .onChange(of: store.selection) { _, newValue in
                 onSelectionChange(newValue)
@@ -537,7 +647,7 @@ private struct ContentViewChrome: ViewModifier {
                 exportPDF: exportPDF,
                 openVault: openVault,
                 toggleViewMode: toggleViewMode,
-                createNote: { store.createNote() },
+                createNote: beginNewNote,
                 createFolder: { store.createFolder() },
                 refresh: { store.refresh() },
                 save: {
@@ -554,8 +664,10 @@ private struct ContentViewDialogs: ViewModifier {
     @Bindable var editor: EditorViewModel
     @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
+    @Binding var showNewNoteSheet: Bool
     var flushEditorError: () -> Void
     var renameSheet: (VaultNode) -> AnyView
+    var newNoteSheet: () -> AnyView
 
     func body(content: Content) -> some View {
         content
@@ -620,6 +732,9 @@ private struct ContentViewDialogs: ViewModifier {
             }
             .sheet(item: $renameTarget) { node in
                 renameSheet(node)
+            }
+            .sheet(isPresented: $showNewNoteSheet) {
+                newNoteSheet()
             }
             .confirmationDialog(
                 "Move to Trash?",

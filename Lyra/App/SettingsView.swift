@@ -3,6 +3,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
+    @AppStorage(GeneralPreferences.promptForNewNoteNameKey) private var promptForNewNoteName = true
+    @AppStorage(GeneralPreferences.defaultNoteStemKey) private var defaultNoteStem = "Untitled"
 
     private var appearancePreference: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .system
@@ -49,11 +51,17 @@ struct SettingsView: View {
             Text("Applies to all Lyra windows. PDF export always uses print-safe light colours.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            // Room for later preference toggles (confirm delete, etc.)
+
+            Toggle("Ask for name when creating a note", isOn: $promptForNewNoteName)
+
+            TextField("Default note name", text: $defaultNoteStem)
+            Text("Used when creating notes. Extension .md is added automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
         .padding()
-        .frame(minWidth: 420, minHeight: 220)
+        .frame(minWidth: 420, minHeight: 280)
     }
 
     // MARK: - About

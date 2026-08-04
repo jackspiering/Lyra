@@ -50,6 +50,9 @@
 		A10000000000000000000031 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* SettingsView.swift */; };
 		A10000000000000000000032 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* AppSession.swift */; };
 		A10000000000000000000033 /* AppearanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* AppearanceController.swift */; };
+		A10000000000000000000034 /* GeneralPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* GeneralPreferences.swift */; };
+		A10000000000000000000035 /* FilenameValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* FilenameValidation.swift */; };
+		A10000000000000000000036 /* FilenameValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000036 /* FilenameValidationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -110,6 +113,9 @@
 		B10000000000000000000031 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000032 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		B10000000000000000000033 /* AppearanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceController.swift; sourceTree = "<group>"; };
+		B10000000000000000000034 /* GeneralPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPreferences.swift; sourceTree = "<group>"; };
+		B10000000000000000000035 /* FilenameValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameValidation.swift; sourceTree = "<group>"; };
+		B10000000000000000000036 /* FilenameValidationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameValidationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,6 +175,7 @@
 				B1000000000000000000002D /* EditorViewModelTests.swift */,
 				B1000000000000000000002E /* MarkdownHighlighterTests.swift */,
 				B1000000000000000000002F /* VaultStoreRenameTests.swift */,
+				B10000000000000000000036 /* FilenameValidationTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -196,6 +203,8 @@
 				B10000000000000000000033 /* AppearanceController.swift */,
 				B10000000000000000000031 /* SettingsView.swift */,
 				B10000000000000000000032 /* AppSession.swift */,
+				B10000000000000000000034 /* GeneralPreferences.swift */,
+				B10000000000000000000035 /* FilenameValidation.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -383,6 +392,8 @@
 				A10000000000000000000033 /* AppearanceController.swift in Sources */,
 				A10000000000000000000031 /* SettingsView.swift in Sources */,
 				A10000000000000000000032 /* AppSession.swift in Sources */,
+				A10000000000000000000034 /* GeneralPreferences.swift in Sources */,
+				A10000000000000000000035 /* FilenameValidation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -401,6 +412,7 @@
 				A1000000000000000000002D /* EditorViewModelTests.swift in Sources */,
 				A1000000000000000000002E /* MarkdownHighlighterTests.swift in Sources */,
 				A1000000000000000000002F /* VaultStoreRenameTests.swift in Sources */,
+				A10000000000000000000036 /* FilenameValidationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

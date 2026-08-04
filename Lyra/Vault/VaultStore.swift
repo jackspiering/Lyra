@@ -101,10 +101,40 @@ final class VaultStore {
         wikiResolver.resolve(text)
     }
 
-    func createNote() {
-        guard let rootURL else { return }
+    /// Creates a note. `nil` name uses `UntitledName.next` with the preferred stem.
+    /// Named create validates and rejects collisions. Returns `true` on success.
+    @discardableResult
+    func createNote(named rawName: String? = nil) -> Bool {
+        guard let rootURL else { return false }
         let parent = createParentDirectory(vaultRoot: rootURL)
-        let url = parent.appendingPathComponent(UntitledName.next(in: parent))
+        let fileName: String
+        if let rawName {
+            switch FilenameValidation.validate(rawName, isDirectory: false) {
+            case .invalid(let detail):
+                present(
+                    context: .createNote,
+                    message: UserFacingError.message(context: .createNote, detail: detail)
+                )
+                return false
+            case .ok(let name):
+                let dest = parent.appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    present(
+                        context: .createNote,
+                        message: UserFacingError.message(
+                            context: .createNote,
+                            detail: "A file with that name already exists."
+                        )
+                    )
+                    return false
+                }
+                fileName = name
+            }
+        } else {
+            let stem = GeneralPreferences.defaultNoteStem
+            fileName = UntitledName.next(base: stem, ext: "md", in: parent)
+        }
+        let url = parent.appendingPathComponent(fileName)
         let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
         if !ok {
             present(
@@ -114,11 +144,12 @@ final class VaultStore {
                     detail: "Lyra couldn't create a new Markdown file in this folder."
                 )
             )
-            return
+            return false
         }
         lastCreateParentPath = parent.path
         pendingSelection = url.path
         refresh()
+        return true
     }
 
     func createFolder() {
@@ -188,23 +219,7 @@ final class VaultStore {
     }
 
     nonisolated static func validatedRename(_ newName: String, isDirectory: Bool) -> ValidatedRename {
-        var trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return .invalid("Name can't be empty.")
-        }
-        if trimmed.contains("/") || trimmed.contains(":") {
-            return .invalid("Names can't contain / or :.")
-        }
-        if trimmed.hasPrefix(".") {
-            return .invalid("Names can't start with a period (they'd be hidden).")
-        }
-        if trimmed == ".." || trimmed == "." {
-            return .invalid("That name isn't valid.")
-        }
-        if !isDirectory, !trimmed.lowercased().hasSuffix(".md") {
-            trimmed += ".md"
-        }
-        return .ok(trimmed)
+        FilenameValidation.validate(newName, isDirectory: isDirectory)
     }
 
     func deleteSelected() {

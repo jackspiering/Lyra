@@ -4,6 +4,7 @@ struct SidebarView: View {
     @Bindable var store: VaultStore
     @Binding var renameTarget: VaultNode?
     @Binding var showDeleteConfirm: Bool
+    var onNewNote: () -> Void = {}
     var onExportNotePDF: (VaultNode) -> Void = { _ in }
     var onExportFolderSeparate: (VaultNode) -> Void = { _ in }
     var onExportFolderCombined: (VaultNode) -> Void = { _ in }
@@ -30,7 +31,7 @@ struct SidebarView: View {
                 if node.isDirectory {
                     Button("New Note") {
                         store.selection = id
-                        store.createNote()
+                        onNewNote()
                     }
                     Button("New Folder") {
                         store.selection = id

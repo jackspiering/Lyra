@@ -59,7 +59,8 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
 | Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
-| Settings | Lyra → Settings: appearance (System / Light / Dark); About (acks, MIT, latest release) |
+| Settings | Lyra → Settings: appearance; ask-for-name when creating notes; default note stem; About |
+| New note | ⌘N / toolbar / context menu — optional name dialog (stem selected); unique Untitled.md when prompt is off |
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
 | Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |

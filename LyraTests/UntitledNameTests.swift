@@ -54,4 +54,40 @@ final class UntitledNameTests: XCTestCase {
         )
         XCTAssertEqual(UntitledName.next(base: "New Folder", ext: nil, in: dir), "New Folder 2")
     }
+
+    func testDefaultStemUntitled() throws {
+        let dir = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        XCTAssertEqual(UntitledName.next(base: "Untitled", ext: "md", in: dir), "Untitled.md")
+        FileManager.default.createFile(
+            atPath: dir.appendingPathComponent("Untitled.md").path,
+            contents: Data(),
+            attributes: nil
+        )
+        XCTAssertEqual(UntitledName.next(base: "Untitled", ext: "md", in: dir), "Untitled 2.md")
+    }
+
+    func testCustomBaseStem() throws {
+        let dir = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        XCTAssertEqual(UntitledName.next(base: "Note", ext: "md", in: dir), "Note.md")
+        FileManager.default.createFile(
+            atPath: dir.appendingPathComponent("Note.md").path,
+            contents: Data(),
+            attributes: nil
+        )
+        XCTAssertEqual(UntitledName.next(base: "Note", ext: "md", in: dir), "Note 2.md")
+    }
 }
