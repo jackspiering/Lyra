@@ -232,13 +232,17 @@ struct ContentView: View {
         guard store.rootURL != nil else { return }
         let tab = tabs.newEmptyTab()
         AppSession.shared.register(editor: tab.editor, store: store)
+        // Clear sidebar so re-clicking the same note opens it in this empty tab.
+        store.selection = nil
     }
 
     private func selectTab(_ id: NoteTab.ID) {
         tabs.select(id)
-        // Sync sidebar highlight to the note in this tab (leave selection if empty).
+        // Sync sidebar highlight to the note in this tab; clear when empty so re-click re-opens.
         if let path = tabs.selectedTab?.editor.fileURL?.path {
             store.selection = path
+        } else {
+            store.selection = nil
         }
     }
 
@@ -251,12 +255,15 @@ struct ContentView: View {
             if !tabs.tabs.contains(where: { $0.id == id }) {
                 AppSession.shared.unregister(editor: editorRef)
             }
-            // After close, if a note is still active, align sidebar.
+            // After close, align sidebar to remaining note or clear for empty tab.
             if let path = tabs.selectedTab?.editor.fileURL?.path {
                 store.selection = path
+            } else {
+                store.selection = nil
             }
         } else {
-            flushEditorError()
+            // Flush the tab that failed to save, not necessarily the previously selected editor.
+            flushEditorError(for: editorRef)
         }
     }
 
@@ -326,18 +333,24 @@ struct ContentView: View {
 
     private func performDelete() {
         guard let node = store.selectedNode() else { return }
-        // Flush any tab that has this note (or a note under a deleted folder) open.
+        // Flush + empty any tab that has this note (or a note under a deleted folder) open.
+        // Do not rely on selection=nil to close editors — that would close the wrong tab.
         let path = node.url.path
         for tab in tabs.tabs {
             guard let openPath = tab.editor.fileURL?.path else { continue }
             let affected = openPath == path || (node.isDirectory && openPath.hasPrefix(path + "/"))
             guard affected else { continue }
             if !tab.editor.close() {
-                flushEditorError()
+                flushEditorError(for: tab.editor)
                 return
             }
         }
         store.deleteSelected()
+        // deleteSelected nils selection; re-sync sidebar to whatever note (if any) is still active.
+        // handleSelectionChange ignores nil and selectOpenNote avoids re-open/dual-open.
+        if let path = tabs.selectedTab?.editor.fileURL?.path {
+            store.selection = path
+        }
     }
 
     private func deleteConfirmSheet() -> some View {
@@ -416,16 +429,9 @@ struct ContentView: View {
     }
 
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
-        // Deselection only — close the active note (tab stays, becomes empty).
-        guard let newValue else {
-            if !editor.close() {
-                if let path = editor.fileURL?.path {
-                    store.selection = path
-                }
-                flushEditorError()
-            }
-            return
-        }
+        // Multi-tab: nil selection is not “close editor” (mirrors folder select).
+        // Delete already empties tabs that held the deleted path; empty-tab / new-tab clear selection intentionally.
+        guard let newValue else { return }
 
         guard let root = store.rootNode,
               let node = FileSystemVault.findNode(id: newValue, in: root) else {
@@ -437,15 +443,28 @@ struct ContentView: View {
             return
         }
 
-        if editor.fileURL?.path != node.url.path {
-            let previousPath = editor.fileURL?.path
-            if tabs.openInActiveTab(url: node.url) {
-                flushEditorError()
-            } else {
-                // Save failed or external conflict — stay on the dirty note.
-                store.selection = previousPath
-                flushEditorError()
-            }
+        activateNote(url: node.url)
+    }
+
+    /// Open a note from sidebar / wiki: reuse an existing tab if already open, else active tab.
+    private func activateNote(url: URL) {
+        if tabs.selectOpenNote(path: url.path) {
+            return
+        }
+        // Open when active tab does not already show this path (covers empty tab after clear selection).
+        if editor.fileURL?.path == url.path {
+            return
+        }
+        let previousPath = editor.fileURL?.path
+        let ok = tabs.openInActiveTab(url: url) { created in
+            AppSession.shared.register(editor: created.editor, store: store)
+        }
+        if ok {
+            flushEditorError()
+        } else {
+            // Save failed or external conflict — stay on the dirty note.
+            store.selection = previousPath
+            flushEditorError()
         }
     }
 
@@ -463,16 +482,17 @@ struct ContentView: View {
 
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
+        // activateNote / selectOpenNote open or switch tabs; still flush dirty active first when replacing.
+        if tabs.selectOpenNote(path: url.path) {
+            store.selection = url.path
+            return
+        }
         guard editor.saveIfNeeded() else {
             flushEditorError()
             return
         }
         store.selection = url.path
-        if tabs.openInActiveTab(url: url) {
-            flushEditorError()
-        } else {
-            flushEditorError()
-        }
+        activateNote(url: url)
     }
 
     private func exportPDF() {

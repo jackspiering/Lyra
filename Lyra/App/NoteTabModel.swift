@@ -66,15 +66,30 @@ final class NoteTabController {
         return tab
     }
 
-    /// Opens `url` in the active tab. Returns `false` if a dirty save failed.
+    /// If any tab already shows this path, select it. Avoids dual-opening the same note.
     @discardableResult
-    func openInActiveTab(url: URL) -> Bool {
-        let tab = selectedTab ?? {
+    func selectOpenNote(path: String) -> Bool {
+        guard let existing = tabs.first(where: { $0.editor.fileURL?.path == path }) else {
+            return false
+        }
+        selectedTabID = existing.id
+        return true
+    }
+
+    /// Opens `url` in the active tab. Returns `false` if a dirty save failed.
+    /// If the controller had no tabs, synthesizes one and invokes `onCreated` so the caller can register AppSession.
+    @discardableResult
+    func openInActiveTab(url: URL, onCreated: ((NoteTab) -> Void)? = nil) -> Bool {
+        let tab: NoteTab
+        if let selected = selectedTab {
+            tab = selected
+        } else {
             let t = NoteTab()
             tabs = [t]
             selectedTabID = t.id
-            return t
-        }()
+            onCreated?(t)
+            tab = t
+        }
         if tab.editor.fileURL?.path == url.path {
             return true
         }
