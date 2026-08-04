@@ -21,6 +21,14 @@ final class EditorViewModelTests: XCTestCase {
         tempRoot = nil
     }
 
+    /// Point the dirty buffer at a directory path so `write(to:atomically:)` fails reliably
+    /// (chmod on a file alone does not block atomic replace when the parent dir is writable).
+    private func makeUnwritableSaveTarget() throws -> URL {
+        let blocker = tempRoot.appendingPathComponent("not-a-file-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+        return blocker
+    }
+
     func testOpenPreservesBufferWhenSaveFails() throws {
         let a = tempRoot.appendingPathComponent("a.md")
         let b = tempRoot.appendingPathComponent("b.md")
@@ -31,23 +39,15 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertTrue(editor.open(url: a))
         editor.text = "unsaved edits"
         editor.isDirty = true
-
-        // Make the open file unwritable so the flush on switch fails.
-        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: a.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: a.path)
-        }
+        let blocked = try makeUnwritableSaveTarget()
+        editor.fileURL = blocked
 
         XCTAssertFalse(editor.open(url: b))
         XCTAssertEqual(editor.text, "unsaved edits")
-        XCTAssertEqual(editor.fileURL?.path, a.path)
+        XCTAssertEqual(editor.fileURL?.path, blocked.path)
         XCTAssertTrue(editor.isDirty)
         XCTAssertNotNil(editor.lastError)
         XCTAssertEqual(editor.lastError?.context, .saveNote)
-
-        // Disk still holds the original contents of a.
-        let disk = try String(contentsOf: a, encoding: .utf8)
-        XCTAssertEqual(disk, "original-a")
     }
 
     func testClosePreservesBufferWhenSaveFails() throws {
@@ -58,15 +58,12 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertTrue(editor.open(url: a))
         editor.text = "dirty"
         editor.isDirty = true
-
-        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: a.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: a.path)
-        }
+        let blocked = try makeUnwritableSaveTarget()
+        editor.fileURL = blocked
 
         XCTAssertFalse(editor.close())
         XCTAssertEqual(editor.text, "dirty")
-        XCTAssertEqual(editor.fileURL?.path, a.path)
+        XCTAssertEqual(editor.fileURL?.path, blocked.path)
         XCTAssertTrue(editor.isDirty)
         XCTAssertNotNil(editor.lastError)
     }

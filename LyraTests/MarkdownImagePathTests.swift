@@ -119,13 +119,17 @@ final class MarkdownImagePathTests: XCTestCase {
         let noteDir = root.appendingPathComponent("notes", isDirectory: true)
         try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
 
-        let encoded = "../_attachments/pasted-image-1.png"
-            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
+        // Explicit %2F encoding (not only path-safe chars left unescaped by urlPathAllowed).
+        let encoded = "..%2F_attachments%2Fpasted-image-1.png"
         let url = MarkdownImagePath.resolve(
             path: encoded,
             noteDirectory: noteDir,
             vaultRoot: root
         )
-        XCTAssertEqual(url?.path, file.path)
+        // `..` relatives may keep `..` in URL.path; compare resolved filesystem paths.
+        XCTAssertEqual(
+            url?.resolvingSymlinksInPath().standardizedFileURL.path,
+            file.resolvingSymlinksInPath().standardizedFileURL.path
+        )
     }
 }
