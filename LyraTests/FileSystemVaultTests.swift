@@ -87,8 +87,35 @@ final class FileSystemVaultTests: XCTestCase {
 
         let tree = try FileSystemVault.scan(root: root)
         let names = (tree.children ?? []).map(\.name)
-        XCTAssertTrue(names.contains("note.md") || names.contains(where: { $0.hasSuffix(".md") }))
+        XCTAssertTrue(names.contains("note.md"))
         XCTAssertFalse(names.contains("_attachments"))
         XCTAssertFalse(names.contains(AttachmentStore.folderName))
+    }
+
+    func testScanSkipsDirectorySymlinkLoops() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        FileManager.default.createFile(
+            atPath: root.appendingPathComponent("note.md").path,
+            contents: Data("# Note".utf8),
+            attributes: nil
+        )
+        let loop = root.appendingPathComponent("loop")
+        // Symlink to parent would recurse forever without a guard.
+        try FileManager.default.createSymbolicLink(
+            at: loop,
+            withDestinationURL: root
+        )
+
+        let tree = try FileSystemVault.scan(root: root)
+        let names = (tree.children ?? []).map(\.name)
+        XCTAssertTrue(names.contains("note.md"))
+        XCTAssertFalse(names.contains("loop"))
     }
 }

@@ -54,7 +54,7 @@ Autosave runs after ~500ms idle.
 | Local vault | Any folder of UTF-8 `.md` files — disk is the source of truth |
 | Sidebar | Nested folders and notes; skips `.git` and hidden files |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V → `_attachments/` + `![](...)` (Source or Live) |
+| Paste images | ⌘V → vault `_attachments/` + note-relative `![](...)` (Source or Live) |
 | Export PDF | **File → Export PDF…** for the open note |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
 | Errors | Plain-language alerts (permissions, missing files, disk full, …) |

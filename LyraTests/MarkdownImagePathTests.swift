@@ -101,4 +101,31 @@ final class MarkdownImagePathTests: XCTestCase {
         XCTAssertNil(MarkdownImagePath.parseImageLine("![hi](x.png) trailing"))
         XCTAssertNil(MarkdownImagePath.parseImageLine("[hi](x.png)"))
     }
+
+    func testResolvePercentEncodedNoteRelative() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let attachments = root.appendingPathComponent("_attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        let file = attachments.appendingPathComponent("pasted-image-1.png")
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: file)
+
+        let noteDir = root.appendingPathComponent("notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let encoded = "../_attachments/pasted-image-1.png"
+            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
+        let url = MarkdownImagePath.resolve(
+            path: encoded,
+            noteDirectory: noteDir,
+            vaultRoot: root
+        )
+        XCTAssertEqual(url?.path, file.path)
+    }
 }

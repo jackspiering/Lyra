@@ -69,8 +69,11 @@ struct ContentView: View {
             titleVisibility: .visible
         ) {
             Button("Move to Trash", role: .destructive) {
-                editor.close()
-                store.deleteSelected()
+                if editor.close() {
+                    store.deleteSelected()
+                } else {
+                    flushEditorError()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -115,8 +118,11 @@ struct ContentView: View {
                     ToolbarItemGroup {
                         Button {
                             if let url = VaultFolderPicker.pick() {
-                                editor.close()
-                                store.openVault(at: url)
+                                if editor.close() {
+                                    store.openVault(at: url)
+                                } else {
+                                    flushEditorError()
+                                }
                             }
                         } label: {
                             Label("Open Vault", systemImage: "folder")
@@ -165,9 +171,12 @@ struct ContentView: View {
                 MarkdownTextView(
                     text: $editor.text,
                     vaultRoot: store.rootURL,
+                    noteURL: editor.fileURL,
                     onEdit: { editor.noteEdited() },
                     onPasteError: { store.present(context: .pasteImage, message: $0) }
                 )
+                // Per-file identity: reset selection, scroll, and undo when switching notes.
+                .id(editor.fileURL?.path)
             case .reading:
                 MarkdownPreviewView(
                     text: editor.text,
@@ -189,11 +198,15 @@ struct ContentView: View {
                 Button("Cancel") { renameTarget = nil }
                 Button("Rename") {
                     let oldPath = node.url.path
-                    _ = editor.saveIfNeeded()
-                    flushEditorError()
+                    guard editor.saveIfNeeded() else {
+                        flushEditorError()
+                        return
+                    }
                     store.renameSelected(to: renameText)
                     if editor.fileURL?.path == oldPath, let newURL = store.selectedFileURL() {
-                        editor.open(url: newURL)
+                        if !editor.open(url: newURL) {
+                            flushEditorError()
+                        }
                     }
                     renameTarget = nil
                 }
@@ -210,12 +223,27 @@ struct ContentView: View {
               let root = store.rootNode,
               let node = FileSystemVault.findNode(id: newValue, in: root),
               !node.isDirectory else {
-            if store.selectedFileURL() == nil { editor.close() }
+            // Folder (or empty) selection: close only when there is no file selected.
+            if store.selectedFileURL() == nil {
+                if !editor.close() {
+                    // Keep the open note selected so dirty edits are not discarded.
+                    if let path = editor.fileURL?.path {
+                        store.selection = path
+                    }
+                    flushEditorError()
+                }
+            }
             return
         }
         if editor.fileURL?.path != node.url.path {
-            editor.open(url: node.url)
-            flushEditorError()
+            let previousPath = editor.fileURL?.path
+            if editor.open(url: node.url) {
+                flushEditorError()
+            } else {
+                // Save failed — stay on the dirty note and surface the error.
+                store.selection = previousPath
+                flushEditorError()
+            }
         }
     }
 
@@ -227,11 +255,14 @@ struct ContentView: View {
 
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
-        _ = editor.saveIfNeeded()
-        flushEditorError()
+        guard editor.saveIfNeeded() else {
+            flushEditorError()
+            return
+        }
         store.selection = url.path
-        editor.open(url: url)
-        flushEditorError()
+        if !editor.open(url: url) {
+            flushEditorError()
+        }
     }
 
     private func exportPDF() {
