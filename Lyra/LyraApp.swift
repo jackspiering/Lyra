@@ -48,6 +48,7 @@ struct VaultWindowRoot: View {
         ContentView(store: store, editor: editor, openNewVaultWindow: {
             openWindow(id: "vault")
         })
+        // nil for System so SwiftUI does not pin light/dark after a forced scheme.
         .preferredColorScheme(appearance.colorScheme)
         .onAppear {
             AppearanceController.apply(rawValue: appearanceRaw)

@@ -16,26 +16,33 @@ struct SettingsView: View {
             get: { AppearancePreference(rawValue: appearanceRaw) ?? .system },
             set: {
                 appearanceRaw = $0.rawValue
+                // Apply after storage write so System clears window-level sticky light/dark.
                 AppearanceController.apply($0)
             }
         )
     }
 
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem {
-                    Label("General", systemImage: "gearshape")
-                }
+        // Group so preferredColorScheme(nil) for System can clear a prior forced scheme.
+        Group {
+            TabView {
+                generalTab
+                    .tabItem {
+                        Label("General", systemImage: "gearshape")
+                    }
 
-            aboutTab
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
+                aboutTab
+                    .tabItem {
+                        Label("About", systemImage: "info.circle")
+                    }
+            }
         }
         .preferredColorScheme(appearancePreference.colorScheme)
         .onAppear {
             AppearanceController.apply(rawValue: appearanceRaw)
+        }
+        .onChange(of: appearanceRaw) { _, new in
+            AppearanceController.apply(rawValue: new)
         }
     }
 
