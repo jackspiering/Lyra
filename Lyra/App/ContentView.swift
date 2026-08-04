@@ -80,12 +80,20 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
-                ToolbarItemGroup {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        openVault()
+                    } label: {
+                        Label("Open Vault", systemImage: "folder")
+                    }
+                    .help("Open Vault…")
+
                     Button {
                         store.createNote()
                     } label: {
                         Label("New Note", systemImage: "square.and.pencil")
                     }
+                    .help("New Note")
                 }
             }
         } detail: {
