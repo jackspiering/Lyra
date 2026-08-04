@@ -19,7 +19,15 @@ final class NoteTab: Identifiable {
         return "New Tab"
     }
 
-    init(id: UUID = UUID(), editor: EditorViewModel = EditorViewModel()) {
+    /// Create an empty tab. Editor is created in the init body so the default
+    /// argument does not evaluate `EditorViewModel()` in a nonisolated context
+    /// (Swift concurrency error under Xcode 16).
+    init(id: UUID = UUID()) {
+        self.id = id
+        self.editor = EditorViewModel()
+    }
+
+    init(id: UUID = UUID(), editor: EditorViewModel) {
         self.id = id
         self.editor = editor
     }
