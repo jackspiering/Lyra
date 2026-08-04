@@ -121,7 +121,10 @@ final class EditorViewModel {
     }
 
     static func modificationDate(of url: URL) -> Date? {
-        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+        // Resource values are cached on the URL; always re-stat for conflict checks.
+        var fresh = url
+        fresh.removeCachedResourceValue(forKey: .contentModificationDateKey)
+        let values = try? fresh.resourceValues(forKeys: [.contentModificationDateKey])
         return values?.contentModificationDate
     }
 
