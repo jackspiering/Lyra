@@ -129,7 +129,8 @@ struct LyraApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
             }
-            CommandGroup(replacing: .find) {
+            // `.find` is not a CommandGroupPlacement; hang vault search after text editing.
+            CommandGroup(after: .textEditing) {
                 Button("Find in Vault") {
                     NotificationCenter.default.post(name: .lyraFocusVaultSearch, object: nil)
                 }

@@ -470,7 +470,7 @@ enum NotePDFExporter {
             mutable.enumerateAttribute(.link, in: full) { value, range, _ in
                 guard value != nil else { return }
                 mutable.addAttributes([
-                    .foregroundColor: Self.linkColor,
+                    .foregroundColor: NotePDFExporter.linkColor,
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
                 ], range: range)
             }
