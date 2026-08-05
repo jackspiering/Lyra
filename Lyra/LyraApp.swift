@@ -7,6 +7,8 @@ extension Notification.Name {
     static let lyraNewNote = Notification.Name("lyraNewNote")
     static let lyraNewFolder = Notification.Name("lyraNewFolder")
     static let lyraOpenVault = Notification.Name("lyraOpenVault")
+    /// Open a Markdown note from the current vault (⌘O when a vault is open).
+    static let lyraGoToFile = Notification.Name("lyraGoToFile")
     static let lyraToggleViewMode = Notification.Name("lyraToggleViewMode")
     static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
     /// Move the sidebar selection to the Trash (⌘⌫).
@@ -137,10 +139,14 @@ struct LyraApp: App {
                 }
             }
             CommandGroup(after: .newItem) {
+                Button("Go to File…") {
+                    NotificationCenter.default.post(name: .lyraGoToFile, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: .command)
+
                 Button("Open Vault…") {
                     NotificationCenter.default.post(name: .lyraOpenVault, object: nil)
                 }
-                .keyboardShortcut("o", modifiers: .command)
 
                 Button("Refresh Vault") {
                     NotificationCenter.default.post(name: .lyraRefreshVault, object: nil)
