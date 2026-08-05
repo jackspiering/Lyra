@@ -495,13 +495,20 @@ struct ContentView: View {
         }
         if editor.fileURL?.path == url.path { return }
         // Active has another note → new tab
-        let ok = tabs.openInNewTab(url: url) { created in
-            AppSession.shared.register(editor: created.editor, store: store)
-        }
+        let ok = tabs.openInNewTab(
+            url: url,
+            onCreated: { created in
+                AppSession.shared.register(editor: created.editor, store: store)
+            },
+            onFailed: { failed in
+                flushEditorError(for: failed)
+            }
+        )
         if ok {
             flushEditorError()
         } else {
-            flushEditorError()
+            // Restored previous tab after rollback — align sidebar to it.
+            store.selection = tabs.selectedTab?.editor.fileURL?.path
         }
     }
 
@@ -512,10 +519,19 @@ struct ContentView: View {
             store.selection = url.path
             return
         }
-        _ = tabs.openInNewTab(url: url) { created in
-            AppSession.shared.register(editor: created.editor, store: store)
+        let ok = tabs.openInNewTab(
+            url: url,
+            onCreated: { created in
+                AppSession.shared.register(editor: created.editor, store: store)
+            },
+            onFailed: { failed in
+                flushEditorError(for: failed)
+            }
+        )
+        if ok {
+            flushEditorError()
         }
-        flushEditorError()
+        // On failure, selection stays on the chosen file; failed editor error already flushed via onFailed.
     }
 
     private func flushEditorError() {

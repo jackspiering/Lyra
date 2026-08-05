@@ -105,9 +105,14 @@ final class NoteTabController {
     }
 
     /// Open `url` in a brand-new tab (caller registers AppSession). Returns false if open failed.
-    /// If already open, selects that tab. On open failure, removes the new tab and restores selection.
+    /// If already open, selects that tab. On open failure, invokes `onFailed` with the failed
+    /// editor (so callers can flush `lastError`) then removes the tab and restores selection.
     @discardableResult
-    func openInNewTab(url: URL, onCreated: ((NoteTab) -> Void)? = nil) -> Bool {
+    func openInNewTab(
+        url: URL,
+        onCreated: ((NoteTab) -> Void)? = nil,
+        onFailed: ((EditorViewModel) -> Void)? = nil
+    ) -> Bool {
         if selectOpenNote(path: url.path) { return true }
         let previousID = selectedTabID
         let tab = NoteTab()
@@ -118,6 +123,8 @@ final class NoteTabController {
             onCreated?(tab)
             return true
         }
+        // Surface lastError before the tab (and its editor) is discarded.
+        onFailed?(tab.editor)
         // Roll back failed tab
         tabs.removeAll { $0.id == tab.id }
         selectedTabID = previousID
