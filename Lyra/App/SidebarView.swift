@@ -51,11 +51,9 @@ struct SidebarView: View {
     private var treeList: some View {
         List(selection: $store.selection) {
             if let root = displayRoot {
-                Section(root.name) {
-                    OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
-                        row(for: node)
-                            .tag(node.id)
-                    }
+                OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
+                    row(for: node)
+                        .tag(node.id)
                 }
             }
         }
@@ -148,13 +146,12 @@ struct SidebarView: View {
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            // Double-click renames even when the row was not previously selected.
-            .highPriorityGesture(
-                TapGesture(count: 2).onEnded {
-                    store.selection = node.id
-                    beginRename(node)
-                }
-            )
+            // Single-click: List(selection:) owns selection — do not add a competing single-tap.
+            // Double-click: rename (even if the row was not previously selected).
+            .onTapGesture(count: 2) {
+                store.selection = node.id
+                beginRename(node)
+            }
         }
     }
 

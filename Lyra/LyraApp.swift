@@ -15,6 +15,8 @@ extension Notification.Name {
     static let lyraFocusVaultSearch = Notification.Name("lyraFocusVaultSearch")
     /// New empty note tab in the key vault window (⌘T).
     static let lyraNewTab = Notification.Name("lyraNewTab")
+    /// Open the sidebar selection in a new note tab (File → Open in New Tab).
+    static let lyraOpenInNewTab = Notification.Name("lyraOpenInNewTab")
     /// Close the selected note tab (File → Close Tab). Last tab becomes empty.
     static let lyraCloseTab = Notification.Name("lyraCloseTab")
     /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
@@ -24,6 +26,11 @@ extension Notification.Name {
 /// Coordinates quit-time save so unsaved work is not discarded silently.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Architecture: custom NoteTabBar only — no NSWindow native tabbing (+ in title bar).
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if AppSession.shared.saveAllEditors() {
             return .terminateNow
@@ -108,6 +115,10 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraNewTab, object: nil)
                 }
                 .keyboardShortcut("t", modifiers: .command)
+
+                Button("Open in New Tab") {
+                    NotificationCenter.default.post(name: .lyraOpenInNewTab, object: nil)
+                }
 
                 Button("Close Tab") {
                     NotificationCenter.default.post(name: .lyraCloseTab, object: nil)

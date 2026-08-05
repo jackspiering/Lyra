@@ -132,4 +132,65 @@ final class MarkdownImagePathTests: XCTestCase {
             file.resolvingSymlinksInPath().standardizedFileURL.path
         )
     }
+
+    func testResolveParentRelativeAttachments() throws {
+        // vault/_attachments/a.png , note in vault/Daily Notes/
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let attachments = root.appendingPathComponent("_attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        let file = attachments.appendingPathComponent("pasted-image-20260804-200206.png")
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: file)
+
+        let noteDir = root.appendingPathComponent("Daily Notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let url = MarkdownImagePath.resolve(
+            path: "../_attachments/pasted-image-20260804-200206.png",
+            noteDirectory: noteDir,
+            vaultRoot: root
+        )
+        XCTAssertEqual(
+            url?.resolvingSymlinksInPath().standardizedFileURL.path,
+            file.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+    }
+
+    func testResolveAttachmentsBasenameFallback() throws {
+        // Even if relative is weird, basename under vault/_attachments still resolves
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let attachments = root.appendingPathComponent("_attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        let file = attachments.appendingPathComponent("x.png")
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: file)
+
+        // Single path component "a/b" so ../../ escapes the vault (note-relative fails).
+        let noteDir = root.appendingPathComponent("a/b", isDirectory: true)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let url = MarkdownImagePath.resolve(
+            path: "../../_attachments/x.png", // over-escaped relative
+            noteDirectory: noteDir,
+            vaultRoot: root
+        )
+        XCTAssertNotNil(url)
+        XCTAssertTrue(url!.path.hasSuffix("/_attachments/x.png"))
+        XCTAssertEqual(
+            url?.resolvingSymlinksInPath().standardizedFileURL.path,
+            file.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+    }
 }

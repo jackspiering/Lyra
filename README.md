@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.9.0-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.9.1-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -32,7 +32,7 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 
 | Shortcut / gesture | Action |
 |--------------------|--------|
-| ⌘O | Open vault |
+| ⌘O | Open vault (File menu; global) |
 | ⌘N | New note (name dialog if enabled in Settings) |
 | ⌘T | New empty note tab (same vault sidebar) |
 | ⇧⌘W | Close current note tab (last tab becomes empty) |
@@ -40,10 +40,12 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | Click sidebar name | Select note or folder |
 | Double-click name | Rename (works even if not already selected) |
 | ↵ in sidebar | Rename selected note or folder |
-| ⌘F | Focus vault search / Go to File from empty tab |
+| ⌘F | Focus vault search (also what empty-tab **Go to file** does) |
 | ⌘E | Toggle Source ↔ Reading |
 | ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
+
+Empty tabs show **Create new note (⌘ N)**, **Go to file (⌘ O)**, and **Close** (Obsidian-style labels). The Go to file row focuses vault search; the real shortcut for that is still ⌘F. Global ⌘O remains Open Vault.
 
 Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
 
@@ -56,19 +58,20 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Mode | Behavior |
 |------|----------|
 | Source | Raw Markdown with syntax highlighting |
-| Reading | Full-width preview (task checkboxes, clickable `[[wiki]]` links) |
+| Reading | Full-width preview (task checkboxes, clickable `[[wiki]]` links, vault images) |
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
-| Sidebar | Nested folders and notes; skips `.git` and hidden files |
+| Sidebar | Nested folders and notes; skips `.git` and hidden files. Click a name to select; double-click to rename |
 | Vault search | Magnifying glass filters the tree by note/folder name or path (not full-text); ⌘F focuses the field |
 | Rename | Double-click a name, or press Return when selected; Escape cancels. Click alone only selects |
 | Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
-| Multiple vaults | One vault per window (File → New Window / Open Vault opens another) |
-| Note tabs | In-window tabs share one vault sidebar; `+` / ⌘T opens an empty tab; sidebar opens notes in the active tab; empty tab offers Create new note, Go to File (⌘F), and Close |
+| Multiple vaults | One vault per window (File → New Window / Open Vault opens another). No vault name in the title bar or sidebar header |
+| Note tabs | In-window tabs share one vault sidebar; tab strip `+` / ⌘T opens an empty tab. Native window tabbing (title-bar `+`) is off so it does not spawn whole-window tabs. Opening a note from the sidebar uses a new tab when the active tab already has a different note; if that note is already open, its tab is focused. Empty tab: Create new note / Go to file / Close |
+| Open in New Tab | File → Open in New Tab always opens the sidebar selection in a new tab (or focuses it if already open) |
 | Note title | Editable title above Source/Reading; tab label matches. A leading `# H1` sets the title; otherwise the filename does. Edits update the H1 when present, or rename the file |
 | Settings | Lyra → Settings (⌘,). Resizable window. Appearance (System / Light / Dark). Prompt for note name; default note stem. Separate confirm toggles for note vs folder Trash, each with (i) help. About: version links to the tag release, Latest release nearby, acks, MIT |
 | New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
@@ -76,7 +79,7 @@ If the open note is moved or deleted outside Lyra, you get a **Note moved or del
 | Context export | Right-click note → Export PDF; folder → separate or single PDF |
 | Sidebar empty menu | Right-click empty sidebar area → New Note / New Folder (uses the selected folder when one is selected) |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only) |
+| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only). Reading shows those images, including nested-note paths like `![](../_attachments/…)` |
 | Status bar | Under the open note: `Words n | Characters n | Created … | Saved …` |
 | Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
 | Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
