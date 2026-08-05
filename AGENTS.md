@@ -18,7 +18,7 @@ Lyra/
   Resources/  # Assets, Fonts (Inter + OFL)
   Scripts/    # smoke.sh (any OS), xcode-test.sh (Mac)
 LyraTests/    # Pure logic unit tests
-docs/         # architecture, CI, design specs
+docs/         # architecture, CI
 ```
 
 One primary type per file when practical. Keep files small.
@@ -42,7 +42,7 @@ One primary type per file when practical. Keep files small.
 
 ## How to add a feature
 
-1. Read the relevant design under `docs/superpowers/` if the change is large.
+1. Read `docs/architecture.md` for invariants and decisions.
 2. Put logic in the right folder (`Vault` vs `Editor` vs `Preview` vs `App`).
 3. Add unit tests in `LyraTests` for pure functions (paths, wiki resolve, naming, ranges, errors).
 4. **Always update `README.md`** for user-visible changes. Update `docs/architecture.md` when structure or invariants change.

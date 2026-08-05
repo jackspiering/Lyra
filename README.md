@@ -137,7 +137,7 @@ More: [docs/ci.md](docs/ci.md)
 | `Lyra/Preview/` | Reading, PDF export |
 | `Lyra/Models/` | Shared types |
 | `LyraTests/` | Unit tests for pure logic |
-| `docs/` | Architecture, CI, design specs |
+| `docs/` | Architecture and CI |
 
 ## Docs
 
@@ -147,7 +147,6 @@ More: [docs/ci.md](docs/ci.md)
 | [docs/ci.md](docs/ci.md) | CI, tests, DMG releases |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and manual checklist |
 | [AGENTS.md](AGENTS.md) | Rules for AI agents and humans |
-| [docs/superpowers/](docs/superpowers/) | Versioned design specs |
 
 ## Contributing
 
