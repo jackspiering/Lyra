@@ -31,8 +31,8 @@ struct ContentView: View {
 
     var body: some View {
         rootShell
-            // Vault folder name when open; empty when none — no center “Lyra” brand.
-            .navigationTitle(store.rootURL?.lastPathComponent ?? "")
+            // Empty chrome title — vault name must not repeat in toolbar principal.
+            .navigationTitle("")
             .frame(minWidth: 900, minHeight: 560)
             .font(LyraFonts.body)
             .background(

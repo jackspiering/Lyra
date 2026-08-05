@@ -51,11 +51,9 @@ struct SidebarView: View {
     private var treeList: some View {
         List(selection: $store.selection) {
             if let root = displayRoot {
-                Section(root.name) {
-                    OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
-                        row(for: node)
-                            .tag(node.id)
-                    }
+                OutlineGroup(root.children ?? [], id: \.id, children: \.children) { node in
+                    row(for: node)
+                        .tag(node.id)
                 }
             }
         }
