@@ -24,6 +24,11 @@ extension Notification.Name {
 /// Coordinates quit-time save so unsaved work is not discarded silently.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Architecture: custom NoteTabBar only — no NSWindow native tabbing (+ in title bar).
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if AppSession.shared.saveAllEditors() {
             return .terminateNow
