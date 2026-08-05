@@ -66,11 +66,11 @@ One primary type per file when practical.
 
 ### In-window note tabs (v0.9+)
 
-**Choice:** Custom tab bar inside each vault window (`NoteTabController` + one `EditorViewModel` per tab). Shared sidebar for the window’s vault. No `NSWindow` native tabbing (that would duplicate whole windows and reintroduce per-tab “No Vault Open”).
+**Choice:** Custom tab bar inside each vault window (`NoteTabController` + one `EditorViewModel` per tab). Shared sidebar for the window’s vault. No `NSWindow` native tabbing (that would duplicate whole windows and reintroduce per-tab “No Vault Open”); automatic window tabbing is disabled so the system title-bar `+` does not appear.
 
 **Why:** Open several notes without losing the vault tree; empty tabs can create a note, focus search, or close without dropping the vault.
 
-**Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open).
+**Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open). From 0.9.1, selecting a note from the sidebar opens a new tab when the active tab already has a different note (reuses if already open); File → Open in New Tab is explicit.
 
 ### Inter typeface (v0.5)
 
