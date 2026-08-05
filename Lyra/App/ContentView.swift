@@ -54,6 +54,7 @@ struct ContentView: View {
                 flushEditorError: flushEditorError,
                 exportPDF: exportPDF,
                 openVault: openVault,
+                goToFile: goToFile,
                 beginNewNote: beginNewNote,
                 requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
@@ -184,7 +185,7 @@ struct ContentView: View {
         if editor.fileURL == nil {
             EmptyTabView(
                 onNewNote: beginNewNote,
-                onGoToFile: { vaultSearchFocusToken += 1 },
+                onGoToFile: goToFile,
                 onCloseTab: { closeTab(id: tabs.selectedTabID) }
             )
         } else {
@@ -310,6 +311,17 @@ struct ContentView: View {
         // Already have a vault — open the chosen folder in a new window.
         AppSession.shared.setPendingVaultURL(url)
         openNewVaultWindow?()
+    }
+
+    /// Empty-tab “Go to file” / ⌘O when a vault is open: pick a Markdown note and open it.
+    private func goToFile() {
+        guard let root = store.rootURL else {
+            openVault()
+            return
+        }
+        guard let url = VaultNotePicker.pick(vaultRoot: root) else { return }
+        store.selection = url.path
+        activateNote(url: url)
     }
 
     private func beginNewNote() {
@@ -818,6 +830,7 @@ private struct ContentViewChrome: ViewModifier {
     var flushEditorError: () -> Void
     var exportPDF: () -> Void
     var openVault: () -> Void
+    var goToFile: () -> Void
     var beginNewNote: () -> Void
     var requestDelete: () -> Void
     var toggleViewMode: () -> Void
@@ -839,6 +852,7 @@ private struct ContentViewChrome: ViewModifier {
         flushEditorError: @escaping () -> Void,
         exportPDF: @escaping () -> Void,
         openVault: @escaping () -> Void,
+        goToFile: @escaping () -> Void,
         beginNewNote: @escaping () -> Void,
         requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
@@ -859,6 +873,7 @@ private struct ContentViewChrome: ViewModifier {
         self.flushEditorError = flushEditorError
         self.exportPDF = exportPDF
         self.openVault = openVault
+        self.goToFile = goToFile
         self.beginNewNote = beginNewNote
         self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
@@ -892,6 +907,7 @@ private struct ContentViewChrome: ViewModifier {
                 shouldHandle: shouldHandleCommands,
                 exportPDF: exportPDF,
                 openVault: openVault,
+                goToFile: goToFile,
                 toggleViewMode: toggleViewMode,
                 createNote: beginNewNote,
                 createFolder: { store.createFolder() },
@@ -993,6 +1009,7 @@ private struct ContentViewCommands: ViewModifier {
     var shouldHandle: () -> Bool
     var exportPDF: () -> Void
     var openVault: () -> Void
+    var goToFile: () -> Void
     var toggleViewMode: () -> Void
     var createNote: () -> Void
     var createFolder: () -> Void
@@ -1022,6 +1039,10 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraNewFolder)) { _ in
                 guard shouldHandle() else { return }
                 createFolder()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraGoToFile)) { _ in
+                guard shouldHandle() else { return }
+                goToFile()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraOpenVault)) { _ in
                 guard shouldHandle() else { return }

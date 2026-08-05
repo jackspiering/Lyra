@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.9.1-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.9.2-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -25,14 +25,14 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 
 ## Quick start
 
-1. Open Lyra → Open Vault… (⌘O)
+1. Open Lyra → Open Vault…
 2. Pick a folder of Markdown notes
 3. Select a note in the sidebar
 4. Switch Source / Reading with the control or ⌘E
 
 | Shortcut / gesture | Action |
 |--------------------|--------|
-| ⌘O | Open vault (File menu; global) |
+| ⌘O | Go to File… (open a Markdown note in the vault; Open Vault… if none) |
 | ⌘N | New note (name dialog if enabled in Settings) |
 | ⌘T | New empty note tab (same vault sidebar) |
 | ⇧⌘W | Close current note tab (last tab becomes empty) |
@@ -45,7 +45,7 @@ macOS may still warn on first open. Use **System Settings → Privacy & Security
 | ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
 
-Empty tabs show **Create new note (⌘ N)**, **Go to file (⌘ O)**, and **Close** (Obsidian-style labels). The Go to file row focuses vault search; the real shortcut for that is still ⌘F. Global ⌘O remains Open Vault.
+Empty tabs show **Create new note (⌘ N)**, **Go to file (⌘ O)**, and **Close** (Obsidian-style labels). Go to file (and ⌘O) opens a file panel for a Markdown note in the current vault. File → Open Vault… still opens a vault folder (new window if one is already open). Find in Vault remains ⌘F.
 
 Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
 

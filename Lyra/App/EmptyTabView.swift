@@ -4,7 +4,7 @@ import SwiftUI
 /// Full-window “No Vault Open” is only for `store.rootURL == nil`.
 struct EmptyTabView: View {
     var onNewNote: () -> Void
-    /// Focus vault search (vault is open when this view is shown).
+    /// Open-note panel for a Markdown file in the current vault (⌘O when vault is open).
     var onGoToFile: () -> Void
     var onCloseTab: () -> Void
 
