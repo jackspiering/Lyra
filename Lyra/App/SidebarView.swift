@@ -140,17 +140,27 @@ struct SidebarView: View {
                     .onExitCommand { cancelRename() }
             }
         } else {
-            Label(
-                node.name,
-                systemImage: node.isDirectory ? "folder" : "doc.text"
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // macOS List(selection:) often misses hits on Label title text — only padding
+            // beside the glyph/text selects. Build an explicit full-row hit target and
+            // set selection ourselves (List binding still highlights via .tag).
+            HStack(spacing: 6) {
+                Image(systemName: node.isDirectory ? "folder" : "doc.text")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, alignment: .center)
+                Text(node.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
             .contentShape(Rectangle())
-            // Single-click: List(selection:) owns selection — do not add a competing single-tap.
-            // Double-click: rename (even if the row was not previously selected).
+            // Register double-tap before single-tap so rename wins on double-click.
             .onTapGesture(count: 2) {
                 store.selection = node.id
                 beginRename(node)
+            }
+            .onTapGesture(count: 1) {
+                store.selection = node.id
             }
         }
     }
