@@ -2,27 +2,35 @@ import Foundation
 
 /// Resolve Markdown image paths and parse image-only lines for preview / PDF.
 enum MarkdownImagePath {
-    /// Absolute path if the file exists; else note-relative if present; else vault-relative if present; else `nil`.
-    /// Percent-encoded destinations (e.g. from paste) are decoded before lookup.
+    /// Absolute path if the file exists; else note-relative if present; else vault-relative
+    /// (when not `../…`); else basename under `vaultRoot/_attachments`. Percent-encoded
+    /// destinations are decoded before lookup. Returned URLs are standardized.
     static func resolve(path: String, noteDirectory: URL, vaultRoot: URL) -> URL? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let decoded = trimmed.removingPercentEncoding ?? trimmed
 
         if let absolute = absoluteFileURL(from: decoded) {
-            return FileManager.default.fileExists(atPath: absolute.path) ? absolute : nil
+            return exists(absolute)
         }
 
-        // `appending(path:)` keeps multi-segment relatives (e.g. `_attachments/a.png`, `../_attachments/a.png`).
-        let noteURL = noteDirectory.appending(path: decoded)
-        if FileManager.default.fileExists(atPath: noteURL.path) {
-            return noteURL
+        // `appending(path:)` keeps multi-segment relatives; standardize so `..` is resolved.
+        let noteURL = noteDirectory.appending(path: decoded).standardizedFileURL
+        if let hit = exists(noteURL) { return hit }
+
+        // Only use vault-relative when path does not start with `../` (avoids escaping vault).
+        if !decoded.hasPrefix("..") {
+            let vaultURL = vaultRoot.appending(path: decoded).standardizedFileURL
+            if let hit = exists(vaultURL) { return hit }
         }
 
-        // Vault-root fallback keeps older notes that used `_attachments/…` from nested folders.
-        let vaultURL = vaultRoot.appending(path: decoded)
-        if FileManager.default.fileExists(atPath: vaultURL.path) {
-            return vaultURL
+        // Obsidian/Lyra: any …/_attachments/file.ext → vaultRoot/_attachments/file.ext
+        if let name = attachmentsBasename(from: decoded) {
+            let candidate = vaultRoot
+                .appendingPathComponent(AttachmentStore.folderName, isDirectory: true)
+                .appendingPathComponent(name)
+                .standardizedFileURL
+            if let hit = exists(candidate) { return hit }
         }
 
         return nil
@@ -46,5 +54,20 @@ enum MarkdownImagePath {
     private static func absoluteFileURL(from path: String) -> URL? {
         guard (path as NSString).isAbsolutePath else { return nil }
         return URL(fileURLWithPath: path)
+    }
+
+    private static func exists(_ url: URL) -> URL? {
+        let standardized = url.resolvingSymlinksInPath().standardizedFileURL
+        return FileManager.default.fileExists(atPath: standardized.path) ? standardized : nil
+    }
+
+    /// Match `_attachments/<file>` segment anywhere in the relative path.
+    private static func attachmentsBasename(from path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard let idx = parts.firstIndex(of: AttachmentStore.folderName),
+              idx + 1 < parts.count else { return nil }
+        let name = parts[idx + 1]
+        guard !name.isEmpty, name != "..", name != "." else { return nil }
+        return name
     }
 }

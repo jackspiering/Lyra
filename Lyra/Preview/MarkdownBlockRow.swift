@@ -68,7 +68,9 @@ struct MarkdownBlockRow: View {
         case .image(let alt, let path):
             if let noteDirectory, let vaultRoot,
                let url = MarkdownImagePath.resolve(path: path, noteDirectory: noteDirectory, vaultRoot: vaultRoot),
-               let nsImage = NSImage(contentsOf: url) {
+               let data = try? Data(contentsOf: url),
+               let nsImage = NSImage(data: data),
+               nsImage.size.width > 0 {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
