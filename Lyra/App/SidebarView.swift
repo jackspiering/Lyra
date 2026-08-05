@@ -151,7 +151,7 @@ struct SidebarView: View {
             .onTapGesture(count: 2) {
                 store.selection = node.id
                 beginRename(node)
-            )
+            }
         }
     }
 
