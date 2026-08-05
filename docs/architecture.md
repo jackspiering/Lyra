@@ -97,6 +97,16 @@ One primary type per file when practical.
 - Autosave: ~500ms debounce; also save on note switch, background, and quit
 - External edits: mtime recorded at open/save; a dirty write against a newer mtime prompts Keep Mine / Reload
 
+## Attachments
+
+**Choice:** Clipboard image paste writes under `{vaultRoot}/_attachments/` and inserts a relative `![](…)` path at the caret (`AttachmentStore`).
+
+**Why:** Plain files next to notes; other Markdown tools can open the vault without Lyra.
+
+## PDF export
+
+**Choice:** Export the open note via PDFKit / native layout (`NotePDFExporter`), not pandoc or WebKit print.
+
 ## Non-goals
 
-Plugin hosts, CRDT sync, Electron, multi-window document architecture, background full-text indexing, full WYSIWYG round-trip.
+Plugin hosts, CRDT sync, Electron, NSDocument multi-window architecture, background full-text indexing, full WYSIWYG round-trip.

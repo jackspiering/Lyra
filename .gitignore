@@ -69,3 +69,6 @@ fastlane/test_output
 
 # Git worktrees
 .worktrees/
+
+# Local agent / audit drops (not product docs)
+.orca/
