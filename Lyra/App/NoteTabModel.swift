@@ -104,6 +104,26 @@ final class NoteTabController {
         return tab.editor.open(url: url)
     }
 
+    /// Open `url` in a brand-new tab (caller registers AppSession). Returns false if open failed.
+    /// If already open, selects that tab. On open failure, removes the new tab and restores selection.
+    @discardableResult
+    func openInNewTab(url: URL, onCreated: ((NoteTab) -> Void)? = nil) -> Bool {
+        if selectOpenNote(path: url.path) { return true }
+        let previousID = selectedTabID
+        let tab = NoteTab()
+        tabs.append(tab)
+        selectedTabID = tab.id
+        if tab.editor.open(url: url) {
+            // Register only after open succeeds so rollback does not leave a dangling AppSession entry.
+            onCreated?(tab)
+            return true
+        }
+        // Roll back failed tab
+        tabs.removeAll { $0.id == tab.id }
+        selectedTabID = previousID
+        return false
+    }
+
     /// Closes the tab after flushing its editor. Last tab becomes empty (vault stays open).
     /// Returns `false` if save failed (tab left open). Unregister only when the tab is removed.
     @discardableResult

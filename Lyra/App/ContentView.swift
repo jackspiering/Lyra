@@ -59,6 +59,7 @@ struct ContentView: View {
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
                 focusVaultSearch: { vaultSearchFocusToken += 1 },
                 newTab: newTab,
+                openInNewTab: openSelectionInNewTab,
                 closeTab: { closeTab(id: tabs.selectedTabID) },
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet,
@@ -475,26 +476,46 @@ struct ContentView: View {
         activateNote(url: node.url)
     }
 
-    /// Open a note from sidebar / wiki: reuse an existing tab if already open, else active tab.
+    /// Open a note from sidebar / wiki: already open → select; empty active → fill; else new tab.
     private func activateNote(url: URL) {
-        if tabs.selectOpenNote(path: url.path) {
+        if tabs.selectOpenNote(path: url.path) { return }
+        if editor.fileURL == nil {
+            // empty active tab — fill it
+            let previousPath = editor.fileURL?.path
+            let ok = tabs.openInActiveTab(url: url) { created in
+                AppSession.shared.register(editor: created.editor, store: store)
+            }
+            if !ok {
+                store.selection = previousPath
+                flushEditorError()
+            } else {
+                flushEditorError()
+            }
             return
         }
-        // Open when active tab does not already show this path (covers empty tab after clear selection).
-        if editor.fileURL?.path == url.path {
-            return
-        }
-        let previousPath = editor.fileURL?.path
-        let ok = tabs.openInActiveTab(url: url) { created in
+        if editor.fileURL?.path == url.path { return }
+        // Active has another note → new tab
+        let ok = tabs.openInNewTab(url: url) { created in
             AppSession.shared.register(editor: created.editor, store: store)
         }
         if ok {
             flushEditorError()
         } else {
-            // Save failed or external conflict — stay on the dirty note.
-            store.selection = previousPath
             flushEditorError()
         }
+    }
+
+    /// File → Open in New Tab: always new tab if not already open; if already open, just select.
+    private func openSelectionInNewTab() {
+        guard let url = store.selectedFileURL() else { return }
+        if tabs.selectOpenNote(path: url.path) {
+            store.selection = url.path
+            return
+        }
+        _ = tabs.openInNewTab(url: url) { created in
+            AppSession.shared.register(editor: created.editor, store: store)
+        }
+        flushEditorError()
     }
 
     private func flushEditorError() {
@@ -786,6 +807,7 @@ private struct ContentViewChrome: ViewModifier {
     var toggleViewMode: () -> Void
     var focusVaultSearch: () -> Void
     var newTab: () -> Void
+    var openInNewTab: () -> Void
     var closeTab: () -> Void
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
@@ -806,6 +828,7 @@ private struct ContentViewChrome: ViewModifier {
         toggleViewMode: @escaping () -> Void,
         focusVaultSearch: @escaping () -> Void,
         newTab: @escaping () -> Void,
+        openInNewTab: @escaping () -> Void,
         closeTab: @escaping () -> Void,
         newNoteSheet: @escaping () -> some View,
         deleteConfirmSheet: @escaping () -> some View,
@@ -825,6 +848,7 @@ private struct ContentViewChrome: ViewModifier {
         self.toggleViewMode = toggleViewMode
         self.focusVaultSearch = focusVaultSearch
         self.newTab = newTab
+        self.openInNewTab = openInNewTab
         self.closeTab = closeTab
         self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
@@ -864,6 +888,7 @@ private struct ContentViewChrome: ViewModifier {
                 quitSaveFailed: flushEditorError,
                 focusVaultSearch: focusVaultSearch,
                 newTab: newTab,
+                openInNewTab: openInNewTab,
                 closeTab: closeTab
             ))
     }
@@ -961,6 +986,7 @@ private struct ContentViewCommands: ViewModifier {
     var quitSaveFailed: () -> Void
     var focusVaultSearch: () -> Void
     var newTab: () -> Void
+    var openInNewTab: () -> Void
     var closeTab: () -> Void
 
     func body(content: Content) -> some View {
@@ -1004,6 +1030,10 @@ private struct ContentViewCommands: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .lyraNewTab)) { _ in
                 guard shouldHandle() else { return }
                 newTab()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraOpenInNewTab)) { _ in
+                guard shouldHandle() else { return }
+                openInNewTab()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraCloseTab)) { _ in
                 guard shouldHandle() else { return }
