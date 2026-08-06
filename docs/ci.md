@@ -12,7 +12,7 @@
 
 | Job | Runner | What |
 |-----|--------|------|
-| `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` |
+| `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` (structure + `Scripts/lint.sh` whitespace checks) |
 | `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug build + unit tests), after smoke |
 
 | Setting | Value |
@@ -88,7 +88,7 @@ What we researched and intentionally chose:
 | Releases | `softprops/action-gh-release@v3` | Replaces ad-hoc `gh release` shell; v2 unmaintained (Node 20 deprecation) |
 | Runner | Keep **`macos-15`** | Matches deployment target (macOS 15+); `macos-26` exists but is unnecessary churn for now |
 | Permissions | Read-only CI; write only on Release | Least privilege for `GITHUB_TOKEN` |
-| Caching / lint matrix | Not added | Single target, small app; DerivedData cache and SwiftLint are YAGNI until pain shows |
+| Caching / lint matrix | Not added | Single target, small app; DerivedData cache is YAGNI until pain shows. A lightweight `Scripts/lint.sh` (trailing whitespace + final newline) runs inside smoke; SwiftLint and multi-config lint matrices are still deferred |
 | Action pins | Floating major tags (`@v7`, `@v3`) | Dependabot bumps majors; avoid fragile full SHAs without automation |
 | Smoke script | Lean invariants, not every Swift path | macOS build is the compiler check; smoke covers docs/fonts/entitlements/version |
 

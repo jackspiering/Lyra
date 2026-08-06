@@ -36,7 +36,8 @@ for path in \
   Lyra/Resources/Fonts/Inter-Bold.ttf \
   Lyra/Resources/Fonts/Inter-OFL.txt \
   Scripts/package-dmg.sh \
-  Scripts/xcode-test.sh
+  Scripts/xcode-test.sh \
+  Scripts/lint.sh
 do
   check_exists "$path"
 done
@@ -95,6 +96,11 @@ if command -v codesign >/dev/null 2>&1; then
       break
     fi
   done
+fi
+
+echo ""
+if ! bash Scripts/lint.sh; then
+  fail=1
 fi
 
 if [[ "$fail" -ne 0 ]]; then

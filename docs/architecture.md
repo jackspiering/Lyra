@@ -14,7 +14,7 @@ Lyra is a single macOS app target with module-shaped folders. This doc is the de
 
 | Folder | Responsibility |
 |--------|----------------|
-| `App/` | Shell, navigation, open vault, theme, fonts, errors, `NoteViewMode` |
+| `App/` | Shell, navigation, open vault, theme, fonts, errors, `NoteViewMode`, window command routing |
 | `Vault/` | Scan, CRUD, bookmarks, wiki resolve, `_attachments` paste storage |
 | `Editor/` | `NSTextView` source editing, highlight, autosave |
 | `Preview/` | Block parse, Reading, PDF export |
@@ -71,6 +71,14 @@ One primary type per file when practical.
 **Why:** Open several notes without losing the vault tree; empty tabs can create a note, focus search, or close without dropping the vault.
 
 **Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open). From 0.9.1, selecting a note from the sidebar opens a new tab when the active tab already has a different note (reuses if already open); File → Open in New Tab is explicit.
+
+### Window chrome decomposition (v0.9.3)
+
+**Choice:** `ContentView` was split so the window shell, dialogs/sheets, command routing, and AppKit bridge helpers live in separate files (`ContentViewChrome`, `ContentViewCommands`, `WindowStateReaders`, `NewNoteNameField`) instead of one 1000+ line file.
+
+**Why:** The monolith had outgrown “one primary type per file”; the split keeps the module map honest without changing behavior.
+
+**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands are still routed via notifications gated by the key window (`ContentViewCommands`); a `@FocusedValue`-based rewrite is the deferred follow-up.
 
 ### Inter typeface (v0.5)
 
