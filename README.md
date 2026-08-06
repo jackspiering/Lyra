@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Native macOS editor for local Markdown vaults.</strong><br>
-  Point it at a folder of <code>.md</code> files. Edit, link, preview, export PDF.
+  Point it at a folder of <code>.md</code> files. Edit, link, preview, export PDF.<br>
   Files stay on disk as plain text. No Electron. No cloud account.
 </p>
 
@@ -19,81 +19,53 @@
 
 ## Download
 
-[Latest DMG](https://github.com/jackspiering/Lyra/releases) (ad-hoc signed for App Sandbox, **not notarized**).
+[Latest DMG](https://github.com/jackspiering/Lyra/releases) — ad-hoc signed for App Sandbox, **not notarized**.
 
-macOS may still warn on first open. Use **System Settings → Privacy & Security → Open Anyway**, or build from source below. (Control-click → Open is no longer a reliable bypass on macOS 15+.)
+On first open, macOS may block it. Use **System Settings → Privacy & Security → Open Anyway**, or build from source.
 
 ## Quick start
 
-1. Open Lyra → Open Vault…
+1. Open Lyra → **Open Vault…** (or File → Open Vault…)
 2. Pick a folder of Markdown notes
 3. Select a note in the sidebar
-4. Switch Source / Reading with the control or ⌘E
+4. Toggle **Source** / **Reading** with the control or **⌘E**
 
-| Shortcut / gesture | Action |
-|--------------------|--------|
-| ⌘O | Go to File… (open a Markdown note in the vault; Open Vault… if none) |
-| ⌘N | New note (name dialog if enabled in Settings) |
-| ⌘T | New empty note tab (same vault sidebar) |
-| ⇧⌘W | Close current note tab (last tab becomes empty) |
-| ⌘⌫ | Move selection to Trash |
-| Click sidebar name | Select note or folder |
-| Double-click name | Rename (works even if not already selected) |
-| ↵ in sidebar | Rename selected note or folder |
-| ⌘F | Focus vault search (also what empty-tab **Go to file** does) |
+| Shortcut | Action |
+|----------|--------|
+| ⌘O | Go to File… (or Open Vault… if none open) |
+| ⌘N | New note |
+| ⌘T | New empty tab |
 | ⌘E | Toggle Source ↔ Reading |
 | ⌘S | Save now |
 | ⌘R | Refresh vault from disk |
+| ⌘F | Focus vault search |
+| ⌘⌫ | Move selection to Trash |
 
-Empty tabs show **Create new note (⌘ N)**, **Go to file (⌘ O)**, and **Close** (Obsidian-style labels). Go to file (and ⌘O) opens a file panel for a Markdown note in the current vault. File → Open Vault… still opens a vault folder (new window if one is already open). Find in Vault remains ⌘F.
-
-Autosave runs after about 500ms of idle time. Unsaved changes show on the window close button (standard macOS edited state). The toolbar shows **Save failed** or **Autosave paused** when those need attention.
-
-If the file changes on disk while you have unsaved edits, Lyra asks whether to keep your buffer or reload from disk. **Cancel** pauses autosave so the dialog does not loop; press ⌘S when you are ready to resolve. Quit is blocked while a save is refused (conflict, missing file, or I/O error).
-
-If the open note is moved or deleted outside Lyra, you get a **Note moved or deleted** dialog. You can save a copy at the old path, or close the note. Lyra will not silently recreate a deleted file on every keystroke.
-
-### View modes
-
-| Mode | Behavior |
-|------|----------|
-| Source | Raw Markdown with syntax highlighting |
-| Reading | Full-width preview (task checkboxes, clickable `[[wiki]]` links, vault images) |
+Autosave runs after ~500ms idle. Unsaved state shows on the window close button. If the file changes on disk while you have edits, Lyra asks whether to keep your buffer or reload.
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
 | Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
-| Sidebar | Nested folders and notes; skips `.git` and hidden files. Click a name to select; double-click to rename |
-| Vault search | Magnifying glass filters the tree by note/folder name or path (not full-text); ⌘F focuses the field |
-| Rename | Double-click a name, or press Return when selected; Escape cancels. Click alone only selects |
-| Refresh | File → Refresh Vault (⌘R), or when the window becomes active |
-| Multiple vaults | One vault per window (File → New Window / Open Vault opens another). No vault name in the title bar or sidebar header |
-| Note tabs | In-window tabs share one vault sidebar; tab strip `+` / ⌘T opens an empty tab. Native window tabbing (title-bar `+`) is off so it does not spawn whole-window tabs. Opening a note from the sidebar uses a new tab when the active tab already has a different note; if that note is already open, its tab is focused. Empty tab: Create new note / Go to file / Close |
-| Open in New Tab | File → Open in New Tab always opens the sidebar selection in a new tab (or focuses it if already open) |
-| Note title | Editable title above Source/Reading; tab label matches. A leading `# H1` sets the title; otherwise the filename does. Edits update the H1 when present, or rename the file |
-| Settings | Lyra → Settings (⌘,). Resizable window. Appearance (System / Light / Dark). Prompt for note name; default note stem. Separate confirm toggles for note vs folder Trash, each with (i) help. About: version links to the tag release, Latest release nearby, acks, MIT |
-| New note | ⌘N / toolbar / context menu. Optional name dialog (stem selected); unique Untitled.md when prompt is off |
-| Move to Trash | ⌘⌫ / File menu / context Delete. Optional confirm for notes and for folders, each with “Don’t ask again” |
-| Context export | Right-click note → Export PDF; folder → separate or single PDF |
-| Sidebar empty menu | Right-click empty sidebar area → New Note / New Folder (uses the selected folder when one is selected) |
+| Source / Reading | Syntax-highlighted editor, or full-width preview with images and `[[wiki]]` links |
+| Note tabs | Multiple notes share one vault sidebar (⌘T, empty-tab actions) |
+| Multiple vaults | One vault per window |
 | Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V writes under `_attachments/` and inserts a note-relative `![](...)` (Source; local images only). Reading shows those images, including nested-note paths like `![](../_attachments/…)` |
-| Status bar | Under the open note: `Words n | Characters n | Created … | Saved …` |
-| Export PDF | File → Export PDF… for the open note (multi-page; inline bold/italic) |
-| Typography | [Inter](https://rsms.me/inter/) (SIL OFL) for UI and notes; mono for code |
-| Errors | Plain-language alerts for permissions, missing files, disk full, and similar failures |
+| Paste images | ⌘V saves under `_attachments/` and inserts a relative image link |
+| Vault search | Filter the tree by name or path (⌘F; not full-text) |
+| Export PDF | File → Export PDF… for the open note |
+| Settings | Appearance, new-note naming, Trash confirmations, About |
 
-Out of scope: plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
+**Out of scope:** plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
 
 ## Who it's for
 
-You keep notes as plain Markdown and want a Mac UI that does not invent a proprietary store. Files remain git-friendly on disk. No account.
+You keep notes as plain Markdown and want a Mac UI that does not invent a proprietary store. Files stay git-friendly on disk. No account.
 
 ## Build from source
 
-Requires macOS 15+, Xcode 16+ (Swift 5.10+).
+Requires **macOS 15+** and **Xcode 16+** (Swift 5.10+).
 
 ```bash
 git clone https://github.com/jackspiering/Lyra.git
@@ -101,7 +73,7 @@ cd Lyra
 open Lyra.xcodeproj
 ```
 
-Scheme Lyra → destination My Mac → Run.
+Scheme **Lyra** → destination **My Mac** → Run.
 
 ```bash
 bash Scripts/smoke.sh        # layout + whitespace lint checks (Linux or Mac)
@@ -111,19 +83,19 @@ bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 <details>
 <summary>Ship a release DMG</summary>
 
-Marketing version in Xcode must match the tag (`0.9.0` ↔ `v0.9.0`):
+Marketing version in Xcode must match the tag (`0.9.2` ↔ `v0.9.2`):
 
 ```bash
-git tag v0.9.0 && git push origin v0.9.0
+git tag v0.9.2 && git push origin v0.9.2
 ```
 
-CI builds an **ad-hoc signed** `Lyra-0.9.0.dmg` (sandbox entitlements applied; not Developer ID / notarized) and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
+CI builds an ad-hoc signed `Lyra-0.9.2.dmg` and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.9.0 bash Scripts/package-dmg.sh   # local Mac → build/dist/
+VERSION=0.9.2 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
 
-More: [docs/ci.md](docs/ci.md)
+Details: [docs/ci.md](docs/ci.md)
 
 </details>
 
@@ -134,9 +106,9 @@ More: [docs/ci.md](docs/ci.md)
 | `Lyra/App/` | Window shell, tabs, settings, theme, fonts, errors, menu command routing |
 | `Lyra/Vault/` | Tree scan, CRUD, bookmarks, attachments, wiki resolve |
 | `Lyra/Editor/` | TextKit source editor, highlight, autosave |
-| `Lyra/Preview/` | Reading, PDF export |
+| `Lyra/Preview/` | Reading mode, PDF export |
 | `Lyra/Models/` | Shared types |
-| `LyraTests/` | Unit tests for pure logic |
+| `LyraTests/` | Unit tests |
 | `docs/` | Architecture and CI |
 
 ## Docs
@@ -145,7 +117,7 @@ More: [docs/ci.md](docs/ci.md)
 |-----|----------|
 | [docs/architecture.md](docs/architecture.md) | Design decisions and invariants |
 | [docs/ci.md](docs/ci.md) | CI, tests, DMG releases |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and manual checklist |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and PR checklist |
 | [AGENTS.md](AGENTS.md) | Rules for AI agents and humans |
 
 ## Contributing
