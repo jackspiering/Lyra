@@ -76,7 +76,7 @@ open Lyra.xcodeproj
 Scheme **Lyra** → destination **My Mac** → Run.
 
 ```bash
-bash Scripts/smoke.sh        # layout checks (Linux or Mac)
+bash Scripts/smoke.sh        # layout + whitespace lint checks (Linux or Mac)
 bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 ```
 
@@ -103,7 +103,7 @@ Details: [docs/ci.md](docs/ci.md)
 
 | Path | Role |
 |------|------|
-| `Lyra/App/` | Window shell, tabs, settings, theme, fonts, errors |
+| `Lyra/App/` | Window shell, tabs, settings, theme, fonts, errors, menu command routing |
 | `Lyra/Vault/` | Tree scan, CRUD, bookmarks, attachments, wiki resolve |
 | `Lyra/Editor/` | TextKit source editor, highlight, autosave |
 | `Lyra/Preview/` | Reading mode, PDF export |

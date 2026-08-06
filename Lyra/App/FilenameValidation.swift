@@ -2,9 +2,15 @@ import Foundation
 
 /// Shared macOS-safe filename rules for create and rename.
 enum FilenameValidation {
+    /// Outcome of validating a proposed name.
+    enum Result: Equatable, Sendable {
+        case ok(String)
+        case invalid(String)
+    }
+
     /// Returns `.ok(finalName)` or `.invalid(message)`.
     /// For notes (`isDirectory == false`), ensures a `.md` suffix when missing.
-    static func validate(_ name: String, isDirectory: Bool) -> VaultStore.ValidatedRename {
+    static func validate(_ name: String, isDirectory: Bool) -> FilenameValidation.Result {
         var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return .invalid("Name can't be empty.")

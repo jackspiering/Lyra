@@ -213,12 +213,7 @@ final class VaultStore {
     }
 
     /// Pure rename rules for notes/folders. Used by sidebar rename and unit tests.
-    enum ValidatedRename: Equatable, Sendable {
-        case ok(String)
-        case invalid(String)
-    }
-
-    nonisolated static func validatedRename(_ newName: String, isDirectory: Bool) -> ValidatedRename {
+    nonisolated static func validatedRename(_ newName: String, isDirectory: Bool) -> FilenameValidation.Result {
         FilenameValidation.validate(newName, isDirectory: isDirectory)
     }
 

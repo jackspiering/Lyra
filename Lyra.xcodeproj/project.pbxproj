@@ -25,6 +25,10 @@
 		A10000000000000000000013 /* FileSystemVaultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* FileSystemVaultTests.swift */; };
 		A10000000000000000000018 /* VaultFolderPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* VaultFolderPicker.swift */; };
 		A10000000000000000000042 /* VaultNotePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000042 /* VaultNotePicker.swift */; };
+		A10000000000000000000043 /* ContentViewChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000043 /* ContentViewChrome.swift */; };
+		A10000000000000000000044 /* ContentViewCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ContentViewCommands.swift */; };
+		A10000000000000000000045 /* WindowStateReaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* WindowStateReaders.swift */; };
+		A10000000000000000000046 /* NewNoteNameField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000046 /* NewNoteNameField.swift */; };
 		A10000000000000000000019 /* LyraTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* LyraTheme.swift */; };
 		A1000000000000000000001A /* MarkdownPreviewBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* MarkdownPreviewBlocks.swift */; };
 		A1000000000000000000001B /* MarkdownPreviewBlocksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */; };
@@ -100,6 +104,10 @@
 		B10000000000000000000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000018 /* VaultFolderPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFolderPicker.swift; sourceTree = "<group>"; };
 		B10000000000000000000042 /* VaultNotePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNotePicker.swift; sourceTree = "<group>"; };
+		B10000000000000000000043 /* ContentViewChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewChrome.swift; sourceTree = "<group>"; };
+		B10000000000000000000044 /* ContentViewCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewCommands.swift; sourceTree = "<group>"; };
+		B10000000000000000000045 /* WindowStateReaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStateReaders.swift; sourceTree = "<group>"; };
+		B10000000000000000000046 /* NewNoteNameField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNoteNameField.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* LyraTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraTheme.swift; sourceTree = "<group>"; };
 		B1000000000000000000001A /* MarkdownPreviewBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewBlocks.swift; sourceTree = "<group>"; };
 		B1000000000000000000001B /* MarkdownPreviewBlocksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownPreviewBlocksTests.swift; sourceTree = "<group>"; };
@@ -223,6 +231,10 @@
 				B10000000000000000000004 /* SidebarView.swift */,
 				B10000000000000000000018 /* VaultFolderPicker.swift */,
 				B10000000000000000000042 /* VaultNotePicker.swift */,
+				B10000000000000000000043 /* ContentViewChrome.swift */,
+				B10000000000000000000044 /* ContentViewCommands.swift */,
+				B10000000000000000000045 /* WindowStateReaders.swift */,
+				B10000000000000000000046 /* NewNoteNameField.swift */,
 				B10000000000000000000019 /* LyraTheme.swift */,
 				B10000000000000000000022 /* NoteViewMode.swift */,
 				B10000000000000000000025 /* UserFacingError.swift */,
@@ -407,6 +419,10 @@
 				A10000000000000000000004 /* SidebarView.swift in Sources */,
 				A10000000000000000000018 /* VaultFolderPicker.swift in Sources */,
 				A10000000000000000000042 /* VaultNotePicker.swift in Sources */,
+				A10000000000000000000043 /* ContentViewChrome.swift in Sources */,
+				A10000000000000000000044 /* ContentViewCommands.swift in Sources */,
+				A10000000000000000000045 /* WindowStateReaders.swift in Sources */,
+				A10000000000000000000046 /* NewNoteNameField.swift in Sources */,
 				A10000000000000000000005 /* VaultNode.swift in Sources */,
 				A10000000000000000000007 /* FileSystemVault.swift in Sources */,
 				A10000000000000000000008 /* UntitledName.swift in Sources */,
