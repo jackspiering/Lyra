@@ -92,7 +92,7 @@ safe_path() {
 validate_version() {
   local version="$1"
   if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "error: VERSION must be three-part semver (e.g. 0.9.2), got '$version'" >&2
+    echo "error: VERSION must be three-part semver (e.g. 0.9.3), got '$version'" >&2
     return 1
   fi
 }

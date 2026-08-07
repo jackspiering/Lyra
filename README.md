@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.9.2-informational?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.9.3-informational?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -83,16 +83,16 @@ bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 <details>
 <summary>Ship a release DMG</summary>
 
-Marketing version in Xcode must match the tag (`0.9.2` ↔ `v0.9.2`):
+Marketing version in Xcode must match the tag (`0.9.3` ↔ `v0.9.3`):
 
 ```bash
-git tag v0.9.2 && git push origin v0.9.2
+git tag v0.9.3 && git push origin v0.9.3
 ```
 
-CI builds an ad-hoc signed `Lyra-0.9.2.dmg` and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
+CI builds an ad-hoc signed `Lyra-0.9.3.dmg` and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ```bash
-VERSION=0.9.2 bash Scripts/package-dmg.sh   # local Mac → build/dist/
+VERSION=0.9.3 bash Scripts/package-dmg.sh   # local Mac → build/dist/
 ```
 
 Details: [docs/ci.md](docs/ci.md)
