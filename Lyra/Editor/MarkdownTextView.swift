@@ -112,7 +112,7 @@ struct MarkdownTextView: NSViewRepresentable {
         /// paste or a replacement made through undo/IME.
         func textStorage(
             _ textStorage: NSTextStorage,
-            didProcessEditing editedMask: NSTextStorage.EditActions,
+            didProcessEditing editedMask: NSTextStorageEditActions,
             range editedRange: NSRange,
             changeInLength delta: Int
         ) {
