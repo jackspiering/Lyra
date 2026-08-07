@@ -102,7 +102,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         func textDidChange(_ notification: Notification) {
-            guard !isApplying, let textView, let storage = textView.textStorage else { return }
+            guard !isApplying, let textView else { return }
             parent.text = textView.string
             parent.onEdit()
         }

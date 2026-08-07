@@ -127,8 +127,8 @@ enum MarkdownPreviewBlocks {
             }
 
             result += rewriteWikis(in: String(source[outsideStart..<openingStart]))
-            result += String(source[openingStart..<closing.endIndex])
-            cursor = closing.endIndex
+            result += String(source[openingStart..<closing.upperBound])
+            cursor = closing.upperBound
             outsideStart = cursor
         }
         result += rewriteWikis(in: String(source[outsideStart...]))
