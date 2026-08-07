@@ -50,6 +50,22 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertEqual(editor.lastError?.context, .saveNote)
     }
 
+    func testOpenPreservesActiveBufferWhenTargetCannotBeRead() throws {
+        let active = tempRoot.appendingPathComponent("active.md")
+        let unreadable = tempRoot.appendingPathComponent("invalid-utf8.md")
+        try "keep this buffer".write(to: active, atomically: true, encoding: .utf8)
+        try Data([0xFF, 0xFE]).write(to: unreadable)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: active))
+
+        XCTAssertFalse(editor.open(url: unreadable))
+        XCTAssertEqual(editor.fileURL?.path, active.path)
+        XCTAssertEqual(editor.text, "keep this buffer")
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertEqual(editor.lastError?.context, .openNote)
+    }
+
     func testClosePreservesBufferWhenSaveFails() throws {
         let roDir = tempRoot.appendingPathComponent("ro-close", isDirectory: true)
         try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
@@ -141,6 +157,24 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertFalse(editor.hasExternalConflict)
     }
 
+    func testReloadMissingFileOffersMissingFileRecovery() throws {
+        let a = tempRoot.appendingPathComponent("reload-missing.md")
+        try "disk".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "local"
+        editor.isDirty = true
+        editor.hasExternalConflict = true
+        try FileManager.default.removeItem(at: a)
+
+        XCTAssertFalse(editor.reloadFromDisk())
+        XCTAssertTrue(editor.hasMissingFile)
+        XCTAssertFalse(editor.hasExternalConflict)
+        XCTAssertEqual(editor.text, "local")
+        XCTAssertTrue(editor.isDirty)
+    }
+
     func testRelocateUpdatesPathWithoutSaving() throws {
         let a = tempRoot.appendingPathComponent("old.md")
         let b = tempRoot.appendingPathComponent("new.md")
@@ -159,7 +193,7 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: a.path))
     }
 
-    func testCloseSucceedsWhenParentDirectoryRemoved() throws {
+    func testCloseBlocksWhenParentDirectoryRemoved() throws {
         let dir = tempRoot.appendingPathComponent("gone", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let a = dir.appendingPathComponent("note.md")
@@ -171,7 +205,13 @@ final class EditorViewModelTests: XCTestCase {
         editor.isDirty = true
         try FileManager.default.removeItem(at: dir)
 
-        XCTAssertTrue(editor.close())
+        XCTAssertFalse(editor.close())
+        XCTAssertEqual(editor.fileURL?.path, a.path)
+        XCTAssertEqual(editor.text, "dirty")
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertTrue(editor.hasMissingFile)
+
+        editor.discardAndClose()
         XCTAssertNil(editor.fileURL)
         XCTAssertFalse(editor.isDirty)
     }
@@ -196,6 +236,24 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
     }
 
+    func testSameSizeReplacementWithOriginalMtimeIsDetected() throws {
+        let a = tempRoot.appendingPathComponent("same-identity.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+
+        editor.text = "local"
+        editor.isDirty = true
+        try "thei".write(to: a, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.modificationDate: known], ofItemAtPath: a.path)
+
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.hasExternalConflict)
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "thei")
+    }
+
     func testDeletedFileDoesNotRecreateOnAutosave() throws {
         let a = tempRoot.appendingPathComponent("deleted.md")
         try "mine".write(to: a, atomically: true, encoding: .utf8)
@@ -212,6 +270,29 @@ final class EditorViewModelTests: XCTestCase {
 
         XCTAssertTrue(editor.saveIfNeeded(force: true))
         XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "local")
+    }
+
+    func testForceSaveRejectsSymlinkedParent() throws {
+        let dir = tempRoot.appendingPathComponent("redirected", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let note = dir.appendingPathComponent("note.md")
+        try "original".write(to: note, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: note))
+        editor.text = "local"
+        editor.isDirty = true
+
+        try FileManager.default.removeItem(at: dir)
+        let outside = tempRoot.deletingLastPathComponent()
+            .appendingPathComponent("lyra-redirect-target-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try FileManager.default.createSymbolicLink(at: dir, withDestinationURL: outside)
+
+        XCTAssertFalse(editor.saveIfNeeded(force: true))
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("note.md").path))
     }
 
     func testConflictDeferSuspendsAutosave() throws {

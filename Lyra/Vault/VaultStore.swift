@@ -21,6 +21,7 @@ final class VaultStore {
     private var wikiResolver = WikiLinkResolver(noteURLs: [])
     /// Drops stale async scan results when a newer refresh was requested.
     private var refreshGeneration = 0
+    private var refreshTask: Task<Void, Never>?
 
     init() {
         // Multi-window: only the first store restores the last vault bookmark.
@@ -47,11 +48,32 @@ final class VaultStore {
     }
 
     func openVault(at url: URL) {
-        stopAccessingIfNeeded()
         clearError()
-        isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
+
+        let startedAccess = url.startAccessingSecurityScopedResource()
+        var isDirectory: ObjCBool = false
+        let isUsable = url.isFileURL
+            && FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+            && !FileSystemVault.hasSymlink(url)
+            && FileManager.default.isReadableFile(atPath: url.path)
+        guard isUsable else {
+            if startedAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+            present(
+                context: .readVault,
+                message: "Choose a readable folder for the vault. The current vault is still open."
+            )
+            return
+        }
+
+        stopAccessingIfNeeded()
+        refreshTask?.cancel()
+        isAccessingSecurityScope = startedAccess
         persistBookmark(for: url)
         rootURL = url
+        AppSession.shared.updateVaultRoot(for: self, root: url)
         pendingSelection = nil
         lastCreateParentPath = nil
         selection = nil
@@ -62,14 +84,20 @@ final class VaultStore {
     /// Scan the vault off the main actor so large trees don't beachball the UI.
     func refresh() {
         guard let rootURL else { return }
+        refreshTask?.cancel()
         refreshGeneration += 1
         let generation = refreshGeneration
         let url = rootURL
-        Task { [weak self] in
+        refreshTask = Task { [weak self] in
             do {
-                let node = try await Task.detached(priority: .userInitiated) {
-                    try FileSystemVault.scan(root: url)
-                }.value
+                let scanTask = Task.detached(priority: .userInitiated) {
+                    try FileSystemVault.scan(root: url, shouldCancel: { Task.isCancelled })
+                }
+                let node = try await withTaskCancellationHandler(
+                    operation: { try await scanTask.value },
+                    onCancel: { scanTask.cancel() }
+                )
+                try Task.checkCancellation()
                 guard let self, generation == self.refreshGeneration else { return }
                 self.rootNode = node
                 self.wikiResolver = WikiLinkResolver(
@@ -82,6 +110,11 @@ final class VaultStore {
                 }
             } catch {
                 guard let self, generation == self.refreshGeneration else { return }
+                if error is CancellationError { return }
+                self.rootNode = nil
+                self.selection = nil
+                self.pendingSelection = nil
+                self.wikiResolver = WikiLinkResolver(noteURLs: [])
                 self.present(error: error, context: .readVault)
             }
         }
@@ -107,6 +140,16 @@ final class VaultStore {
     func createNote(named rawName: String? = nil) -> Bool {
         guard let rootURL else { return false }
         let parent = createParentDirectory(vaultRoot: rootURL)
+        guard FileSystemVault.isSafeDirectory(parent, within: rootURL) else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The selected folder is no longer available inside this vault."
+                )
+            )
+            return false
+        }
         let fileName: String
         if let rawName {
             switch FilenameValidation.validate(rawName, isDirectory: false) {
@@ -155,6 +198,16 @@ final class VaultStore {
     func createFolder() {
         guard let rootURL else { return }
         let parent = createParentDirectory(vaultRoot: rootURL)
+        guard FileSystemVault.isSafeDirectory(parent, within: rootURL) else {
+            present(
+                context: .createFolder,
+                message: UserFacingError.message(
+                    context: .createFolder,
+                    detail: "The selected folder is no longer available inside this vault."
+                )
+            )
+            return
+        }
         let url = parent.appendingPathComponent(UntitledName.next(base: "New Folder", ext: nil, in: parent))
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
@@ -166,13 +219,19 @@ final class VaultStore {
         }
     }
 
-    /// Parent for new notes/folders. Prefers the remembered create parent (avoids race with
-    /// async refresh), then the selected node, then the vault root.
+    /// Parent for new notes/folders. A current selection always wins; the
+    /// remembered path is only a fallback while a refresh is still landing.
     private func createParentDirectory(vaultRoot: URL) -> URL {
+        if let selected = selectedNode() {
+            return FileSystemVault.parentDirectory(for: selected, vaultRoot: vaultRoot)
+        }
         if let path = lastCreateParentPath {
             var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
-                return URL(fileURLWithPath: path, isDirectory: true)
+            let remembered = URL(fileURLWithPath: path, isDirectory: true)
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDir),
+               isDir.boolValue,
+               FileSystemVault.isSafeDirectory(remembered, within: vaultRoot) {
+                return remembered
             }
         }
         return FileSystemVault.parentDirectory(for: selectedNode(), vaultRoot: vaultRoot)
@@ -182,7 +241,14 @@ final class VaultStore {
     /// the async tree refresh lands).
     @discardableResult
     func renameSelected(to newName: String) -> URL? {
-        guard let node = selectedNode() else { return nil }
+        guard let rootURL, let node = selectedNode(),
+              FileSystemVault.isSafePath(node.url, within: rootURL) else {
+            present(
+                context: .rename,
+                message: "The selected item is no longer available inside this vault. Refresh and try again."
+            )
+            return nil
+        }
         switch Self.validatedRename(newName, isDirectory: node.isDirectory) {
         case .invalid(let detail):
             present(
@@ -192,6 +258,16 @@ final class VaultStore {
             return nil
         case .ok(let name):
             let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
+            guard FileSystemVault.isSafeDirectory(
+                node.url.deletingLastPathComponent(),
+                within: rootURL
+            ), FileSystemVault.isSafePath(dest, within: rootURL) else {
+                present(
+                    context: .rename,
+                    message: "The destination is no longer available inside this vault. Refresh and try again."
+                )
+                return nil
+            }
             do {
                 try FileManager.default.moveItem(at: node.url, to: dest)
                 // Keep create-parent coherent if we renamed the folder we last created into.
@@ -199,7 +275,7 @@ final class VaultStore {
                     if last == node.url.path {
                         lastCreateParentPath = dest.path
                     } else if last.hasPrefix(node.url.path + "/") {
-                        lastCreateParentPath = dest.path + last.dropFirst(node.url.path.count)
+                        lastCreateParentPath = dest.path + String(last.dropFirst(node.url.path.count))
                     }
                 }
                 pendingSelection = dest.path
@@ -218,7 +294,14 @@ final class VaultStore {
     }
 
     func deleteSelected() {
-        guard let node = selectedNode() else { return }
+        guard let rootURL, let node = selectedNode() else { return }
+        guard FileSystemVault.isSafePath(node.url, within: rootURL) else {
+            present(
+                context: .delete,
+                message: "The selected item is no longer available inside this vault. Refresh and try again."
+            )
+            return
+        }
         do {
             try FileManager.default.trashItem(at: node.url, resultingItemURL: nil)
             if let last = lastCreateParentPath,
@@ -235,6 +318,7 @@ final class VaultStore {
 
     /// Balance `startAccessingSecurityScopedResource` (e.g. on quit).
     func releaseAccess() {
+        refreshTask?.cancel()
         stopAccessingIfNeeded()
     }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lightweight whitespace checks that run anywhere (Linux CI included).
 # The macOS compile job catches type errors; this catches drift it cannot:
-# trailing whitespace and missing final newlines in tracked source files.
+# trailing whitespace, missing final newlines, and shell syntax in tracked files.
 #
 # No formatter dependency — deliberately objective so it never bikesheds style.
 set -euo pipefail
@@ -21,9 +21,10 @@ while IFS= read -r file; do
     continue
   fi
 
-  if grep -nE ' +$' "$file" >/tmp/lyra-lint-trailing.txt; then
+  trailing="$(grep -nE ' +$' "$file" || true)"
+  if [[ -n "$trailing" ]]; then
     echo "  FAIL: trailing whitespace in $file:"
-    sed 's/^/      /' /tmp/lyra-lint-trailing.txt | head -5
+    printf '%s\n' "$trailing" | sed -n '1,5{s/^/      /;p;}'
     fail=1
   fi
 
@@ -31,6 +32,11 @@ while IFS= read -r file; do
     :
   elif [[ -s "$file" ]]; then
     echo "  FAIL: $file does not end with a newline"
+    fail=1
+  fi
+
+  if [[ "$file" == *.sh ]] && ! bash -n "$file"; then
+    echo "  FAIL: shell syntax in $file"
     fail=1
   fi
 done <<< "$FILES"

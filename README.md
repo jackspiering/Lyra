@@ -41,7 +41,7 @@ On first open, macOS may block it. Use **System Settings → Privacy & Security 
 | ⌘F | Focus vault search |
 | ⌘⌫ | Move selection to Trash |
 
-Autosave runs after ~500ms idle. Unsaved state shows on the window close button. If the file changes on disk while you have edits, Lyra asks whether to keep your buffer or reload.
+Autosave runs after ~500ms idle. Unsaved state shows on the window close button. Lyra blocks a window close until dirty notes save or you choose a recovery action. If the file changes on disk while you have edits, Lyra asks whether to keep your buffer or reload.
 
 ## Features
 
@@ -76,7 +76,7 @@ open Lyra.xcodeproj
 Scheme **Lyra** → destination **My Mac** → Run.
 
 ```bash
-bash Scripts/smoke.sh        # layout + whitespace lint checks (Linux or Mac)
+bash Scripts/smoke.sh        # layout + whitespace + shell syntax checks (Linux or Mac)
 bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
 ```
 

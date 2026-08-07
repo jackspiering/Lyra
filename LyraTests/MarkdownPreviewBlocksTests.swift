@@ -85,6 +85,15 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertTrue(prepared.contains("[hi](lyra-wiki:Hello)"), "got: \(prepared)")
     }
 
+    func testPrepareInlineEscapesWikiDestinationParentheses() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("See [[A)B]]")
+        XCTAssertTrue(prepared.contains("[A)B](lyra-wiki:A%29B)"), "got: \(prepared)")
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.wikiLinkName(from: URL(string: "lyra-wiki:A%29B")!),
+            "A)B"
+        )
+    }
+
     func testParseImageBlock() {
         let blocks = MarkdownPreviewBlocks.parse("![a](_attachments/b.png)\n")
         XCTAssertEqual(blocks, [.image(alt: "a", path: "_attachments/b.png")])
@@ -107,5 +116,31 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
     func testInlineImageInParagraphStaysParagraph() {
         let blocks = MarkdownPreviewBlocks.parse("Hello ![a](b.png) world\n")
         XCTAssertEqual(blocks, [.paragraph("Hello ![a](b.png) world")])
+    }
+
+    func testLongFenceDoesNotCloseOnShorterFence() {
+        let source = "````swift\ninside\n```\nstill code\n````\nAfter"
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse(source),
+            [.code("inside\n```\nstill code"), .paragraph("After")]
+        )
+    }
+
+    func testTildeFenceUsesMatchingMarkerAndLength() {
+        let source = "~~~~\ncode\n~~~\nmore\n~~~~\n"
+        XCTAssertEqual(MarkdownPreviewBlocks.parse(source), [.code("code\n~~~\nmore")])
+    }
+
+    func testPrepareInlineSkipsWikiInsideDoubleBacktickSpan() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown(
+            "Keep ``[[inside]]`` but rewrite [[outside]]"
+        )
+        XCTAssertTrue(prepared.contains("``[[inside]]``"), "got: \(prepared)")
+        XCTAssertTrue(prepared.contains("[outside](lyra-wiki:outside)"), "got: \(prepared)")
+    }
+
+    func testImageBlockAcceptsParenthesesAndTitleInDestination() {
+        let blocks = MarkdownPreviewBlocks.parse("![shot](images/photo(1).png \"preview\")\n")
+        XCTAssertEqual(blocks, [.image(alt: "shot", path: "images/photo(1).png")])
     }
 }

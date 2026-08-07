@@ -8,11 +8,14 @@ final class AppSession {
 
     /// Only the first vault window restores the last-opened bookmark.
     private(set) var didRestoreLaunchVault = false
-    /// Folder chosen in window A to open in a newly created window B.
-    private var pendingVaultURL: URL?
+    /// Folders chosen for newly created windows. Keep request order so two
+    /// Open Vault actions cannot overwrite one another before onAppear runs.
+    private var pendingVaultURLs: [URL] = []
 
     private struct Entry {
-        weak var editor: EditorViewModel?
+        // Keep a failed editor alive across an unexpected scene teardown so a
+        // cancelled quit can retry the save instead of losing its buffer.
+        var editor: EditorViewModel?
         weak var store: VaultStore?
     }
 
@@ -26,35 +29,43 @@ final class AppSession {
     }
 
     func setPendingVaultURL(_ url: URL) {
-        pendingVaultURL = url
+        pendingVaultURLs.append(url)
     }
 
     func takePendingVaultURL() -> URL? {
-        defer { pendingVaultURL = nil }
-        return pendingVaultURL
+        guard !pendingVaultURLs.isEmpty else { return nil }
+        return pendingVaultURLs.removeFirst()
     }
 
     func register(editor: EditorViewModel, store: VaultStore) {
+        editor.vaultRoot = store.rootURL
         entries[ObjectIdentifier(editor)] = Entry(editor: editor, store: store)
         prune()
+    }
+
+    func updateVaultRoot(for store: VaultStore, root: URL?) {
+        for key in entries.keys {
+            guard let entry = entries[key], entry.store === store, let editor = entry.editor else { continue }
+            editor.vaultRoot = root
+        }
     }
 
     func unregister(editor: EditorViewModel) {
         entries.removeValue(forKey: ObjectIdentifier(editor))
     }
 
-    /// Returns false if any editor blocked save (conflict / missing / I/O).
+    /// Returns editors that blocked save (conflict / missing / I/O).
     @discardableResult
-    func saveAllEditors() -> Bool {
+    func saveAllEditors() -> [EditorViewModel] {
         prune()
-        var ok = true
+        var failed: [EditorViewModel] = []
         for entry in entries.values {
             guard let editor = entry.editor else { continue }
             if !editor.saveIfNeeded() {
-                ok = false
+                failed.append(editor)
             }
         }
-        return ok
+        return failed
     }
 
     func releaseAllVaultAccess() {

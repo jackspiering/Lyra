@@ -51,7 +51,7 @@ Required (~10 minutes):
 13. **⌘S** saves immediately; failed save shows a plain-language alert and a toolbar indicator
 14. **Export PDF…** with a long code fence and `**bold**` — multi-page PDF, bold not literal asterisks
 15. Body text uses Inter; code fences stay monospaced
-16. No File → New Window (single main window); File menu has New Note / Open Vault / Refresh / Export
+16. File → New Window opens another vault window; File menu has New Note / Open Vault / Refresh / Export
 
 Optional:
 

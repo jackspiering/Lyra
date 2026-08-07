@@ -67,15 +67,8 @@ struct MarkdownBlockRow: View {
 
         case .image(let alt, let path):
             if let noteDirectory, let vaultRoot,
-               let url = MarkdownImagePath.resolve(path: path, noteDirectory: noteDirectory, vaultRoot: vaultRoot),
-               let data = try? Data(contentsOf: url),
-               let nsImage = NSImage(data: data),
-               nsImage.size.width > 0 {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 480, alignment: .leading)
-                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+               let url = MarkdownImagePath.resolve(path: path, noteDirectory: noteDirectory, vaultRoot: vaultRoot) {
+                MarkdownPreviewImage(url: url, alt: alt, path: path)
             } else {
                 Text("Missing image: \(path)")
                     .font(LyraFonts.caption)
@@ -100,5 +93,44 @@ struct MarkdownBlockRow: View {
             attributed[range].underlineStyle = .single
         }
         return attributed
+    }
+}
+
+private struct MarkdownPreviewImage: View {
+    let url: URL
+    let alt: String
+    let path: String
+
+    @State private var image: NSImage?
+    @State private var finishedLoading = false
+
+    var body: some View {
+        Group {
+            if let image, image.size.width > 0, image.size.height > 0 {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 480, alignment: .leading)
+                    .accessibilityLabel(alt.isEmpty ? "Image" : alt)
+            } else if finishedLoading {
+                Text("Missing image: \(path)")
+                    .font(LyraFonts.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Loading image")
+            }
+        }
+        .task(id: url) {
+            image = nil
+            finishedLoading = false
+            let data = await Task.detached(priority: .utility) {
+                try? Data(contentsOf: url)
+            }.value
+            guard !Task.isCancelled else { return }
+            image = data.flatMap { NSImage(data: $0) }
+            finishedLoading = true
+        }
     }
 }

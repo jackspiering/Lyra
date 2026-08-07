@@ -11,9 +11,10 @@ enum AttachmentStore {
         let stamp = f.string(from: now)
         // Hyphenated name: CommonMark link destinations cannot contain unescaped spaces.
         let base = "pasted-image-\(stamp).png"
-        if !existing.contains(base) { return base }
+        let occupied = Set(existing.map { $0.lowercased() })
+        if !occupied.contains(base.lowercased()) { return base }
         var n = 2
-        while existing.contains("pasted-image-\(stamp)-\(n).png") { n += 1 }
+        while occupied.contains("pasted-image-\(stamp)-\(n).png".lowercased()) { n += 1 }
         return "pasted-image-\(stamp)-\(n).png"
     }
 
@@ -26,8 +27,18 @@ enum AttachmentStore {
         noteURL: URL? = nil,
         now: Date = Date()
     ) throws -> String {
+        guard FileSystemVault.isSafeDirectory(vaultRoot, within: vaultRoot) else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
         let dir = vaultRoot.appendingPathComponent(folderName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: dir.path),
+           !FileSystemVault.isSafeDirectory(dir, within: vaultRoot) {
+            throw CocoaError(.fileWriteNoPermission)
+        }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard FileSystemVault.isSafeDirectory(dir, within: vaultRoot) else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
         let existing = Set(
             (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         )

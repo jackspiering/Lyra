@@ -84,6 +84,49 @@ final class NotePDFExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("line-200-content"), "last code line missing; got: \(text.suffix(200))")
     }
 
+    func testOversizedListItemSpansPagesWithoutDroppingTail() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let words = (1...500).map { "list-word-\($0)" }.joined(separator: " ")
+        let data = try NotePDFExporter.pdfData(
+            markdown: "- \(words)",
+            noteDirectory: root,
+            vaultRoot: root
+        )
+        let doc = try XCTUnwrap(PDFDocument(data: data))
+        XCTAssertGreaterThan(doc.pageCount, 1)
+        XCTAssertTrue(try extractedText(from: data).contains("list-word-500"))
+    }
+
+    func testOversizedQuoteSpansPagesWithoutDroppingTail() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let words = (1...500).map { "quote-word-\($0)" }.joined(separator: " ")
+        let data = try NotePDFExporter.pdfData(
+            markdown: "> \(words)",
+            noteDirectory: root,
+            vaultRoot: root
+        )
+        let doc = try XCTUnwrap(PDFDocument(data: data))
+        XCTAssertGreaterThan(doc.pageCount, 1)
+        XCTAssertTrue(try extractedText(from: data).contains("quote-word-500"))
+    }
+
+    func testUnicodeTextRemainsIntactAcrossPages() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let source = (1...600).map { "😀 café line \($0)" }.joined(separator: " ")
+        let data = try NotePDFExporter.pdfData(
+            markdown: source,
+            noteDirectory: root,
+            vaultRoot: root
+        )
+        XCTAssertTrue(try extractedText(from: data).contains("😀 café line 600"))
+    }
+
     func testInlineMarkdownStripsMarkers() throws {
         let root = try tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

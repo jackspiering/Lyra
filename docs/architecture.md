@@ -103,7 +103,9 @@ One primary type per file when practical.
 - UI / stores: `@MainActor`
 - Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
 - Autosave: ~500ms debounce; also save on note switch, background, and quit
-- External edits: mtime recorded at open/save; a dirty write against a newer mtime prompts Keep Mine / Reload
+- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload
+- Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root
+- PDF export: rendering and folder file I/O run in a detached task; UI panels and error state return to the main actor
 
 ## Attachments
 

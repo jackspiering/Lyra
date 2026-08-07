@@ -30,6 +30,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
 
         textView.delegate = context.coordinator
+        textView.textStorage?.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
         textView.font = LyraFonts.ui(size: 14)
@@ -64,6 +65,7 @@ struct MarkdownTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? LyraTextView else { return }
         textView.vaultRoot = vaultRoot
         textView.noteURL = noteURL
+        textView.textStorage?.delegate = context.coordinator
         let coordinator = context.coordinator
         textView.onPasteError = { message in
             coordinator.parent.onPasteError?(message)
@@ -73,12 +75,10 @@ struct MarkdownTextView: NSViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         var parent: MarkdownTextView
         weak var textView: LyraTextView?
         private var isApplying = false
-        /// Previous document length — used to expand the highlight range over multi-line paste.
-        private var lastDocumentLength = 0
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
@@ -92,7 +92,6 @@ struct MarkdownTextView: NSViewRepresentable {
             textView.string = string
             MarkdownHighlighter.applyHighlighting(to: storage)
             let newLength = (string as NSString).length
-            lastDocumentLength = newLength
             textView.selectedRanges = selected.map { value -> NSValue in
                 let r = value.rangeValue
                 let loc = min(r.location, newLength)
@@ -106,22 +105,21 @@ struct MarkdownTextView: NSViewRepresentable {
             guard !isApplying, let textView, let storage = textView.textStorage else { return }
             parent.text = textView.string
             parent.onEdit()
-            // Attribute-only restyle (no setAttributedString): preserves undo, selection, and IME.
-            // Expand over the inserted span so multi-line paste is highlighted; caret-only
-            // keystrokes keep a zero-length range at the caret (paragraph scope).
-            // Do not use storage.editedRange — it is already reset by textDidChange.
-            let newLength = storage.length
-            let caret = textView.selectedRange()
-            let delta = newLength - lastDocumentLength
-            lastDocumentLength = newLength
-            let highlight: NSRange
-            if delta > 0 {
-                let start = max(0, caret.location - delta)
-                highlight = NSRange(location: start, length: delta)
-            } else {
-                highlight = caret
-            }
-            MarkdownHighlighter.applyHighlighting(to: storage, range: highlight)
+        }
+
+        /// NSTextStorage reports the post-edit range, including replacements
+        /// and deletions. The caret alone cannot identify a multi-character
+        /// paste or a replacement made through undo/IME.
+        func textStorage(
+            _ textStorage: NSTextStorage,
+            didProcessEditing editedMask: NSTextStorage.EditActions,
+            range editedRange: NSRange,
+            changeInLength delta: Int
+        ) {
+            guard !isApplying, editedMask.contains(.editedCharacters) else { return }
+            isApplying = true
+            MarkdownHighlighter.applyHighlighting(to: textStorage, range: editedRange)
+            isApplying = false
         }
     }
 }
