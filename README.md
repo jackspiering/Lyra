@@ -1,71 +1,104 @@
-# Lyra
+<p align="center">
+  <img src="Assets/lyra-logo.png" alt="Lyra logo" width="128" height="128">
+</p>
+
+<h1 align="center">Lyra</h1>
 
 <p align="center">
-  <img src="Assets/lyra-logo.png" alt="Lyra" width="128" height="128">
+  <strong>A native macOS editor for local Markdown vaults.</strong><br>
+  Edit plain files, follow wiki links, preview notes, and export PDFs.
 </p>
 
 <p align="center">
-  <strong>Native macOS editor for local Markdown vaults.</strong><br>
-  Point it at a folder of <code>.md</code> files. Edit, link, preview, export PDF.<br>
-  Files stay on disk as plain text. No Electron. No cloud account.
+  <a href="https://github.com/jackspiering/Lyra/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/jackspiering/Lyra/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
+  <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
+  <img alt="Version 0.9.3" src="https://img.shields.io/badge/version-0.9.3-informational?style=flat-square">
+  <a href="LICENSE">
+    <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
+  </a>
 </p>
 
-<p align="center">
-  <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
-  <img alt="Swift" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.9.3-informational?style=flat-square">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
-</p>
+Lyra is for people who want a focused writing environment without giving up ownership of their files. A vault is a folder on your Mac. Notes remain UTF-8 Markdown files that work with Git, Finder, scripts, and other editors.
+
+## Why Lyra
+
+- **File-first:** No database, proprietary format, cloud account, or lock-in.
+- **Native:** SwiftUI and AppKit provide a Mac app with a real menu bar, windows, TextKit editing, and sandbox support.
+- **Focused:** Source and Reading modes keep writing and review in one workspace.
+- **Durable:** Autosave, external-edit detection, missing-file recovery, and guarded window closing protect in-memory work.
+- **Portable:** Wiki links, relative images, attachments, and PDF export work with ordinary Markdown conventions.
 
 ## Download
 
-[Latest DMG](https://github.com/jackspiering/Lyra/releases) — ad-hoc signed for App Sandbox, **not notarized**.
+Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.9.3), then drag Lyra to Applications.
 
-On first open, macOS may block it. Use **System Settings → Privacy & Security → Open Anyway**, or build from source.
-
-## Quick start
-
-1. Open Lyra → **Open Vault…** (or File → Open Vault…)
-2. Pick a folder of Markdown notes
-3. Select a note in the sidebar
-4. Toggle **Source** / **Reading** with the control or **⌘E**
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘O | Go to File… (or Open Vault… if none open) |
-| ⌘N | New note |
-| ⌘T | New empty tab |
-| ⌘E | Toggle Source ↔ Reading |
-| ⌘S | Save now |
-| ⌘R | Refresh vault from disk |
-| ⌘F | Focus vault search |
-| ⌘⌫ | Move selection to Trash |
-
-Autosave runs after ~500ms idle. Unsaved state shows on the window close button. Lyra blocks a window close until dirty notes save or you choose a recovery action. If the file changes on disk while you have edits, Lyra asks whether to keep your buffer or reload.
+The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| Local vault | Folder of UTF-8 `.md` files; disk is the source of truth |
-| Source / Reading | Syntax-highlighted editor, or full-width preview with images and `[[wiki]]` links |
-| Note tabs | Multiple notes share one vault sidebar (⌘T, empty-tab actions) |
-| Multiple vaults | One vault per window |
-| Wiki links | `[[Note Name]]` resolves inside the vault |
-| Paste images | ⌘V saves under `_attachments/` and inserts a relative image link |
-| Vault search | Filter the tree by name or path (⌘F; not full-text) |
-| Export PDF | File → Export PDF… for the open note |
-| Settings | Appearance, new-note naming, Trash confirmations, About |
+- **Source mode:** TextKit editing with Markdown syntax highlighting, undo, autosave, and standard text editing behavior.
+- **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links.
+- **Note tabs:** Open multiple notes inside one vault window without losing the sidebar.
+- **Multiple vaults:** Open separate vault folders in separate windows.
+- **Vault search:** Filter the sidebar by note name or path. Search is local and does not build a full-text index.
+- **Wiki links:** Resolve `[[Note Name]]` and `[[Note Name.md]]` links inside the current vault.
+- **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link.
+- **PDF export:** Export one note, a folder of notes, or a combined folder document.
+- **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window.
+- **Preferences:** Configure appearance, new-note naming, and Trash confirmations.
 
-**Out of scope:** plugins, graph view, cloud sync, tag indexes, iOS, full WYSIWYG.
+## Quick Start
 
-## Who it's for
+1. Open Lyra and choose **Open Vault**.
+2. Select a folder containing Markdown notes.
+3. Select a note in the sidebar.
+4. Edit in **Source** mode or review in **Reading** mode.
+5. Use **File > Export PDF** when you need a printable copy.
 
-You keep notes as plain Markdown and want a Mac UI that does not invent a proprietary store. Files stay git-friendly on disk. No account.
+### Keyboard Shortcuts
 
-## Build from source
+| Shortcut | Action |
+| --- | --- |
+| Command-O | Go to File, or Open Vault when no vault is open |
+| Command-N | Create a note |
+| Shift-Command-N | Open a new vault window |
+| Command-T | Open a new note tab |
+| Shift-Command-W | Close the current note tab |
+| Command-E | Toggle Source and Reading modes |
+| Command-S | Save the current note |
+| Command-R | Refresh the vault from disk |
+| Command-F | Focus vault search |
+| Command-Delete | Move the selected item to Trash |
 
-Requires **macOS 15+** and **Xcode 16+** (Swift 5.10+).
+Autosave runs after approximately 500 milliseconds of inactivity. If a note changes outside Lyra, the editor presents Keep Mine and Reload Theirs options. Dirty windows stay open until their buffers save or you explicitly choose a recovery action.
+
+## Vault Format
+
+Lyra reads a directory tree and includes visible `.md` files. The vault itself stays transparent:
+
+```text
+My Vault/
+|-- Welcome.md
+|-- Projects/
+|   `-- Roadmap.md
+`-- _attachments/
+    `-- pasted-image-20260807-120000.png
+```
+
+Lyra does not create a sidecar database or proprietary note format. Hidden files, package directories, and symlinked entries are ignored by the vault tree. Clipboard images are stored in `_attachments/` and referenced with relative paths.
+
+## Build From Source
+
+Requirements:
+
+- macOS 15 or later
+- Xcode 16 or later
+- Swift 5.10 or later
+
+Clone the repository and open the Xcode project:
 
 ```bash
 git clone https://github.com/jackspiering/Lyra.git
@@ -73,63 +106,58 @@ cd Lyra
 open Lyra.xcodeproj
 ```
 
-Scheme **Lyra** → destination **My Mac** → Run.
+Select the **Lyra** scheme, choose **My Mac**, and run.
+
+### Verification
+
+The repository provides checks for both Linux and macOS environments:
 
 ```bash
-bash Scripts/smoke.sh        # layout + whitespace + shell syntax checks (Linux or Mac)
-bash Scripts/xcode-test.sh   # build + unit tests (Mac only)
+# Structure, documentation, version, entitlement, whitespace, and shell checks
+bash Scripts/smoke.sh
+
+# Build and unit tests, requires macOS and Xcode
+bash Scripts/xcode-test.sh
 ```
 
-<details>
-<summary>Ship a release DMG</summary>
+Release packaging details are documented in [docs/ci.md](docs/ci.md).
 
-Marketing version in Xcode must match the tag (`0.9.3` ↔ `v0.9.3`):
+## Project Structure
 
-```bash
-git tag v0.9.3 && git push origin v0.9.3
-```
+| Path | Responsibility |
+| --- | --- |
+| `Lyra/App/` | Window shell, navigation, tabs, settings, menus, theme, and errors |
+| `Lyra/Vault/` | Vault scanning, file operations, bookmarks, attachments, search, and wiki resolution |
+| `Lyra/Editor/` | TextKit editing, highlighting, autosave, and paste handling |
+| `Lyra/Preview/` | Reading mode, Markdown blocks, image resolution, and PDF export |
+| `Lyra/Models/` | Shared value types such as `VaultNode` |
+| `LyraTests/` | Unit tests for pure logic and editor durability |
+| `docs/` | Architecture decisions and CI documentation |
 
-CI builds an ad-hoc signed `Lyra-0.9.3.dmg` and uploads it to [Releases](https://github.com/jackspiering/Lyra/releases).
+## Documentation
 
-```bash
-VERSION=0.9.3 bash Scripts/package-dmg.sh   # local Mac → build/dist/
-```
+- [Architecture](docs/architecture.md): Product invariants and technical decisions.
+- [CI and releases](docs/ci.md): Continuous integration, signing, and DMG packaging.
+- [Contributing](CONTRIBUTING.md): Development setup and pull request expectations.
+- [Agent guidance](AGENTS.md): Repository rules for coding agents and humans.
 
-Details: [docs/ci.md](docs/ci.md)
+## Scope
 
-</details>
-
-## Project layout
-
-| Path | Role |
-|------|------|
-| `Lyra/App/` | Window shell, tabs, settings, theme, fonts, errors, menu command routing |
-| `Lyra/Vault/` | Tree scan, CRUD, bookmarks, attachments, wiki resolve |
-| `Lyra/Editor/` | TextKit source editor, highlight, autosave |
-| `Lyra/Preview/` | Reading mode, PDF export |
-| `Lyra/Models/` | Shared types |
-| `LyraTests/` | Unit tests |
-| `docs/` | Architecture and CI |
-
-## Docs
-
-| Doc | Audience |
-|-----|----------|
-| [docs/architecture.md](docs/architecture.md) | Design decisions and invariants |
-| [docs/ci.md](docs/ci.md) | CI, tests, DMG releases |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and PR checklist |
-| [AGENTS.md](AGENTS.md) | Rules for AI agents and humans |
+Lyra intentionally stays small and local. Plugins, graph views, cloud sync, accounts, tag indexes, iOS support, and full WYSIWYG round-tripping are outside the current scope.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Prefer small PRs. Update this README when user-facing behavior changes.
+Issues and pull requests are welcome. Before opening a pull request:
+
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Keep changes focused and update tests for pure logic.
+3. Run `bash Scripts/smoke.sh`.
+4. Update documentation when user-facing behavior changes.
 
 ## Acknowledgments
 
-Also listed in Settings → About:
-
-- [Inter](https://rsms.me/inter/) by Rasmus Andersson, SIL Open Font License 1.1 (`Lyra/Resources/Fonts/Inter-OFL.txt`)
+Lyra bundles [Inter](https://rsms.me/inter/) by Rasmus Andersson under the SIL Open Font License 1.1. The license text is included at `Lyra/Resources/Fonts/Inter-OFL.txt`.
 
 ## License
 
-[MIT](LICENSE) © 2026 Jack Spiering
+Lyra is available under the [MIT License](LICENSE). Copyright 2026 Jack Spiering.
