@@ -21,7 +21,8 @@ extension Notification.Name {
     static let lyraOpenInNewTab = Notification.Name("lyraOpenInNewTab")
     /// Close the selected note tab (File → Close Tab). Last tab becomes empty.
     static let lyraCloseTab = Notification.Name("lyraCloseTab")
-    /// Posted when quit was cancelled because a save failed; ContentView surfaces the error.
+    /// Posted when quit was cancelled because one or more saves failed. The
+    /// owning window surfaces the first failed editor.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
 
@@ -34,10 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if AppSession.shared.saveAllEditors() {
+        let failed = AppSession.shared.saveAllEditors()
+        if failed.isEmpty {
             return .terminateNow
         }
-        NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: nil)
+        NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
         return .terminateCancel
     }
 
@@ -76,11 +78,17 @@ struct VaultWindowRoot: View {
             AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
+            var failed = false
             for editor in tabs.allEditors() {
-                _ = editor.saveIfNeeded()
-                AppSession.shared.unregister(editor: editor)
+                if editor.saveIfNeeded() {
+                    AppSession.shared.unregister(editor: editor)
+                } else {
+                    failed = true
+                }
             }
-            store.releaseAccess()
+            if !failed {
+                store.releaseAccess()
+            }
         }
     }
 }

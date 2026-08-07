@@ -10,6 +10,7 @@ struct ContentViewChrome: ViewModifier {
     var onHasErrorChange: (Bool) -> Void
     var flushEditorError: () -> Void
     var exportPDF: () -> Void
+    var quitSaveFailed: ([EditorViewModel]) -> Void
     var openVault: () -> Void
     var goToFile: () -> Void
     var beginNewNote: () -> Void
@@ -32,6 +33,7 @@ struct ContentViewChrome: ViewModifier {
         onHasErrorChange: @escaping (Bool) -> Void,
         flushEditorError: @escaping () -> Void,
         exportPDF: @escaping () -> Void,
+        quitSaveFailed: @escaping ([EditorViewModel]) -> Void,
         openVault: @escaping () -> Void,
         goToFile: @escaping () -> Void,
         beginNewNote: @escaping () -> Void,
@@ -53,6 +55,7 @@ struct ContentViewChrome: ViewModifier {
         self.onHasErrorChange = onHasErrorChange
         self.flushEditorError = flushEditorError
         self.exportPDF = exportPDF
+        self.quitSaveFailed = quitSaveFailed
         self.openVault = openVault
         self.goToFile = goToFile
         self.beginNewNote = beginNewNote
@@ -98,7 +101,7 @@ struct ContentViewChrome: ViewModifier {
                     _ = editor.saveIfNeeded()
                     flushEditorError()
                 },
-                quitSaveFailed: flushEditorError,
+                quitSaveFailed: quitSaveFailed,
                 focusVaultSearch: focusVaultSearch,
                 newTab: newTab,
                 openInNewTab: openInNewTab,
@@ -133,7 +136,7 @@ struct ContentViewDialogs: ViewModifier {
                 "Note changed on disk",
                 isPresented: Binding(
                     get: { editor.hasExternalConflict },
-                    set: { if !$0 { editor.hasExternalConflict = false } }
+                    set: { if !$0 { editor.deferConflict() } }
                 ),
                 titleVisibility: .visible
             ) {
@@ -157,7 +160,7 @@ struct ContentViewDialogs: ViewModifier {
                 "Note moved or deleted",
                 isPresented: Binding(
                     get: { editor.hasMissingFile },
-                    set: { if !$0 { editor.hasMissingFile = false } }
+                    set: { if !$0 { editor.deferConflict(); editor.hasMissingFile = false } }
                 ),
                 titleVisibility: .visible
             ) {
@@ -167,12 +170,12 @@ struct ContentViewDialogs: ViewModifier {
                     }
                 }
                 Button("Close Note", role: .destructive) {
-                    _ = editor.close()
+                    editor.discardAndClose()
                     store.selection = nil
                 }
                 Button("Cancel", role: .cancel) {
-                    editor.hasMissingFile = false
                     editor.deferConflict()
+                    editor.hasMissingFile = false
                 }
             } message: {
                 Text("This note was moved or deleted outside Lyra. Save a copy at the old path, or close the note.")

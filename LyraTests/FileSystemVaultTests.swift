@@ -119,6 +119,44 @@ final class FileSystemVaultTests: XCTestCase {
         XCTAssertFalse(names.contains("loop"))
     }
 
+    func testScanSkipsFileSymlinks() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outside = root.deletingLastPathComponent()
+            .appendingPathComponent("lyra-outside-note-\(UUID().uuidString).md")
+        try "private".write(to: outside, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("linked.md"),
+            withDestinationURL: outside
+        )
+
+        let tree = try FileSystemVault.scan(root: root)
+        XCTAssertFalse((tree.children ?? []).contains { $0.name == "linked.md" })
+    }
+
+    func testScanRejectsSymlinkedRoot() throws {
+        let target = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: target) }
+        let link = target.deletingLastPathComponent()
+            .appendingPathComponent("lyra-root-link-\(UUID().uuidString)")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: link) }
+
+        XCTAssertThrowsError(try FileSystemVault.scan(root: link))
+    }
+
     func testScanSkipsUnreadableChildButKeepsSiblings() throws {
         let root = try FileManager.default.url(
             for: .itemReplacementDirectory,

@@ -2,6 +2,12 @@ import Foundation
 
 /// Lightweight Markdown block split for the native preview (no WebKit).
 enum MarkdownPreviewBlocks {
+    private static let wikiDestinationAllowed: CharacterSet = {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "()")
+        return allowed
+    }()
+
     enum Block: Equatable {
         case heading(level: Int, text: String)
         case paragraph(String)
@@ -38,11 +44,11 @@ enum MarkdownPreviewBlocks {
             let raw = line.text
             let trimmed = raw.trimmingCharacters(in: .whitespaces)
 
-            if trimmed.hasPrefix("```") {
+            if let fence = parseFence(raw) {
                 flushParagraph()
                 i += 1
                 var code: [String] = []
-                while i < lines.count, !lines[i].text.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                while i < lines.count, !isClosingFence(lines[i].text, for: fence) {
                     code.append(lines[i].text)
                     i += 1
                 }
@@ -97,23 +103,35 @@ enum MarkdownPreviewBlocks {
     /// Turn `[[wiki]]` into markdown links `lyra-wiki:` so Reading can open them as clickable links.
     /// Skips conversion inside inline code spans (`` `...` ``). Supports Obsidian `[[path|alias]]`.
     static func prepareInlineMarkdown(_ source: String) -> String {
-        // Split on `...` code spans; only transform segments outside code.
+        // Find matching delimiter runs instead of toggling on every backtick;
+        // otherwise a double-backtick span rewrites its wiki link as plain text.
         var result = ""
-        var i = source.startIndex
-        var inCode = false
-        var segmentStart = i
-        while i < source.endIndex {
-            if source[i] == "`" {
-                let segment = String(source[segmentStart..<i])
-                result += inCode ? segment : rewriteWikis(in: segment)
-                inCode.toggle()
-                result.append("`")
-                segmentStart = source.index(after: i)
+        var outsideStart = source.startIndex
+        var cursor = source.startIndex
+        while cursor < source.endIndex {
+            guard source[cursor] == "`" else {
+                cursor = source.index(after: cursor)
+                continue
             }
-            i = source.index(after: i)
+
+            let openingStart = cursor
+            let openingEnd = endOfBacktickRun(in: source, startingAt: cursor)
+            let length = source.distance(from: openingStart, to: openingEnd)
+            guard let closing = closingBacktickRun(
+                in: source,
+                after: openingEnd,
+                length: length
+            ) else {
+                cursor = openingEnd
+                continue
+            }
+
+            result += rewriteWikis(in: String(source[outsideStart..<openingStart]))
+            result += String(source[openingStart..<closing.upperBound])
+            cursor = closing.upperBound
+            outsideStart = cursor
         }
-        let tail = String(source[segmentStart...])
-        result += inCode ? tail : rewriteWikis(in: tail)
+        result += rewriteWikis(in: String(source[outsideStart...]))
         return result
     }
 
@@ -135,7 +153,7 @@ enum MarkdownPreviewBlocks {
                 target = body.trimmingCharacters(in: .whitespacesAndNewlines)
                 display = target
             }
-            let encoded = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
+            let encoded = target.addingPercentEncoding(withAllowedCharacters: wikiDestinationAllowed) ?? target
             // Escape brackets in the link label so nested markdown stays stable.
             let label = display
                 .replacingOccurrences(of: "[", with: "\\[")
@@ -157,12 +175,10 @@ enum MarkdownPreviewBlocks {
         return encoded.removingPercentEncoding ?? encoded
     }
 
-    // MARK: - Line split (UTF-16 offsets)
+    // MARK: - Line split
 
     private struct Line {
         let text: String
-        let start: Int
-        var end: Int { start + (text as NSString).length }
     }
 
     private static func splitLines(_ source: String) -> [Line] {
@@ -177,7 +193,7 @@ enum MarkdownPreviewBlocks {
                 i += 1
             }
             let len = i - start
-            lines.append(Line(text: ns.substring(with: NSRange(location: start, length: len)), start: start))
+            lines.append(Line(text: ns.substring(with: NSRange(location: start, length: len))))
             if i < ns.length {
                 let ch = ns.character(at: i)
                 if ch == 0x0D {
@@ -189,6 +205,81 @@ enum MarkdownPreviewBlocks {
             }
         }
         return lines
+    }
+
+    private struct Fence {
+        let marker: Character
+        let length: Int
+    }
+
+    private static func parseFence(_ raw: String) -> Fence? {
+        var index = raw.startIndex
+        var indentation = 0
+        while index < raw.endIndex, (raw[index] == " " || raw[index] == "\t"), indentation < 4 {
+            indentation += raw[index] == "\t" ? 4 : 1
+            index = raw.index(after: index)
+        }
+        guard indentation <= 3, index < raw.endIndex else { return nil }
+        let marker = raw[index]
+        guard marker == "`" || marker == "~" else { return nil }
+
+        let runStart = index
+        while index < raw.endIndex, raw[index] == marker {
+            index = raw.index(after: index)
+        }
+        let length = raw.distance(from: runStart, to: index)
+        guard length >= 3 else { return nil }
+        if marker == "`", raw[index...].contains("`") { return nil }
+        return Fence(marker: marker, length: length)
+    }
+
+    private static func isClosingFence(_ raw: String, for fence: Fence) -> Bool {
+        var index = raw.startIndex
+        var indentation = 0
+        while index < raw.endIndex, (raw[index] == " " || raw[index] == "\t"), indentation < 4 {
+            indentation += raw[index] == "\t" ? 4 : 1
+            index = raw.index(after: index)
+        }
+        guard indentation <= 3, index < raw.endIndex, raw[index] == fence.marker else {
+            return false
+        }
+
+        let runStart = index
+        while index < raw.endIndex, raw[index] == fence.marker {
+            index = raw.index(after: index)
+        }
+        let length = raw.distance(from: runStart, to: index)
+        guard length >= fence.length else { return false }
+        return raw[index...].allSatisfy { $0 == " " || $0 == "\t" }
+    }
+
+    private static func endOfBacktickRun(in source: String, startingAt start: String.Index) -> String.Index {
+        var index = start
+        while index < source.endIndex, source[index] == "`" {
+            index = source.index(after: index)
+        }
+        return index
+    }
+
+    private static func closingBacktickRun(
+        in source: String,
+        after start: String.Index,
+        length: Int
+    ) -> Range<String.Index>? {
+        var index = start
+        while index < source.endIndex {
+            guard source[index] == "`" else {
+                index = source.index(after: index)
+                continue
+            }
+            let runStart = index
+            let runEnd = endOfBacktickRun(in: source, startingAt: index)
+            if source.distance(from: runStart, to: runEnd) == length {
+                return runStart..<runEnd
+            }
+            index = runEnd
+        }
+        return nil
     }
 
     private static func parseHeading(_ trimmed: String) -> Block? {

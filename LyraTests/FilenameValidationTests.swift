@@ -47,6 +47,10 @@ final class FilenameValidationTests: XCTestCase {
 
     func testFoldersKeepNameWithoutMd() {
         XCTAssertEqual(FilenameValidation.validate("Projects", isDirectory: true), .ok("Projects"))
+        switch FilenameValidation.validate("_attachments", isDirectory: true) {
+        case .ok: XCTFail("expected reserved attachment folder rejection")
+        case .invalid: break
+        }
     }
 
     func testVaultStoreValidatedRenameDelegates() {

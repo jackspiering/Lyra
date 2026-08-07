@@ -67,6 +67,30 @@ final class MarkdownHighlighterTests: XCTestCase {
         XCTAssertEqual(font?.fontName, boldFont.fontName)
     }
 
+    func testReplacementRangeRestylesEveryEditedParagraph() {
+        let storage = NSTextStorage(string: "before\nplain\nafter")
+        MarkdownHighlighter.applyHighlighting(to: storage)
+
+        let old = (storage.string as NSString).range(of: "plain")
+        let replacement = "## heading\n**bold**"
+        storage.replaceCharacters(in: old, with: replacement)
+        MarkdownHighlighter.applyHighlighting(
+            to: storage,
+            range: NSRange(location: old.location, length: (replacement as NSString).length)
+        )
+
+        var range = NSRange(location: 0, length: 0)
+        let heading = storage.attributes(at: old.location, effectiveRange: &range)
+        XCTAssertEqual((heading[.font] as? NSFont)?.fontName, boldFont.fontName)
+
+        let boldIndex = (storage.string as NSString).range(of: "**bold**").location
+        let bold = storage.attributes(at: boldIndex, effectiveRange: &range)
+        XCTAssertEqual((bold[.font] as? NSFont)?.fontName, boldFont.fontName)
+
+        let beforeAttrs = storage.attributes(at: 0, effectiveRange: &range)
+        assertColorDoesNotMatch(beforeAttrs[.foregroundColor], LyraTheme.heading)
+    }
+
     // MARK: - Color helpers (dynamic NSColor is not reliably `==`)
 
     private func assertColor(

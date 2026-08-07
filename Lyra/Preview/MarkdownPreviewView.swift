@@ -9,7 +9,7 @@ struct MarkdownPreviewView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 10) {
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Nothing to preview")
                         .font(LyraFonts.body)

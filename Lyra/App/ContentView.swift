@@ -41,6 +41,12 @@ struct ContentView: View {
             .background(
                 DocumentEditedReader(isEdited: tabs.anyDirty)
             )
+            .background(
+                WindowCloseGuard(
+                    editors: tabs.allEditors(),
+                    onSaveFailure: handleEditorSaveFailures
+                )
+            )
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }
@@ -53,6 +59,7 @@ struct ContentView: View {
                 onHasErrorChange: handleHasErrorChange,
                 flushEditorError: flushEditorError,
                 exportPDF: exportPDF,
+                quitSaveFailed: handleEditorSaveFailures,
                 openVault: openVault,
                 goToFile: goToFile,
                 beginNewNote: beginNewNote,
@@ -65,7 +72,7 @@ struct ContentView: View {
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet,
                 shouldHandleCommands: {
-                    guard let hostWindowNumber else { return true }
+                    guard let hostWindowNumber else { return false }
                     return NSApp.keyWindow?.windowNumber == hostWindowNumber
                 }
             ))
@@ -270,6 +277,7 @@ struct ContentView: View {
             }
         } else {
             // Flush the tab that failed to save, not necessarily the previously selected editor.
+            selectTab(containing: editorRef)
             flushEditorError(for: editorRef)
         }
     }
@@ -282,10 +290,10 @@ struct ContentView: View {
                 store.refresh()
             }
         } else {
-            for tab in tabs.tabs {
-                _ = tab.editor.saveIfNeeded()
+            let failures = tabs.tabs.compactMap { tab in
+                tab.editor.saveIfNeeded() ? nil : tab.editor
             }
-            flushEditorError()
+            handleEditorSaveFailures(failures)
         }
     }
 
@@ -553,6 +561,22 @@ struct ContentView: View {
         ed.lastError = nil
     }
 
+    /// Select the tab that owns a failed editor so conflict/missing-file
+    /// dialogs and ordinary save alerts are attached to the right note.
+    private func handleEditorSaveFailures(_ failures: [EditorViewModel]) {
+        guard let failed = failures.first(where: { editor in
+            tabs.tabs.contains { $0.editor === editor }
+        }) else { return }
+        selectTab(containing: failed)
+        flushEditorError(for: failed)
+    }
+
+    private func selectTab(containing editor: EditorViewModel) {
+        guard let tab = tabs.tabs.first(where: { $0.editor === editor }) else { return }
+        tabs.select(tab.id)
+        store.selection = tab.editor.fileURL?.path
+    }
+
     private func openWikiLink(_ text: String) {
         guard let url = store.resolveWikiLink(text) else { return }
         // activateNote / selectOpenNote open or switch tabs; still flush dirty active first when replacing.
@@ -609,6 +633,7 @@ struct ContentView: View {
             store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
             return
         }
+        let liveBuffers = exportBufferSnapshot()
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -617,32 +642,42 @@ struct ContentView: View {
         panel.message = "Choose a folder for \(notes.count) PDF file(s)."
         panel.begin { resp in
             guard resp == .OK, let dest = panel.url else { return }
-            var failures = 0
-            for noteURL in notes {
-                do {
-                    let md = try String(contentsOf: noteURL, encoding: .utf8)
-                    let data = try NotePDFExporter.pdfData(
-                        markdown: md,
-                        noteDirectory: noteURL.deletingLastPathComponent(),
-                        vaultRoot: vault
-                    )
-                    let base = noteURL.deletingPathExtension().lastPathComponent
-                    var out = dest.appendingPathComponent("\(base).pdf")
-                    var n = 2
-                    while FileManager.default.fileExists(atPath: out.path) {
-                        out = dest.appendingPathComponent("\(base)-\(n).pdf")
-                        n += 1
+            Task { @MainActor in
+                let failures = await Task.detached(priority: .userInitiated) {
+                    var failures = 0
+                    for noteURL in notes {
+                        do {
+                            let markdown: String
+                            if let live = liveBuffers[noteURL.path] {
+                                markdown = live
+                            } else {
+                                markdown = try String(contentsOf: noteURL, encoding: .utf8)
+                            }
+                            let data = try NotePDFExporter.pdfData(
+                                markdown: markdown,
+                                noteDirectory: noteURL.deletingLastPathComponent(),
+                                vaultRoot: vault
+                            )
+                            let base = noteURL.deletingPathExtension().lastPathComponent
+                            var out = dest.appendingPathComponent("\(base).pdf")
+                            var n = 2
+                            while FileManager.default.fileExists(atPath: out.path) {
+                                out = dest.appendingPathComponent("\(base)-\(n).pdf")
+                                n += 1
+                            }
+                            try data.write(to: out, options: .atomic)
+                        } catch {
+                            failures += 1
+                        }
                     }
-                    try data.write(to: out, options: .atomic)
-                } catch {
-                    failures += 1
+                    return failures
+                }.value
+                if failures > 0 {
+                    store.present(
+                        context: .exportPDF,
+                        message: "Exported with \(failures) failure(s). Check permissions and disk space."
+                    )
                 }
-            }
-            if failures > 0 {
-                store.present(
-                    context: .exportPDF,
-                    message: "Exported with \(failures) failure(s). Check permissions and disk space."
-                )
             }
         }
     }
@@ -656,33 +691,43 @@ struct ContentView: View {
             store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
             return
         }
-        do {
-            var sources: [NotePDFExporter.NoteSource] = []
-            for noteURL in notes {
-                let md = try String(contentsOf: noteURL, encoding: .utf8)
-                sources.append(
-                    NotePDFExporter.NoteSource(
-                        title: noteURL.deletingPathExtension().lastPathComponent,
-                        markdown: md,
-                        noteDirectory: noteURL.deletingLastPathComponent()
-                    )
-                )
-            }
-            let data = try NotePDFExporter.pdfData(notes: sources, vaultRoot: vault)
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [.pdf]
-            panel.nameFieldStringValue = folder.name + ".pdf"
-            panel.directoryURL = folder.url
-            panel.begin { resp in
-                guard resp == .OK, let url = panel.url else { return }
-                do {
-                    try data.write(to: url, options: .atomic)
-                } catch {
-                    store.present(error: error, context: .exportPDF)
+        let liveBuffers = exportBufferSnapshot()
+        Task { @MainActor in
+            do {
+                let data = try await Task.detached(priority: .userInitiated) {
+                    var sources: [NotePDFExporter.NoteSource] = []
+                    for noteURL in notes {
+                        let markdown: String
+                        if let live = liveBuffers[noteURL.path] {
+                            markdown = live
+                        } else {
+                            markdown = try String(contentsOf: noteURL, encoding: .utf8)
+                        }
+                        sources.append(
+                            NotePDFExporter.NoteSource(
+                                title: noteURL.deletingPathExtension().lastPathComponent,
+                                markdown: markdown,
+                                noteDirectory: noteURL.deletingLastPathComponent()
+                            )
+                        )
+                    }
+                    return try NotePDFExporter.pdfData(notes: sources, vaultRoot: vault)
+                }.value
+                let panel = NSSavePanel()
+                panel.allowedContentTypes = [.pdf]
+                panel.nameFieldStringValue = folder.name + ".pdf"
+                panel.directoryURL = folder.url
+                panel.begin { resp in
+                    guard resp == .OK, let url = panel.url else { return }
+                    do {
+                        try data.write(to: url, options: .atomic)
+                    } catch {
+                        store.present(error: error, context: .exportPDF)
+                    }
                 }
+            } catch {
+                store.present(error: error, context: .exportPDF)
             }
-        } catch {
-            store.present(error: error, context: .exportPDF)
         }
     }
 
@@ -693,26 +738,42 @@ struct ContentView: View {
         directoryURL: URL?
     ) {
         guard let vault = store.rootURL else { return }
-        do {
-            let data = try NotePDFExporter.pdfData(
-                markdown: markdown,
-                noteDirectory: noteDirectory,
-                vaultRoot: vault
-            )
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [.pdf]
-            panel.nameFieldStringValue = suggestedName
-            panel.directoryURL = directoryURL
-            panel.begin { resp in
-                guard resp == .OK, let url = panel.url else { return }
-                do {
-                    try data.write(to: url, options: .atomic)
-                } catch {
-                    store.present(error: error, context: .exportPDF)
+        Task { @MainActor in
+            do {
+                let data = try await Task.detached(priority: .userInitiated) {
+                    try NotePDFExporter.pdfData(
+                        markdown: markdown,
+                        noteDirectory: noteDirectory,
+                        vaultRoot: vault
+                    )
+                }.value
+                let panel = NSSavePanel()
+                panel.allowedContentTypes = [.pdf]
+                panel.nameFieldStringValue = suggestedName
+                panel.directoryURL = directoryURL
+                panel.begin { resp in
+                    guard resp == .OK, let url = panel.url else { return }
+                    do {
+                        try data.write(to: url, options: .atomic)
+                    } catch {
+                        store.present(error: error, context: .exportPDF)
+                    }
                 }
+            } catch {
+                store.present(error: error, context: .exportPDF)
             }
-        } catch {
-            store.present(error: error, context: .exportPDF)
         }
     }
+
+    private func exportBufferSnapshot() -> [String: String] {
+        var buffers: [String: String] = [:]
+        for tab in tabs.tabs {
+            guard let path = tab.editor.fileURL?.path else { continue }
+            _ = tab.editor.saveIfNeeded()
+            flushEditorError(for: tab.editor)
+            buffers[path] = tab.editor.text
+        }
+        return buffers
+    }
+
 }

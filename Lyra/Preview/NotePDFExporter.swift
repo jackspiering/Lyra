@@ -171,14 +171,35 @@ enum NotePDFExporter {
             width: CGFloat = NotePDFExporter.contentWidth
         ) {
             let full = makeAttributed(text, font: font, color: color)
+            drawAttributedSpanning(
+                full,
+                x: x,
+                width: width,
+                minimumHeight: max(font.ascender - font.descender, 1)
+            )
+        }
+
+        /// Draw an attributed block in page-sized fragments. Decorations are
+        /// drawn per fragment so a quote bar or code background cannot extend
+        /// below the page when a block is taller than one page.
+        private func drawAttributedSpanning(
+            _ full: NSAttributedString,
+            x: CGFloat,
+            width: CGFloat,
+            minimumHeight: CGFloat,
+            horizontalPadding: CGFloat = 0,
+            topPadding: CGFloat = 0,
+            bottomPadding: CGFloat = 0,
+            decoration: ((CGRect, Bool) -> Void)? = nil
+        ) {
             var offset = 0
-            let ns = full.string as NSString
-            let total = ns.length
+            let total = full.length
             guard total > 0 else { return }
 
             while offset < total {
-                ensureSpace(min(20, remainingHeight))
-                let available = remainingHeight
+                let minimumFragmentHeight = minimumHeight + topPadding + bottomPadding
+                ensureSpace(minimumFragmentHeight)
+                let available = max(1, remainingHeight - topPadding - bottomPadding)
                 let fit = charactersFitting(
                     full,
                     from: offset,
@@ -189,9 +210,26 @@ enum NotePDFExporter {
                 let range = NSRange(location: offset, length: min(length, total - offset))
                 let slice = full.attributedSubstring(from: range)
                 let height = measure(slice, width: width)
-                let rect = CGRect(x: x, y: y, width: width, height: height)
-                slice.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-                y += height
+                let blockHeight = topPadding + height + bottomPadding
+                if blockHeight > remainingHeight + 0.5, y > NotePDFExporter.margin + 0.5 {
+                    endPage()
+                    beginPage()
+                    continue
+                }
+                let textRect = CGRect(x: x, y: y + topPadding, width: width, height: height)
+                let blockRect = CGRect(
+                    x: x - horizontalPadding,
+                    y: y,
+                    width: width + horizontalPadding * 2,
+                    height: blockHeight
+                )
+                decoration?(blockRect, offset == 0)
+                slice.draw(
+                    with: textRect,
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    context: nil
+                )
+                y += blockHeight
                 offset += range.length
                 if offset < total {
                     endPage()
@@ -229,15 +267,40 @@ enum NotePDFExporter {
             let window = ns.substring(with: NSRange(location: from, length: low)) as NSString
             let br = window.rangeOfCharacter(from: .newlines, options: .backwards)
             if br.location != NSNotFound, br.location > 0 {
-                return br.location + 1
+                return composedCharacterSafeLength(
+                    attr,
+                    from: from,
+                    proposedLength: br.location + 1
+                )
             }
             if low > 20 {
                 let sp = window.rangeOfCharacter(from: .whitespaces, options: .backwards)
                 if sp.location != NSNotFound, sp.location > low / 2 {
-                    return sp.location + 1
+                    return composedCharacterSafeLength(
+                        attr,
+                        from: from,
+                        proposedLength: sp.location + 1
+                    )
                 }
             }
-            return max(1, low)
+            return composedCharacterSafeLength(attr, from: from, proposedLength: max(1, low))
+        }
+
+        private func composedCharacterSafeLength(
+            _ attr: NSAttributedString,
+            from: Int,
+            proposedLength: Int
+        ) -> Int {
+            let proposedEnd = min(attr.length, from + proposedLength)
+            guard proposedEnd > from, proposedEnd < attr.length else {
+                return max(1, proposedEnd - from)
+            }
+            let cluster = (attr.string as NSString).rangeOfComposedCharacterSequence(at: proposedEnd - 1)
+            guard NSMaxRange(cluster) > proposedEnd else { return proposedEnd - from }
+            if cluster.location >= from {
+                return NSMaxRange(cluster) - from
+            }
+            return max(1, cluster.location - from)
         }
 
         private func drawListItem(_ text: String, ordinal: Int?, depth: Int, taskChecked: Bool?) {
@@ -253,105 +316,69 @@ enum NotePDFExporter {
                 .foregroundColor: NotePDFExporter.secondaryColor,
             ]
             let bullet = NSAttributedString(string: marker, attributes: bulletAttrs)
-            let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.bodyColor)
+            let body = makeAttributed(text.isEmpty ? " " : text, font: bodyFont, color: NotePDFExporter.bodyColor)
             let bulletWidth: CGFloat = (ordinal != nil || taskChecked != nil) ? 28 : 16
             let x = NotePDFExporter.margin + indent
-            let bodyWidth = NotePDFExporter.contentWidth - indent - bulletWidth
-            let height = max(measure(body, width: bodyWidth), bodyFont.ascender - bodyFont.descender)
-            ensureSpace(height)
-            bullet.draw(at: CGPoint(x: x, y: y))
-            let rect = CGRect(
+            let bodyWidth = max(1, NotePDFExporter.contentWidth - indent - bulletWidth)
+            drawAttributedSpanning(
+                body,
                 x: x + bulletWidth,
-                y: y,
                 width: bodyWidth,
-                height: height
-            )
-            body.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-            y += height + NotePDFExporter.blockGap
+                minimumHeight: max(bodyFont.ascender - bodyFont.descender, 1)
+            ) { rect, isFirst in
+                if isFirst {
+                    bullet.draw(at: CGPoint(x: x, y: rect.minY))
+                }
+            }
         }
 
         private func drawQuote(_ text: String) {
             let barWidth: CGFloat = 3
             let pad: CGFloat = 10
-            let body = makeAttributed(text, font: bodyFont, color: NotePDFExporter.secondaryColor)
+            let body = makeAttributed(text.isEmpty ? " " : text, font: bodyFont, color: NotePDFExporter.secondaryColor)
             let textWidth = NotePDFExporter.contentWidth - barWidth - pad
-            let height = max(measure(body, width: textWidth), 16)
-            ensureSpace(height)
-            let bar = CGRect(
-                x: NotePDFExporter.margin,
-                y: y,
-                width: barWidth,
-                height: height
-            )
-            NotePDFExporter.quoteBarColor.setFill()
-            bar.fill()
-            let rect = CGRect(
+            drawAttributedSpanning(
+                body,
                 x: NotePDFExporter.margin + barWidth + pad,
-                y: y,
                 width: textWidth,
-                height: height
-            )
-            body.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-            y += height + NotePDFExporter.blockGap
+                minimumHeight: max(bodyFont.ascender - bodyFont.descender, 1)
+            ) { rect, _ in
+                let bar = CGRect(
+                    x: NotePDFExporter.margin,
+                    y: rect.minY,
+                    width: barWidth,
+                    height: rect.height
+                )
+                NotePDFExporter.quoteBarColor.setFill()
+                bar.fill()
+            }
         }
 
-        /// Code is uniform line-height text — split by lines that fit each page.
+        /// Code is a padded attributed block; the shared fragment pagination
+        /// also handles a single unusually long wrapped line.
         private func drawCode(_ code: String) {
             let display = code.isEmpty ? " " : code
             let font = LyraFonts.code(size: 11)
             let padding: CGFloat = 8
             let textWidth = NotePDFExporter.contentWidth - padding * 2
-            let lines = display.components(separatedBy: "\n")
-            var index = 0
-            while index < lines.count {
-                ensureSpace(min(40, remainingHeight))
-                let available = remainingHeight - padding * 2
-                var chunk: [String] = []
-                var chunkHeight: CGFloat = 0
-                while index < lines.count {
-                    let candidate = chunk + [lines[index]]
-                    let attr = makeAttributed(
-                        candidate.joined(separator: "\n"),
-                        font: font,
-                        color: NotePDFExporter.bodyColor,
-                        parseMarkdown: false
-                    )
-                    let h = measure(attr, width: textWidth)
-                    if !chunk.isEmpty, h > available { break }
-                    chunk = candidate
-                    chunkHeight = h
-                    index += 1
-                    // Single oversize line: still emit one line so we make progress.
-                    if chunk.count == 1, h > available { break }
-                }
-                let boxHeight = chunkHeight + padding * 2
-                let box = CGRect(
-                    x: NotePDFExporter.margin,
-                    y: y,
-                    width: NotePDFExporter.contentWidth,
-                    height: boxHeight
-                )
+            let attr = makeAttributed(
+                display,
+                font: font,
+                color: NotePDFExporter.bodyColor,
+                parseMarkdown: false
+            )
+            drawAttributedSpanning(
+                attr,
+                x: NotePDFExporter.margin + padding,
+                width: textWidth,
+                minimumHeight: max(font.ascender - font.descender, 1),
+                horizontalPadding: padding,
+                topPadding: padding,
+                bottomPadding: padding
+            ) { box, _ in
                 NotePDFExporter.codeBackgroundColor.setFill()
                 let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
                 path.fill()
-                let attr = makeAttributed(
-                    chunk.joined(separator: "\n"),
-                    font: font,
-                    color: NotePDFExporter.bodyColor,
-                    parseMarkdown: false
-                )
-                let textRect = CGRect(
-                    x: NotePDFExporter.margin + padding,
-                    y: y + padding,
-                    width: textWidth,
-                    height: chunkHeight
-                )
-                attr.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
-                y += boxHeight + NotePDFExporter.blockGap
-                if index < lines.count {
-                    endPage()
-                    beginPage()
-                }
             }
         }
 
@@ -418,7 +445,7 @@ enum NotePDFExporter {
             parseMarkdown: Bool = true
         ) -> NSAttributedString {
             let paragraph = NSMutableParagraphStyle()
-            paragraph.lineBreakMode = .byWordWrapping
+            paragraph.lineBreakMode = parseMarkdown ? .byWordWrapping : .byCharWrapping
             paragraph.alignment = .natural
 
             guard parseMarkdown else {

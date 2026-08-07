@@ -28,6 +28,23 @@ final class AttachmentStoreTests: XCTestCase {
         XCTAssertFalse(name.contains(" "))
     }
 
+    func testUniqueFilenameTreatsCaseVariantAsCollision() {
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 7
+        components.day = 27
+        components.hour = 15
+        components.minute = 30
+        components.second = 45
+        let date = calendar.date(from: components)!
+        let name = AttachmentStore.uniquePNGFilename(
+            now: date,
+            existing: ["PASTED-IMAGE-20260727-153045.PNG"]
+        )
+        XCTAssertNotEqual(name.lowercased(), "pasted-image-20260727-153045.png")
+    }
+
     func testSavePNGCreatesFolderAndReturnsRelativePath() throws {
         let root = try FileManager.default.url(
             for: .itemReplacementDirectory,
@@ -78,6 +95,30 @@ final class AttachmentStoreTests: XCTestCase {
         )
         XCTAssertNotNil(resolved)
         XCTAssertTrue(FileManager.default.fileExists(atPath: resolved!.path))
+    }
+
+    func testSavePNGRejectsAttachmentsSymlink() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outside = root.deletingLastPathComponent()
+            .appendingPathComponent("lyra-outside-attachments-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent(AttachmentStore.folderName),
+            withDestinationURL: outside
+        )
+
+        XCTAssertThrowsError(
+            try AttachmentStore.savePNG(data: Data([0x01]), vaultRoot: root)
+        )
+        XCTAssertTrue((try? FileManager.default.contentsOfDirectory(atPath: outside.path))?.isEmpty == true)
     }
 
     func testRelativePathHelper() {

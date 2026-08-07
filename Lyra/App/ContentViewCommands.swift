@@ -14,7 +14,7 @@ struct ContentViewCommands: ViewModifier {
     var requestDelete: () -> Void
     var refresh: () -> Void
     var save: () -> Void
-    var quitSaveFailed: () -> Void
+    var quitSaveFailed: ([EditorViewModel]) -> Void
     var focusVaultSearch: () -> Void
     var newTab: () -> Void
     var openInNewTab: () -> Void
@@ -74,10 +74,11 @@ struct ContentViewCommands: ViewModifier {
                 guard shouldHandle() else { return }
                 closeTab()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { _ in
-                // All windows may surface; only key window needs UI (others already saved or clean).
-                guard shouldHandle() else { return }
-                quitSaveFailed()
+            .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { notification in
+                // The failing editor may belong to a non-key window, so let
+                // each window check ownership instead of gating this event by key status.
+                let failures = notification.object as? [EditorViewModel] ?? []
+                quitSaveFailed(failures)
             }
     }
 }

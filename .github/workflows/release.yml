@@ -35,22 +35,37 @@ jobs:
 
       - name: Resolve version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
-            V="${{ inputs.version }}"
-          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
-            V="${GITHUB_REF_NAME}"
+          set -euo pipefail
+          EXPLICIT_VERSION=false
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "${INPUT_VERSION:-}" ]]; then
+            V="$INPUT_VERSION"
+            EXPLICIT_VERSION=true
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            V="$REF_NAME"
+            EXPLICIT_VERSION=true
           else
             V=""
           fi
           V="${V#v}"
-          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if [[ "$EXPLICIT_VERSION" == true ]] && ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: version must be three-part semver (e.g. 0.6.2), got '$V'" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$V" >> "$GITHUB_OUTPUT"
           echo "Resolved version: '${V:-from project}'"
 
       - name: Guard version matches project
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          V="${{ steps.ver.outputs.version }}"
+          V="${VERSION:-}"
           if [[ -z "$V" ]]; then
             echo "No explicit version (workflow_dispatch without input) — package-dmg will use MARKETING_VERSION."
             exit 0
@@ -95,10 +110,10 @@ jobs:
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
-            Unsigned macOS build for testing (not notarized).
+            Ad-hoc-signed macOS build for testing (not notarized).
 
             - Open the DMG and drag **Lyra** to **Applications**.
-            - First launch: right-click → **Open** if Gatekeeper warns (unsigned CI build).
+            - First launch: right-click → **Open** if Gatekeeper warns (ad-hoc CI build).
             - Built by GitHub Actions on `macos-15`.
 
             Commit: `${{ github.sha }}`

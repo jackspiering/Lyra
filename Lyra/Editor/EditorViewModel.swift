@@ -5,11 +5,14 @@ import Observation
 @Observable
 final class EditorViewModel {
     var fileURL: URL?
+    /// Current vault root, when the editor belongs to a vault window. Used to
+    /// reject writes redirected through a replaced symlinked ancestor.
+    var vaultRoot: URL?
     var text: String = ""
     var isDirty = false
     /// Last save/open failure for the UI to present.
     var lastError: (context: UserFacingError.Context, error: Error)?
-    /// Disk mtime/size changed under us while dirty — UI offers Keep Mine / Reload.
+    /// Disk identity changed under us while dirty — UI offers Keep Mine / Reload.
     var hasExternalConflict = false
     /// Open note path no longer exists (moved/deleted outside Lyra).
     var hasMissingFile = false
@@ -25,8 +28,37 @@ final class EditorViewModel {
     /// True while there is an error the UI has not yet flushed.
     var hasError: Bool { lastError != nil }
 
-    /// Path + mtime + size observed at last successful open/save/reload.
-    private var diskSnapshot: (path: String, date: Date, size: Int)?
+    /// File identity observed at the last successful open/save/reload.
+    ///
+    /// Metadata alone is not enough here: an atomic replacement can retain the
+    /// same path, size, and coarse-grained modification date. Keep the bytes
+    /// too so conflict detection remains conservative on filesystems with a
+    /// low timestamp resolution.
+    private struct DiskSnapshot: Equatable {
+        let path: String
+        let date: Date
+        let size: Int
+        let device: UInt64?
+        let inode: UInt64?
+        let content: Data
+
+        func hasSameFileIdentity(as other: DiskSnapshot) -> Bool {
+            date == other.date
+                && size == other.size
+                && device == other.device
+                && inode == other.inode
+                && content == other.content
+        }
+    }
+
+    private struct FileMetadata: Equatable {
+        let date: Date
+        let size: Int
+        let device: UInt64?
+        let inode: UInt64?
+    }
+
+    private var diskSnapshot: DiskSnapshot?
     private var saveTask: Task<Void, Never>?
 
     /// Opens `url` after flushing dirty state. Returns `false` if a dirty save failed;
@@ -47,12 +79,8 @@ final class EditorViewModel {
             refreshFileDates(for: url, markSavedNow: false)
             return true
         } catch {
-            fileURL = nil
-            text = ""
-            isDirty = false
-            diskSnapshot = nil
-            createdAt = nil
-            lastSavedAt = nil
+            // Do not discard the active note when the requested target cannot
+            // be read. The user must still be able to retry or keep editing it.
             lastError = (.openNote, error)
             return false
         }
@@ -72,24 +100,31 @@ final class EditorViewModel {
 
     /// Cancel on the conflict dialog: stop autosaving without treating Cancel as overwrite.
     func deferConflict() {
+        guard hasExternalConflict || hasMissingFile else { return }
         hasExternalConflict = false
         conflictDeferred = true
         saveTask?.cancel()
         saveTask = nil
     }
 
-    /// Closes the current note after flushing dirty state. Returns `false` if save failed.
-    /// Closing still succeeds when the file or its parent no longer exists so the user is not trapped.
+    /// Closes the current note after flushing dirty state. Returns `false` if
+    /// save failed or the file disappeared so the UI can offer recovery.
     @discardableResult
     func close() -> Bool {
         if isDirty, let url = fileURL, !FileManager.default.fileExists(atPath: url.path) {
-            // Cannot save a missing path; abandon the buffer rather than trap the UI.
-            clearBuffer()
-            return true
+            hasMissingFile = true
+            lastSaveFailed = true
+            return false
         }
         guard saveIfNeeded() else { return false }
         clearBuffer()
         return true
+    }
+
+    /// Explicitly discard the in-memory buffer after the user confirms a
+    /// missing-file close. Normal close never takes this destructive path.
+    func discardAndClose() {
+        clearBuffer()
     }
 
     /// Call after `text` has already been updated (e.g. via Binding).
@@ -114,7 +149,7 @@ final class EditorViewModel {
 
         if !FileManager.default.fileExists(atPath: url.path) {
             if force {
-                return writeToDisk(url)
+                return writeToDisk(url, force: true)
             }
             hasMissingFile = true
             lastSaveFailed = true
@@ -127,7 +162,7 @@ final class EditorViewModel {
             return false
         }
 
-        return writeToDisk(url)
+        return writeToDisk(url, force: force)
     }
 
     /// Discard the in-memory buffer and re-read from disk (Reload Theirs).
@@ -148,19 +183,89 @@ final class EditorViewModel {
             refreshFileDates(for: url, markSavedNow: false)
             return true
         } catch {
+            hasExternalConflict = false
+            if !FileManager.default.fileExists(atPath: url.path) {
+                hasMissingFile = true
+                lastSaveFailed = true
+            }
             lastError = (.openNote, error)
             return false
         }
     }
 
-    private func writeToDisk(_ url: URL) -> Bool {
+    private func writeToDisk(_ url: URL, force: Bool) -> Bool {
         do {
             // Ensure parent exists when force-recreating after a move/delete.
             let parent = url.deletingLastPathComponent()
+            guard !FileSystemVault.hasSymlink(parent), !FileSystemVault.hasSymlink(url) else {
+                throw CocoaError(.fileWriteNoPermission)
+            }
+            if let vaultRoot, !FileSystemVault.isSafePath(url, within: vaultRoot) {
+                throw CocoaError(.fileWriteNoPermission)
+            }
             if !FileManager.default.fileExists(atPath: parent.path) {
                 try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
             }
-            try text.write(to: url, atomically: true, encoding: .utf8)
+
+            var coordinationError: NSError?
+            var writeError: Error?
+            var didWrite = false
+            var detectedConflict = false
+            let itemExists = FileManager.default.fileExists(atPath: url.path)
+            if force, !itemExists {
+                // There is no existing item for NSFileCoordinator to lock;
+                // force-recreate is an explicit choice, so create it directly.
+                try text.write(to: url, atomically: true, encoding: .utf8)
+                didWrite = true
+            } else {
+                let options: NSFileCoordinator.WritingOptions = itemExists ? .forReplacing : []
+
+                // Re-check inside the coordinated write. This closes the obvious
+                // check-then-write window for cooperating file presenters; a
+                // non-cooperating process can still race at the filesystem level.
+                NSFileCoordinator(filePresenter: nil).coordinate(
+                    writingItemAt: url,
+                    options: options,
+                    error: &coordinationError
+                ) { coordinatedURL in
+                    if !force {
+                        guard let known = diskSnapshot, known.path == url.path else {
+                            detectedConflict = true
+                            return
+                        }
+                        guard let current = Self.captureSnapshot(of: coordinatedURL) else {
+                            hasMissingFile = true
+                            lastSaveFailed = true
+                            detectedConflict = true
+                            return
+                        }
+                        guard current.hasSameFileIdentity(as: known) else {
+                            hasExternalConflict = true
+                            conflictDeferred = false
+                            detectedConflict = true
+                            return
+                        }
+                    }
+
+                    do {
+                        try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
+                        didWrite = true
+                    } catch {
+                        writeError = error
+                    }
+                }
+            }
+
+            if detectedConflict {
+                if !hasMissingFile {
+                    hasExternalConflict = true
+                    conflictDeferred = false
+                }
+                return false
+            }
+            guard didWrite else {
+                throw coordinationError ?? writeError ?? CocoaError(.fileWriteUnknown)
+            }
             isDirty = false
             lastError = nil
             lastSaveFailed = false
@@ -209,19 +314,13 @@ final class EditorViewModel {
     }
 
     private func hasDiskChanged(relativeTo url: URL) -> Bool {
-        guard let known = diskSnapshot, known.path == url.path else { return false }
-        guard let current = Self.fileIdentity(of: url) else { return false }
-        if abs(current.date.timeIntervalSince(known.date)) > 0.001 { return true }
-        if current.size != known.size { return true }
-        return false
+        guard let known = diskSnapshot, known.path == url.path else { return true }
+        guard let current = Self.captureSnapshot(of: url) else { return true }
+        return !current.hasSameFileIdentity(as: known)
     }
 
     private func rememberDiskSnapshot(for url: URL) {
-        if let id = Self.fileIdentity(of: url) {
-            diskSnapshot = (url.path, id.date, id.size)
-        } else {
-            diskSnapshot = nil
-        }
+        diskSnapshot = Self.captureSnapshot(of: url)
     }
 
     static func modificationDate(of url: URL) -> Date? {
@@ -229,14 +328,41 @@ final class EditorViewModel {
     }
 
     static func fileIdentity(of url: URL) -> (date: Date, size: Int)? {
-        // Resource values are cached on the URL; always re-stat for conflict checks.
-        var fresh = url
-        fresh.removeCachedResourceValue(forKey: .contentModificationDateKey)
-        fresh.removeCachedResourceValue(forKey: .fileSizeKey)
-        let values = try? fresh.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-        guard let date = values?.contentModificationDate else { return nil }
-        let size = values?.fileSize ?? 0
-        return (date, size)
+        guard let metadata = metadata(of: url) else { return nil }
+        return (metadata.date, metadata.size)
+    }
+
+    private static func metadata(of url: URL) -> FileMetadata? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let date = attributes[.modificationDate] as? Date,
+              let size = (attributes[.size] as? NSNumber)?.intValue else {
+            return nil
+        }
+        let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value
+        let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
+        return FileMetadata(date: date, size: size, device: device, inode: inode)
+    }
+
+    private static func captureSnapshot(of url: URL) -> DiskSnapshot? {
+        // Retry once if metadata changes while the bytes are being read so the
+        // saved identity cannot combine one version's metadata with another's.
+        for _ in 0..<2 {
+            guard let before = metadata(of: url),
+                  let content = try? Data(contentsOf: url),
+                  let after = metadata(of: url),
+                  before == after else {
+                continue
+            }
+            return DiskSnapshot(
+                path: url.path,
+                date: after.date,
+                size: after.size,
+                device: after.device,
+                inode: after.inode,
+                content: content
+            )
+        }
+        return nil
     }
 
     private func scheduleAutosave() {

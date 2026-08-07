@@ -27,6 +27,9 @@ enum FilenameValidation {
         if trimmed == ".." || trimmed == "." {
             return .invalid("That name isn't valid.")
         }
+        if isDirectory, trimmed.caseInsensitiveCompare("_attachments") == .orderedSame {
+            return .invalid("That name is reserved for Lyra attachments.")
+        }
         if !isDirectory, !trimmed.lowercased().hasSuffix(".md") {
             trimmed += ".md"
         }

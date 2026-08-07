@@ -73,6 +73,54 @@ final class MarkdownImagePathTests: XCTestCase {
         XCTAssertEqual(url?.path, absFile.path)
     }
 
+    func testRejectAbsolutePathOutsideVault() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outside = root.deletingLastPathComponent()
+            .appendingPathComponent("lyra-outside-\(UUID().uuidString).png")
+        try Data([0x01]).write(to: outside)
+        defer { try? FileManager.default.removeItem(at: outside) }
+
+        XCTAssertNil(
+            MarkdownImagePath.resolve(
+                path: outside.path,
+                noteDirectory: root,
+                vaultRoot: root
+            )
+        )
+    }
+
+    func testRejectsNoteRelativePathThatEscapesVault() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let outside = root.deletingLastPathComponent()
+            .appendingPathComponent("lyra-outside-relative-\(UUID().uuidString).png")
+        try Data([0x01]).write(to: outside)
+        defer { try? FileManager.default.removeItem(at: outside) }
+
+        let noteDir = root.appendingPathComponent("notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+        XCTAssertNil(
+            MarkdownImagePath.resolve(
+                path: "../../\(outside.lastPathComponent)",
+                noteDirectory: noteDir,
+                vaultRoot: root
+            )
+        )
+    }
+
     func testResolveMissingReturnsNil() {
         let vault = URL(fileURLWithPath: "/tmp/lyra-missing-vault-\(UUID().uuidString)")
         let noteDir = vault.appendingPathComponent("notes")
@@ -94,6 +142,23 @@ final class MarkdownImagePathTests: XCTestCase {
         let r = MarkdownImagePath.parseImageLine("![](_attachments/y.png)")
         XCTAssertEqual(r?.alt, "")
         XCTAssertEqual(r?.path, "_attachments/y.png")
+    }
+
+    func testParseImageLineWithParenthesesAndTitle() {
+        let r = MarkdownImagePath.parseImageLine("![shot](images/photo(1).png \"preview image\")")
+        XCTAssertEqual(r?.alt, "shot")
+        XCTAssertEqual(r?.path, "images/photo(1).png")
+    }
+
+    func testParseAngleImageDestinationWithTitle() {
+        let r = MarkdownImagePath.parseImageLine("![shot](<images/photo one.png> 'preview')")
+        XCTAssertEqual(r?.alt, "shot")
+        XCTAssertEqual(r?.path, "images/photo one.png")
+    }
+
+    func testParseImageDestinationUnescapesMarkdownPunctuation() {
+        let r = MarkdownImagePath.parseImageLine("![shot](images/photo\\ (1).png)")
+        XCTAssertEqual(r?.path, "images/photo (1).png")
     }
 
     func testParseImageLineRejectsPartial() {
