@@ -12,14 +12,15 @@ enum VaultNotePicker {
         panel.directoryURL = vaultRoot
         panel.prompt = "Open"
         panel.message = message ?? "Choose a Markdown note"
-        panel.allowedContentTypes = [.text, .plainText]
         if let md = UTType(filenameExtension: "md") {
-            panel.allowedContentTypes.append(md)
+            panel.allowedContentTypes = [md]
+        } else {
+            panel.allowedContentTypes = []
         }
-        // Prefer showing .md; still allow other text the vault may hold.
         panel.allowsOtherFileTypes = false
 
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        guard url.pathExtension.lowercased() == "md" else { return nil }
 
         let rootPath = vaultRoot.resolvingSymlinksInPath().standardizedFileURL.path
         let chosenPath = url.resolvingSymlinksInPath().standardizedFileURL.path

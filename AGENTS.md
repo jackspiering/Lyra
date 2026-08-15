@@ -4,7 +4,11 @@ This repository is designed so coding agents can extend Lyra safely.
 
 ## What Lyra is
 
-Native **macOS-only** Markdown vault editor. Local folders of plain `.md` files. No Electron, no cloud sync, no database, no proprietary formats.
+Native **macOS-only** PKM over a folder of Markdown. Writing is first. The PKM surface is wiki links, backlinks, and in-memory full-text search. That surface is how a person leaves Obsidian without Electron. Notes are UTF-8 `.md` files. No cloud, no sidecar database, no proprietary format.
+
+A note’s identity is its **filename**. The first `#` heading is content, not the name.
+
+`docs/architecture.md` records the decisions. Do not implement a banned item.
 
 ## Module map
 
@@ -25,11 +29,11 @@ One primary type per file when practical. Keep files small.
 
 ## Invariants (do not break)
 
-1. **Disk is source of truth** — UTF-8 `.md` files; no sidecar DB.
+1. **Disk is source of truth** — UTF-8 `.md` files. No sidecar DB. An in-memory wiki or search map that is rebuilt on scan is allowed. A persisted index is not.
 2. **macOS only** — no iOS targets or multiplatform abstractions “just in case.”
 3. **No Electron / no web-first UI** — SwiftUI + AppKit. WebKit only as a last-resort fallback, documented in `docs/architecture.md`.
 4. **Sandbox-friendly** — security-scoped bookmarks for user-selected vault folders.
-5. **YAGNI** — no plugins, graph view, sync, tags index, or theme marketplace unless a human explicitly asks.
+5. **YAGNI** — no plugins, graph view, sync, tag index, theme marketplace, daily notes, frontmatter UI, embeds, heading fragments, or WYSIWYG unless a human explicitly asks.
 
 ## Coding standards
 
@@ -50,7 +54,9 @@ One primary type per file when practical. Keep files small.
 
 ## Non-goals
 
-Plugins, graph, full-text search index, cloud, accounts, iOS, full WYSIWYG, UI test suites (unless asked).
+Plugins, graph view, cloud, accounts, sync, tag index, theme marketplace, iOS, full WYSIWYG, persisted full-text index, daily notes, frontmatter property UI, `![[embeds]]`, `[[Note#heading]]`, UI test suites (unless asked).
+
+In the product: path-aware wiki, backlinks inspector, in-memory full-text search, in-note find.
 
 ## Testing
 
@@ -62,7 +68,7 @@ xcodebuild -scheme Lyra -destination 'platform=macOS' test
 bash Scripts/xcode-test.sh
 ```
 
-Prefer tests for: wiki resolution, ignore rules, `Untitled` naming, attachment helpers, block ranges, error copy.
+Prefer tests for: wiki resolution, aliases, ignore rules, `Untitled` naming, attachment helpers, block ranges, error copy, full-text snippets.
 
 ## Prefer the simplest working change
 

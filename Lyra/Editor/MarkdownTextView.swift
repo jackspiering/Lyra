@@ -8,6 +8,10 @@ struct MarkdownTextView: NSViewRepresentable {
     var noteURL: URL?
     var onEdit: () -> Void
     var onPasteError: ((String) -> Void)?
+    /// Command-click a `[[wiki]]` span.
+    var onWikiLink: ((String) -> Void)?
+    /// Bumped to show the system find bar (⌘F).
+    var findBarToken: Int = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -41,9 +45,14 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.vaultRoot = vaultRoot
         textView.noteURL = noteURL
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         let coordinator = context.coordinator
         textView.onPasteError = { message in
             coordinator.parent.onPasteError?(message)
+        }
+        textView.onWikiLink = { name in
+            coordinator.parent.onWikiLink?(name)
         }
 
         let scrollView = NSScrollView()
@@ -70,18 +79,38 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.onPasteError = { message in
             coordinator.parent.onPasteError?(message)
         }
+        textView.onWikiLink = { name in
+            coordinator.parent.onWikiLink?(name)
+        }
         if textView.string != text {
             context.coordinator.loadDocument(text)
+        }
+        if context.coordinator.lastFindBarToken != findBarToken {
+            context.coordinator.lastFindBarToken = findBarToken
+            if findBarToken > 0 {
+                context.coordinator.showFindBar()
+            }
         }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate, NSTextStorageDelegate {
         var parent: MarkdownTextView
         weak var textView: LyraTextView?
+        var lastFindBarToken = 0
         private var isApplying = false
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
+        }
+
+        func showFindBar() {
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            textView.usesFindBar = true
+            textView.isIncrementalSearchingEnabled = true
+            let sender = NSMenuItem()
+            sender.tag = Int(NSFindPanelAction.showFindPanel.rawValue)
+            textView.performFindPanelAction(sender)
         }
 
         /// Replace document contents (note switch / external binding). Not used on keystrokes.
@@ -129,6 +158,19 @@ final class LyraTextView: NSTextView {
     var vaultRoot: URL?
     var noteURL: URL?
     var onPasteError: ((String) -> Void)?
+    var onWikiLink: ((String) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.command), let onWikiLink {
+            let point = convert(event.locationInWindow, from: nil)
+            let index = characterIndexForInsertion(at: point)
+            if let match = WikiLinkSyntax.link(atUTF16Offset: index, in: string) {
+                onWikiLink(match.inner)
+                return
+            }
+        }
+        super.mouseDown(with: event)
+    }
 
     override func paste(_ sender: Any?) {
         if pasteImageIfPossible() { return }

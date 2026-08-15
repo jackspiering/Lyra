@@ -13,8 +13,12 @@ struct ContentView: View {
     @State private var showNewNoteSheet = false
     @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
-    /// Bumped when ⌘F / Find in Vault targets this window so the sidebar focuses search.
-    @State private var vaultSearchFocusToken = 0
+    /// Bumped when ⌘F should show the Source find bar.
+    @State private var findBarToken = 0
+    @State private var wikiPrompt: WikiFollowPrompt?
+    @State private var showVaultSearch = false
+    @State private var vaultSearchQuery = ""
+    @SceneStorage("lyra.showBacklinks") private var showBacklinks = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var noteViewMode: NoteViewMode {
@@ -65,7 +69,9 @@ struct ContentView: View {
                 beginNewNote: beginNewNote,
                 requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
-                focusVaultSearch: { vaultSearchFocusToken += 1 },
+                findInNote: findInNote,
+                findInVault: { showVaultSearch = true },
+                toggleBacklinks: { showBacklinks.toggle() },
                 newTab: newTab,
                 openInNewTab: openSelectionInNewTab,
                 closeTab: { closeTab(id: tabs.selectedTabID) },
@@ -103,10 +109,7 @@ struct ContentView: View {
                 onCommitRename: commitSidebarRename,
                 onRequestDelete: requestDelete,
                 onNewNote: beginNewNote,
-                onExportNotePDF: exportNotePDF,
-                onExportFolderSeparate: exportFolderSeparatePDFs,
-                onExportFolderCombined: exportFolderCombinedPDF,
-                searchFocusToken: vaultSearchFocusToken
+                onExportNotePDF: exportNotePDF
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
@@ -134,6 +137,31 @@ struct ContentView: View {
                     }
                 }
         }
+        .sheet(item: $wikiPrompt) { prompt in
+            WikiFollowSheet(
+                prompt: prompt,
+                onPick: { url in
+                    wikiPrompt = nil
+                    openResolvedNote(url)
+                },
+                onCreate: { dest in
+                    wikiPrompt = nil
+                    createWikiNote(at: dest)
+                },
+                onCancel: { wikiPrompt = nil }
+            )
+        }
+        .sheet(isPresented: $showVaultSearch) {
+            VaultSearchPalette(
+                query: $vaultSearchQuery,
+                search: { store.searchNoteBodies(query: $0, liveBodies: liveBodies()) },
+                onOpen: { url in
+                    showVaultSearch = false
+                    openResolvedNote(url)
+                },
+                onClose: { showVaultSearch = false }
+            )
+        }
     }
 
     @ViewBuilder
@@ -156,6 +184,14 @@ struct ContentView: View {
         }
         .disabled(editor.fileURL == nil)
         .help("Export current note to PDF")
+
+        Button {
+            showBacklinks.toggle()
+        } label: {
+            Label("Backlinks", systemImage: "link")
+        }
+        .disabled(editor.fileURL == nil)
+        .help("Show or hide backlinks")
 
         saveStatusLabel
     }
@@ -202,8 +238,19 @@ struct ContentView: View {
                     onCommit: commitNoteTitle
                 )
                 .id(editor.fileURL?.path)
-                noteContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 0) {
+                    noteContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if showBacklinks, let url = editor.fileURL {
+                        Divider()
+                        BacklinksInspector(
+                            items: store.backlinks(to: url, liveBodies: liveBodies()),
+                            onOpen: { openResolvedNote($0) },
+                            onHide: { showBacklinks = false }
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 EditorStatusBar(
                     wordCount: NoteStats.wordCount(editor.text),
                     characterCount: NoteStats.characterCount(editor.text),
@@ -226,7 +273,9 @@ struct ContentView: View {
                 vaultRoot: store.rootURL,
                 noteURL: editor.fileURL,
                 onEdit: { editor.noteEdited() },
-                onPasteError: { store.present(context: .pasteImage, message: $0) }
+                onPasteError: { store.present(context: .pasteImage, message: $0) },
+                onWikiLink: { openWikiLink($0) },
+                findBarToken: findBarToken
             )
             // Per-file identity: reset selection, scroll, and undo when switching notes/tabs.
             .id(editor.fileURL?.path)
@@ -454,7 +503,7 @@ struct ContentView: View {
         return true
     }
 
-    /// Title field commit: sync leading H1 when present; otherwise rename the file stem.
+    /// Title field commit: rename the file. The first heading is not the name.
     private func commitNoteTitle(_ newTitle: String) {
         guard editor.fileURL != nil else { return }
         let result = NoteTitle.applyingTitle(newTitle, to: editor.text)
@@ -578,8 +627,25 @@ struct ContentView: View {
     }
 
     private func openWikiLink(_ text: String) {
-        guard let url = store.resolveWikiLink(text) else { return }
-        // activateNote / selectOpenNote open or switch tabs; still flush dirty active first when replacing.
+        switch store.resolveWikiLink(text) {
+        case .unique(let url):
+            openResolvedNote(url)
+        case .ambiguous(let candidates):
+            wikiPrompt = .pick(query: text, candidates: candidates)
+        case .unresolved:
+            guard let root = store.rootURL,
+                  let dest = WikiLinkSyntax.destinationURL(
+                    target: WikiLinkSyntax.parseInner(text).target,
+                    vaultRoot: root,
+                    linkingNoteURL: editor.fileURL
+                  ) else {
+                return
+            }
+            wikiPrompt = .create(query: text, destination: dest)
+        }
+    }
+
+    private func openResolvedNote(_ url: URL) {
         if tabs.selectOpenNote(path: url.path) {
             store.selection = url.path
             return
@@ -590,6 +656,30 @@ struct ContentView: View {
         }
         store.selection = url.path
         activateNote(url: url)
+    }
+
+    private func createWikiNote(at dest: URL) {
+        guard editor.saveIfNeeded() else {
+            flushEditorError()
+            return
+        }
+        guard store.createNote(at: dest) else { return }
+        store.selection = dest.path
+        activateNote(url: dest)
+    }
+
+    private func findInNote() {
+        guard noteViewMode == .source, editor.fileURL != nil else { return }
+        findBarToken += 1
+    }
+
+    private func liveBodies() -> [String: String] {
+        var bodies: [String: String] = [:]
+        for tab in tabs.tabs {
+            guard let path = tab.editor.fileURL?.path else { continue }
+            bodies[path] = tab.editor.text
+        }
+        return bodies
     }
 
     private func exportPDF() {
@@ -626,111 +716,6 @@ struct ContentView: View {
         )
     }
 
-    private func exportFolderSeparatePDFs(_ folder: VaultNode) {
-        guard folder.isDirectory, let vault = store.rootURL else { return }
-        let notes = FileSystemVault.collectNoteURLs(from: folder)
-        guard !notes.isEmpty else {
-            store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
-            return
-        }
-        let liveBuffers = exportBufferSnapshot()
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = "Export Here"
-        panel.message = "Choose a folder for \(notes.count) PDF file(s)."
-        panel.begin { resp in
-            guard resp == .OK, let dest = panel.url else { return }
-            Task { @MainActor in
-                let failures = await Task.detached(priority: .userInitiated) {
-                    var failures = 0
-                    for noteURL in notes {
-                        do {
-                            let markdown: String
-                            if let live = liveBuffers[noteURL.path] {
-                                markdown = live
-                            } else {
-                                markdown = try String(contentsOf: noteURL, encoding: .utf8)
-                            }
-                            let data = try NotePDFExporter.pdfData(
-                                markdown: markdown,
-                                noteDirectory: noteURL.deletingLastPathComponent(),
-                                vaultRoot: vault
-                            )
-                            let base = noteURL.deletingPathExtension().lastPathComponent
-                            var out = dest.appendingPathComponent("\(base).pdf")
-                            var n = 2
-                            while FileManager.default.fileExists(atPath: out.path) {
-                                out = dest.appendingPathComponent("\(base)-\(n).pdf")
-                                n += 1
-                            }
-                            try data.write(to: out, options: .atomic)
-                        } catch {
-                            failures += 1
-                        }
-                    }
-                    return failures
-                }.value
-                if failures > 0 {
-                    store.present(
-                        context: .exportPDF,
-                        message: "Exported with \(failures) failure(s). Check permissions and disk space."
-                    )
-                }
-            }
-        }
-    }
-
-    private func exportFolderCombinedPDF(_ folder: VaultNode) {
-        guard folder.isDirectory, let vault = store.rootURL else { return }
-        let notes = FileSystemVault.collectNoteURLs(from: folder).sorted {
-            $0.path.localizedStandardCompare($1.path) == .orderedAscending
-        }
-        guard !notes.isEmpty else {
-            store.present(context: .exportPDF, message: "This folder has no Markdown notes to export.")
-            return
-        }
-        let liveBuffers = exportBufferSnapshot()
-        Task { @MainActor in
-            do {
-                let data = try await Task.detached(priority: .userInitiated) {
-                    var sources: [NotePDFExporter.NoteSource] = []
-                    for noteURL in notes {
-                        let markdown: String
-                        if let live = liveBuffers[noteURL.path] {
-                            markdown = live
-                        } else {
-                            markdown = try String(contentsOf: noteURL, encoding: .utf8)
-                        }
-                        sources.append(
-                            NotePDFExporter.NoteSource(
-                                title: noteURL.deletingPathExtension().lastPathComponent,
-                                markdown: markdown,
-                                noteDirectory: noteURL.deletingLastPathComponent()
-                            )
-                        )
-                    }
-                    return try NotePDFExporter.pdfData(notes: sources, vaultRoot: vault)
-                }.value
-                let panel = NSSavePanel()
-                panel.allowedContentTypes = [.pdf]
-                panel.nameFieldStringValue = folder.name + ".pdf"
-                panel.directoryURL = folder.url
-                panel.begin { resp in
-                    guard resp == .OK, let url = panel.url else { return }
-                    do {
-                        try data.write(to: url, options: .atomic)
-                    } catch {
-                        store.present(error: error, context: .exportPDF)
-                    }
-                }
-            } catch {
-                store.present(error: error, context: .exportPDF)
-            }
-        }
-    }
-
     private func exportMarkdown(
         _ markdown: String,
         noteDirectory: URL,
@@ -763,17 +748,6 @@ struct ContentView: View {
                 store.present(error: error, context: .exportPDF)
             }
         }
-    }
-
-    private func exportBufferSnapshot() -> [String: String] {
-        var buffers: [String: String] = [:]
-        for tab in tabs.tabs {
-            guard let path = tab.editor.fileURL?.path else { continue }
-            _ = tab.editor.saveIfNeeded()
-            flushEditorError(for: tab.editor)
-            buffers[path] = tab.editor.text
-        }
-        return buffers
     }
 
 }

@@ -7,10 +7,6 @@ struct SidebarView: View {
     var onRequestDelete: () -> Void = {}
     var onNewNote: () -> Void = {}
     var onExportNotePDF: (VaultNode) -> Void = { _ in }
-    var onExportFolderSeparate: (VaultNode) -> Void = { _ in }
-    var onExportFolderCombined: (VaultNode) -> Void = { _ in }
-    /// Bumped by ContentView when ⌘F / Find in Vault targets this window.
-    var searchFocusToken: Int = 0
 
     @State private var query: String = ""
     @State private var renamingID: VaultNode.ID?
@@ -18,7 +14,6 @@ struct SidebarView: View {
     /// When true, focus-loss must not commit (Escape / selection change / successful commit cleanup).
     @State private var suppressFocusCommit = false
     @FocusState private var renameFieldFocused: Bool
-    @FocusState private var searchFieldFocused: Bool
 
     private var displayRoot: VaultNode? {
         guard let root = store.rootNode else { return nil }
@@ -31,18 +26,14 @@ struct SidebarView: View {
             Divider()
             treeList
         }
-        .onChange(of: searchFocusToken) { _, _ in
-            searchFieldFocused = true
-        }
     }
 
     private var searchField: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
+            Image(systemName: "line.3.horizontal.decrease.circle")
                 .foregroundStyle(.secondary)
-            TextField("Search", text: $query)
+            TextField("Filter", text: $query)
                 .textFieldStyle(.plain)
-                .focused($searchFieldFocused)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -93,15 +84,6 @@ struct SidebarView: View {
                     Button("New Folder") {
                         store.selection = id
                         store.createFolder()
-                    }
-                    Divider()
-                    Button("Export All to Separate PDFs…") {
-                        store.selection = id
-                        onExportFolderSeparate(node)
-                    }
-                    Button("Export All to Single PDF…") {
-                        store.selection = id
-                        onExportFolderCombined(node)
                     }
                     Divider()
                 } else {

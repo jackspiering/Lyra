@@ -5,8 +5,8 @@
 <h1 align="center">Lyra</h1>
 
 <p align="center">
-  <strong>A native macOS editor for local Markdown vaults.</strong><br>
-  Edit plain files, follow wiki links, preview notes, and export PDFs.
+  <strong>A native Mac PKM over a folder of Markdown.</strong><br>
+  Write in Source. Review in Reading. Keep plain files on disk.
 </p>
 
 <p align="center">
@@ -15,38 +15,43 @@
   </a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version 0.9.3" src="https://img.shields.io/badge/version-0.9.3-informational?style=flat-square">
+  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-informational?style=flat-square">
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   </a>
 </p>
 
-Lyra is for people who want a focused writing environment without giving up ownership of their files. A vault is a folder on your Mac. Notes remain UTF-8 Markdown files that work with Git, Finder, scripts, and other editors.
+Lyra is for people who leave Electron or Obsidian and still want a folder of notes. A vault is a folder on your Mac. Notes stay UTF-8 Markdown files. Git, Finder, scripts, and other editors can read them.
+
+Writing is the first job. Wiki links and the vault tree support that job. They are not a second product.
 
 ## Why Lyra
 
 - **File-first:** No database, proprietary format, cloud account, or lock-in.
-- **Native:** SwiftUI and AppKit provide a Mac app with a real menu bar, windows, TextKit editing, and sandbox support.
-- **Focused:** Source and Reading modes keep writing and review in one workspace.
+- **Native:** SwiftUI and AppKit. A real menu bar, windows, TextKit editing, and sandbox support.
+- **Writing first:** Source and Reading stay in one window. You draft in Source. You review in Reading.
 - **Durable:** Autosave, external-edit detection, missing-file recovery, and guarded window closing protect in-memory work.
-- **Portable:** Wiki links, relative images, attachments, and PDF export work with ordinary Markdown conventions.
+- **Local:** Wiki links, relative images, attachments, and PDF use ordinary Markdown conventions.
 
 ## Download
 
-Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.9.3), then drag Lyra to Applications.
+Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.10.0), then drag Lyra to Applications.
 
 The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
 ## Features
 
-- **Source mode:** TextKit editing with Markdown syntax highlighting, undo, autosave, and standard text editing behavior.
-- **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links.
+- **Source mode:** TextKit editing with Markdown syntax highlighting, undo, autosave, and standard text editing behavior. Command-click a wiki link to follow it.
+- **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links. Reading is not editable.
 - **Note tabs:** Open multiple notes inside one vault window without losing the sidebar.
 - **Multiple vaults:** Open separate vault folders in separate windows.
-- **Vault search:** Filter the sidebar by note name or path. Search is local and does not build a full-text index.
-- **Wiki links:** Resolve `[[Note Name]]` and `[[Note Name.md]]` links inside the current vault.
+- **Filename identity:** The title bar and tab show the file stem. Editing the title renames the file. The first heading is content only.
+- **Sidebar filter:** Filter the sidebar by note name or path. This is not Find.
+- **Find:** Command-F finds text in the open note. Shift-Command-F searches note bodies in memory and shows a path plus one snippet.
+- **Wiki links:** Path-aware `[[Note]]`, `[[Folder/Note]]`, and `[[path|alias]]`. A leading YAML `aliases:` list adds extra names. If more than one note matches, pick from a list. Lyra does not guess. An unresolved link can create a file after you confirm.
+- **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. There is no graph view.
 - **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link.
-- **PDF export:** Export one note, a folder of notes, or a combined folder document.
+- **PDF export:** Export the open note.
 - **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window.
 - **Preferences:** Configure appearance, new-note naming, and Trash confirmations.
 
@@ -56,7 +61,7 @@ The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS 
 2. Select a folder containing Markdown notes.
 3. Select a note in the sidebar.
 4. Edit in **Source** mode or review in **Reading** mode.
-5. Use **File > Export PDF** when you need a printable copy.
+5. Use **File > Export PDF** when you need a printable copy of the open note.
 
 ### Keyboard Shortcuts
 
@@ -70,7 +75,8 @@ The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS 
 | Command-E | Toggle Source and Reading modes |
 | Command-S | Save the current note |
 | Command-R | Refresh the vault from disk |
-| Command-F | Focus vault search |
+| Command-F | Find in the open note |
+| Shift-Command-F | Search note bodies in the vault |
 | Command-Delete | Move the selected item to Trash |
 
 Autosave runs after approximately 500 milliseconds of inactivity. If a note changes outside Lyra, the editor presents Keep Mine and Reload Theirs options. Dirty windows stay open until their buffers save or you explicitly choose a recovery action.
@@ -143,7 +149,20 @@ Release packaging details are documented in [docs/ci.md](docs/ci.md).
 
 ## Scope
 
-Lyra intentionally stays small and local. Plugins, graph views, cloud sync, accounts, tag indexes, iOS support, and full WYSIWYG round-tripping are outside the current scope.
+Lyra stays small and local. These items are out of scope:
+
+- Plugins
+- Graph views
+- Cloud sync, accounts, and CRDT sync
+- Tag indexes
+- Theme marketplace
+- iOS
+- Full WYSIWYG
+- Daily notes
+- Frontmatter property UI
+- Embeds (`![[Note]]`)
+- Heading fragments (`[[Note#heading]]`)
+- A full-text index on disk
 
 ## Contributing
 

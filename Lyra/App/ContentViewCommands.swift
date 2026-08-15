@@ -15,7 +15,9 @@ struct ContentViewCommands: ViewModifier {
     var refresh: () -> Void
     var save: () -> Void
     var quitSaveFailed: ([EditorViewModel]) -> Void
-    var focusVaultSearch: () -> Void
+    var findInNote: () -> Void
+    var findInVault: () -> Void
+    var toggleBacklinks: () -> Void
     var newTab: () -> Void
     var openInNewTab: () -> Void
     var closeTab: () -> Void
@@ -58,9 +60,17 @@ struct ContentViewCommands: ViewModifier {
                 guard shouldHandle() else { return }
                 requestDelete()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .lyraFocusVaultSearch)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .lyraFindInNote)) { _ in
                 guard shouldHandle() else { return }
-                focusVaultSearch()
+                findInNote()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraFindInVault)) { _ in
+                guard shouldHandle() else { return }
+                findInVault()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .lyraToggleBacklinks)) { _ in
+                guard shouldHandle() else { return }
+                toggleBacklinks()
             }
             .onReceive(NotificationCenter.default.publisher(for: .lyraNewTab)) { _ in
                 guard shouldHandle() else { return }
