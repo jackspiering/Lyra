@@ -16,7 +16,9 @@ struct ContentViewChrome: ViewModifier {
     var beginNewNote: () -> Void
     var requestDelete: () -> Void
     var toggleViewMode: () -> Void
-    var focusVaultSearch: () -> Void
+    var findInNote: () -> Void
+    var findInVault: () -> Void
+    var toggleBacklinks: () -> Void
     var newTab: () -> Void
     var openInNewTab: () -> Void
     var closeTab: () -> Void
@@ -39,7 +41,9 @@ struct ContentViewChrome: ViewModifier {
         beginNewNote: @escaping () -> Void,
         requestDelete: @escaping () -> Void,
         toggleViewMode: @escaping () -> Void,
-        focusVaultSearch: @escaping () -> Void,
+        findInNote: @escaping () -> Void,
+        findInVault: @escaping () -> Void,
+        toggleBacklinks: @escaping () -> Void,
         newTab: @escaping () -> Void,
         openInNewTab: @escaping () -> Void,
         closeTab: @escaping () -> Void,
@@ -61,7 +65,9 @@ struct ContentViewChrome: ViewModifier {
         self.beginNewNote = beginNewNote
         self.requestDelete = requestDelete
         self.toggleViewMode = toggleViewMode
-        self.focusVaultSearch = focusVaultSearch
+        self.findInNote = findInNote
+        self.findInVault = findInVault
+        self.toggleBacklinks = toggleBacklinks
         self.newTab = newTab
         self.openInNewTab = openInNewTab
         self.closeTab = closeTab
@@ -102,7 +108,9 @@ struct ContentViewChrome: ViewModifier {
                     flushEditorError()
                 },
                 quitSaveFailed: quitSaveFailed,
-                focusVaultSearch: focusVaultSearch,
+                findInNote: findInNote,
+                findInVault: findInVault,
+                toggleBacklinks: toggleBacklinks,
                 newTab: newTab,
                 openInNewTab: openInNewTab,
                 closeTab: closeTab

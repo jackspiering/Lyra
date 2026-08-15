@@ -18,7 +18,9 @@ final class VaultStore {
     /// Alert body (plain language).
     var errorMessage: String?
     private var isAccessingSecurityScope = false
-    private var wikiResolver = WikiLinkResolver(noteURLs: [])
+    private var wikiResolver = WikiLinkResolver()
+    private var searchDocuments: [VaultFullTextSearch.Document] = []
+    private var noteBodiesByPath: [String: String] = [:]
     /// Drops stale async scan results when a newer refresh was requested.
     private var refreshGeneration = 0
     private var refreshTask: Task<Void, Never>?
@@ -91,18 +93,43 @@ final class VaultStore {
         refreshTask = Task { [weak self] in
             do {
                 let scanTask = Task.detached(priority: .userInitiated) {
-                    try FileSystemVault.scan(root: url, shouldCancel: { Task.isCancelled })
+                    let node = try FileSystemVault.scan(root: url, shouldCancel: { Task.isCancelled })
+                    let noteURLs = FileSystemVault.collectNoteURLs(from: node)
+                    var notes: [WikiNote] = []
+                    var documents: [VaultFullTextSearch.Document] = []
+                    var bodies: [String: String] = [:]
+                    for noteURL in noteURLs {
+                        if Task.isCancelled { throw CancellationError() }
+                        let body = (try? String(contentsOf: noteURL, encoding: .utf8)) ?? ""
+                        let relative = WikiLinkSyntax.relativePath(for: noteURL, vaultRoot: url)
+                        notes.append(
+                            WikiNote(
+                                url: noteURL,
+                                relativePath: relative,
+                                aliases: FrontmatterAliases.parse(from: body)
+                            )
+                        )
+                        documents.append(
+                            VaultFullTextSearch.Document(
+                                url: noteURL,
+                                relativePath: relative,
+                                body: body
+                            )
+                        )
+                        bodies[noteURL.path] = body
+                    }
+                    return (node, notes, documents, bodies)
                 }
-                let node = try await withTaskCancellationHandler(
+                let (node, notes, documents, bodies) = try await withTaskCancellationHandler(
                     operation: { try await scanTask.value },
                     onCancel: { scanTask.cancel() }
                 )
                 try Task.checkCancellation()
                 guard let self, generation == self.refreshGeneration else { return }
                 self.rootNode = node
-                self.wikiResolver = WikiLinkResolver(
-                    noteURLs: FileSystemVault.collectNoteURLs(from: node)
-                )
+                self.wikiResolver = WikiLinkResolver(notes: notes)
+                self.searchDocuments = documents
+                self.noteBodiesByPath = bodies
                 // Apply pending selection only after the tree contains the new path.
                 if let pending = self.pendingSelection {
                     self.selection = pending
@@ -114,7 +141,9 @@ final class VaultStore {
                 self.rootNode = nil
                 self.selection = nil
                 self.pendingSelection = nil
-                self.wikiResolver = WikiLinkResolver(noteURLs: [])
+                self.wikiResolver = WikiLinkResolver()
+                self.searchDocuments = []
+                self.noteBodiesByPath = [:]
                 self.present(error: error, context: .readVault)
             }
         }
@@ -130,8 +159,91 @@ final class VaultStore {
         return node.url
     }
 
-    func resolveWikiLink(_ text: String) -> URL? {
+    func resolveWikiLink(_ text: String) -> WikiResolveResult {
         wikiResolver.resolve(text)
+    }
+
+    func backlinks(to url: URL, liveBodies: [String: String]) -> [WikiCandidate] {
+        var bodies: [URL: String] = [:]
+        for doc in searchDocuments {
+            bodies[doc.url] = liveBodies[doc.url.path] ?? noteBodiesByPath[doc.url.path] ?? doc.body
+        }
+        return wikiResolver.backlinks(to: url, bodies: bodies)
+    }
+
+    func searchNoteBodies(query: String, liveBodies: [String: String]) -> [VaultFullTextSearch.Hit] {
+        let documents = searchDocuments.map { doc in
+            var copy = doc
+            if let live = liveBodies[doc.url.path] {
+                copy.body = live
+            }
+            return copy
+        }
+        return VaultFullTextSearch.search(documents: documents, query: query)
+    }
+
+    /// Creates a note at an explicit vault path (wiki Create). Intermediate folders are created.
+    @discardableResult
+    func createNote(at dest: URL) -> Bool {
+        guard let rootURL else { return false }
+        guard dest.pathExtension.lowercased() == "md" else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "New notes must be Markdown files."
+                )
+            )
+            return false
+        }
+        guard FileSystemVault.isWithin(dest, root: rootURL),
+              !FileSystemVault.hasSymlink(dest, relativeTo: rootURL) else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The destination is not inside this vault."
+                )
+            )
+            return false
+        }
+        if FileManager.default.fileExists(atPath: dest.path) {
+            pendingSelection = dest.path
+            refresh()
+            return true
+        }
+        let parent = dest.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        } catch {
+            present(error: error, context: .createNote)
+            return false
+        }
+        guard FileSystemVault.isSafeDirectory(parent, within: rootURL) else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The destination is no longer available inside this vault."
+                )
+            )
+            return false
+        }
+        let ok = FileManager.default.createFile(atPath: dest.path, contents: Data(), attributes: nil)
+        if !ok {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "Lyra couldn't create a new Markdown file in this folder."
+                )
+            )
+            return false
+        }
+        lastCreateParentPath = parent.path
+        pendingSelection = dest.path
+        refresh()
+        return true
     }
 
     /// Creates a note. `nil` name uses `UntitledName.next` with the preferred stem.

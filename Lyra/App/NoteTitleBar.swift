@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Editable note title above Source / Reading. Commits on Return or focus loss.
 struct NoteTitleBar: View {
-    /// Live display title (H1 or filename stem).
+    /// Live display title (filename stem).
     let title: String
     /// Called with the committed title string (Return / focus loss).
     var onCommit: (String) -> Void
@@ -20,7 +20,7 @@ struct NoteTitleBar: View {
             .onExitCommand { revertAndBlur() }
             .onAppear { draft = title }
             .onChange(of: title) { _, newValue in
-                // Keep draft in sync when H1/filename changes elsewhere, unless the user is editing.
+                // Keep draft in sync when the file is renamed elsewhere, unless the user is editing.
                 if !focused {
                     draft = newValue
                 }

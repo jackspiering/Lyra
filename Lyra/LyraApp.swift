@@ -13,8 +13,12 @@ extension Notification.Name {
     static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
     /// Move the sidebar selection to the Trash (⌘⌫).
     static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
-    /// Focus the sidebar vault name search field (⌘F). No in-note find yet.
-    static let lyraFocusVaultSearch = Notification.Name("lyraFocusVaultSearch")
+    /// Show the Source find bar (⌘F).
+    static let lyraFindInNote = Notification.Name("lyraFindInNote")
+    /// Open in-memory vault full-text search (⇧⌘F).
+    static let lyraFindInVault = Notification.Name("lyraFindInVault")
+    /// Show or hide the backlinks inspector.
+    static let lyraToggleBacklinks = Notification.Name("lyraToggleBacklinks")
     /// New empty note tab in the key vault window (⌘T).
     static let lyraNewTab = Notification.Name("lyraNewTab")
     /// Open the sidebar selection in a new note tab (File → Open in New Tab).
@@ -173,13 +177,21 @@ struct LyraApp: App {
                     NotificationCenter.default.post(name: .lyraToggleViewMode, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: .command)
+
+                Button("Backlinks") {
+                    NotificationCenter.default.post(name: .lyraToggleBacklinks, object: nil)
+                }
             }
-            // `.find` is not a CommandGroupPlacement; hang vault search after text editing.
             CommandGroup(after: .textEditing) {
-                Button("Find in Vault") {
-                    NotificationCenter.default.post(name: .lyraFocusVaultSearch, object: nil)
+                Button("Find…") {
+                    NotificationCenter.default.post(name: .lyraFindInNote, object: nil)
                 }
                 .keyboardShortcut("f", modifiers: .command)
+
+                Button("Search Vault…") {
+                    NotificationCenter.default.post(name: .lyraFindInVault, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
             }
         }
 

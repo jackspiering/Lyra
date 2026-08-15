@@ -69,6 +69,15 @@
 		A1000000000000000000003F /* NoteTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000003F /* NoteTitle.swift */; };
 		A10000000000000000000040 /* NoteTitleBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000040 /* NoteTitleBar.swift */; };
 		A10000000000000000000041 /* NoteTitleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000041 /* NoteTitleTests.swift */; };
+		A10000000000000000000047 /* WikiLinkSyntax.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000047 /* WikiLinkSyntax.swift */; };
+		A10000000000000000000048 /* FrontmatterAliases.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000048 /* FrontmatterAliases.swift */; };
+		A10000000000000000000049 /* VaultFullTextSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000049 /* VaultFullTextSearch.swift */; };
+		A1000000000000000000004A /* WikiFollowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004A /* WikiFollowSheet.swift */; };
+		A1000000000000000000004B /* VaultSearchPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004B /* VaultSearchPalette.swift */; };
+		A1000000000000000000004C /* BacklinksInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004C /* BacklinksInspector.swift */; };
+		A1000000000000000000004D /* WikiLinkSyntaxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004D /* WikiLinkSyntaxTests.swift */; };
+		A1000000000000000000004E /* FrontmatterAliasesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004E /* FrontmatterAliasesTests.swift */; };
+		A1000000000000000000004F /* VaultFullTextSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004F /* VaultFullTextSearchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,6 +157,15 @@
 		B1000000000000000000003F /* NoteTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitle.swift; sourceTree = "<group>"; };
 		B10000000000000000000040 /* NoteTitleBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitleBar.swift; sourceTree = "<group>"; };
 		B10000000000000000000041 /* NoteTitleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTitleTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000047 /* WikiLinkSyntax.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiLinkSyntax.swift; sourceTree = "<group>"; };
+		B10000000000000000000048 /* FrontmatterAliases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterAliases.swift; sourceTree = "<group>"; };
+		B10000000000000000000049 /* VaultFullTextSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFullTextSearch.swift; sourceTree = "<group>"; };
+		B1000000000000000000004A /* WikiFollowSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiFollowSheet.swift; sourceTree = "<group>"; };
+		B1000000000000000000004B /* VaultSearchPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSearchPalette.swift; sourceTree = "<group>"; };
+		B1000000000000000000004C /* BacklinksInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklinksInspector.swift; sourceTree = "<group>"; };
+		B1000000000000000000004D /* WikiLinkSyntaxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiLinkSyntaxTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000004E /* FrontmatterAliasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterAliasesTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000004F /* VaultFullTextSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFullTextSearchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -211,6 +229,9 @@
 				B10000000000000000000038 /* VaultSearchTests.swift */,
 				B1000000000000000000003B /* NoteStatsTests.swift */,
 				B10000000000000000000041 /* NoteTitleTests.swift */,
+				B1000000000000000000004D /* WikiLinkSyntaxTests.swift */,
+				B1000000000000000000004E /* FrontmatterAliasesTests.swift */,
+				B1000000000000000000004F /* VaultFullTextSearchTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -252,6 +273,9 @@
 				B1000000000000000000003E /* EmptyTabView.swift */,
 				B1000000000000000000003F /* NoteTitle.swift */,
 				B10000000000000000000040 /* NoteTitleBar.swift */,
+				B1000000000000000000004A /* WikiFollowSheet.swift */,
+				B1000000000000000000004B /* VaultSearchPalette.swift */,
+				B1000000000000000000004C /* BacklinksInspector.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -273,6 +297,9 @@
 				B1000000000000000000000A /* VaultStore.swift */,
 				B1000000000000000000001C /* AttachmentStore.swift */,
 				B10000000000000000000037 /* VaultSearch.swift */,
+				B10000000000000000000047 /* WikiLinkSyntax.swift */,
+				B10000000000000000000048 /* FrontmatterAliases.swift */,
+				B10000000000000000000049 /* VaultFullTextSearch.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -455,6 +482,12 @@
 				A1000000000000000000003E /* EmptyTabView.swift in Sources */,
 				A1000000000000000000003F /* NoteTitle.swift in Sources */,
 				A10000000000000000000040 /* NoteTitleBar.swift in Sources */,
+				A10000000000000000000047 /* WikiLinkSyntax.swift in Sources */,
+				A10000000000000000000048 /* FrontmatterAliases.swift in Sources */,
+				A10000000000000000000049 /* VaultFullTextSearch.swift in Sources */,
+				A1000000000000000000004A /* WikiFollowSheet.swift in Sources */,
+				A1000000000000000000004B /* VaultSearchPalette.swift in Sources */,
+				A1000000000000000000004C /* BacklinksInspector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -477,6 +510,9 @@
 				A10000000000000000000038 /* VaultSearchTests.swift in Sources */,
 				A1000000000000000000003B /* NoteStatsTests.swift in Sources */,
 				A10000000000000000000041 /* NoteTitleTests.swift in Sources */,
+				A1000000000000000000004D /* WikiLinkSyntaxTests.swift in Sources */,
+				A1000000000000000000004E /* FrontmatterAliasesTests.swift in Sources */,
+				A1000000000000000000004F /* VaultFullTextSearchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -535,7 +571,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -544,7 +580,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.3;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -560,7 +596,7 @@
 				CODE_SIGN_ENTITLEMENTS = Lyra/Lyra.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Lyra/Info.plist;
@@ -569,7 +605,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.3;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -582,10 +618,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.3;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -598,10 +634,10 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.9.3;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lyra.LyraTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
