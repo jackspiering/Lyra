@@ -212,9 +212,12 @@ final class EditorViewModel {
             var didWrite = false
             var detectedConflict = false
             let itemExists = FileManager.default.fileExists(atPath: url.path)
-            if force, !itemExists {
-                // There is no existing item for NSFileCoordinator to lock;
-                // force-recreate is an explicit choice, so create it directly.
+            // Force-recreate (missing-file recovery) must still use the coordinator
+            // when possible so the vault-boundary checks are re-validated inside
+            // the coordinated block. Direct write without coordination is only a
+            // fallback when the coordinator itself is unavailable.
+            let shouldCoordinate = itemExists || force
+            if !shouldCoordinate {
                 try text.write(to: url, atomically: true, encoding: .utf8)
                 didWrite = true
             } else {
@@ -228,6 +231,20 @@ final class EditorViewModel {
                     options: options,
                     error: &coordinationError
                 ) { coordinatedURL in
+                    // Re-validate vault containment and symlink status inside the
+                    // coordinator, even for force-recreate.
+                    if FileSystemVault.hasSymlink(url) || FileSystemVault.hasSymlink(parent) {
+                        writeError = CocoaError(.fileWriteNoPermission)
+                        return
+                    }
+                    if let vaultRoot, !FileSystemVault.isSafePath(url, within: vaultRoot) {
+                        writeError = CocoaError(.fileWriteNoPermission)
+                        return
+                    }
+                    if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
+                        writeError = CocoaError(.fileWriteNoPermission)
+                        return
+                    }
                     if !force {
                         guard let known = diskSnapshot, known.path == url.path else {
                             detectedConflict = true
@@ -248,6 +265,16 @@ final class EditorViewModel {
                     }
 
                     do {
+                        // Ensure parent still exists inside the coordinated block for force-recreate.
+                        if force, !FileManager.default.fileExists(atPath: parent.path) {
+                            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+                            if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
+                                throw CocoaError(.fileWriteNoPermission)
+                            }
+                            guard !FileSystemVault.hasSymlink(parent) else {
+                                throw CocoaError(.fileWriteNoPermission)
+                            }
+                        }
                         try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
                         didWrite = true
                     } catch {
@@ -323,16 +350,16 @@ final class EditorViewModel {
         diskSnapshot = Self.captureSnapshot(of: url)
     }
 
-    static func modificationDate(of url: URL) -> Date? {
+    nonisolated static func modificationDate(of url: URL) -> Date? {
         fileIdentity(of: url)?.date
     }
 
-    static func fileIdentity(of url: URL) -> (date: Date, size: Int)? {
+    nonisolated static func fileIdentity(of url: URL) -> (date: Date, size: Int)? {
         guard let metadata = metadata(of: url) else { return nil }
         return (metadata.date, metadata.size)
     }
 
-    private static func metadata(of url: URL) -> FileMetadata? {
+    private nonisolated static func metadata(of url: URL) -> FileMetadata? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let date = attributes[.modificationDate] as? Date,
               let size = (attributes[.size] as? NSNumber)?.intValue else {
@@ -343,9 +370,12 @@ final class EditorViewModel {
         return FileMetadata(date: date, size: size, device: device, inode: inode)
     }
 
-    private static func captureSnapshot(of url: URL) -> DiskSnapshot? {
+    private nonisolated static func captureSnapshot(of url: URL) -> DiskSnapshot? {
         // Retry once if metadata changes while the bytes are being read so the
         // saved identity cannot combine one version's metadata with another's.
+        // Note: This performs blocking I/O (attributes + Data read). Callers on
+        // @MainActor should keep notes small; large vaults rely on the detached
+        // scan in VaultStore, not this per-save path.
         for _ in 0..<2 {
             guard let before = metadata(of: url),
                   let content = try? Data(contentsOf: url),

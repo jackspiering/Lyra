@@ -290,6 +290,16 @@ final class VaultStore {
             fileName = UntitledName.next(base: stem, ext: "md", in: parent)
         }
         let url = parent.appendingPathComponent(fileName)
+        guard FileSystemVault.isSafePath(url, within: rootURL) else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The destination is no longer available inside this vault."
+                )
+            )
+            return false
+        }
         let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
         if !ok {
             present(
@@ -297,6 +307,19 @@ final class VaultStore {
                 message: UserFacingError.message(
                     context: .createNote,
                     detail: "Lyra couldn't create a new Markdown file in this folder."
+                )
+            )
+            return false
+        }
+        // Post-create vault-boundary check: parent may have been swapped for a symlink
+        // between the pre-check and createFile.
+        guard FileSystemVault.isSafePath(url, within: rootURL) else {
+            try? FileManager.default.removeItem(at: url)
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The destination is no longer available inside this vault."
                 )
             )
             return false
@@ -323,6 +346,19 @@ final class VaultStore {
         let url = parent.appendingPathComponent(UntitledName.next(base: "New Folder", ext: nil, in: parent))
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            // Post-create check for TOCTOU on the new folder and its parent.
+            guard FileSystemVault.isSafePath(url, within: rootURL),
+                  FileSystemVault.isSafeDirectory(parent, within: rootURL) else {
+                try? FileManager.default.removeItem(at: url)
+                present(
+                    context: .createFolder,
+                    message: UserFacingError.message(
+                        context: .createFolder,
+                        detail: "The selected folder is no longer available inside this vault."
+                    )
+                )
+                return
+            }
             lastCreateParentPath = parent.path
             pendingSelection = url.path
             refresh()
@@ -330,6 +366,7 @@ final class VaultStore {
             present(error: error, context: .createFolder)
         }
     }
+
 
     /// Parent for new notes/folders. A current selection always wins; the
     /// remembered path is only a fallback while a refresh is still landing.

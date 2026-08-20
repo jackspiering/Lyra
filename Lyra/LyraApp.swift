@@ -82,17 +82,17 @@ struct VaultWindowRoot: View {
             AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
-            var failed = false
             for editor in tabs.allEditors() {
                 if editor.saveIfNeeded() {
                     AppSession.shared.unregister(editor: editor)
                 } else {
-                    failed = true
+                    // Keep failed editor registered so AppSession can retry on quit;
+                    // do not unregister — prune keeps weak entry alive.
                 }
             }
-            if !failed {
-                store.releaseAccess()
-            }
+            // Always balance startAccessingSecurityScopedResource, even when a save
+            // failed. Per-window scope must not leak across window close + reopen.
+            store.releaseAccess()
         }
     }
 }

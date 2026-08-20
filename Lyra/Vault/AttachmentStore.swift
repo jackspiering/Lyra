@@ -44,8 +44,17 @@ enum AttachmentStore {
         )
         let name = uniquePNGFilename(now: now, existing: existing)
         let fileURL = dir.appendingPathComponent(name)
+        // Final vault-boundary check: _attachments may have been swapped for a symlink
+        // between the directory validations and the write.
+        guard FileSystemVault.isSafePath(fileURL, within: vaultRoot) else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
         try data.write(to: fileURL, options: .atomic)
-
+        // Verify the write landed inside the vault (defense against TOCTOU on fileURL itself).
+        guard FileSystemVault.isSafePath(fileURL, within: vaultRoot) else {
+            try? FileManager.default.removeItem(at: fileURL)
+            throw CocoaError(.fileWriteNoPermission)
+        }
         if let noteURL {
             let noteDir = noteURL.deletingLastPathComponent()
             return relativePath(from: noteDir, to: fileURL)
