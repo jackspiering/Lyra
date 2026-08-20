@@ -202,12 +202,20 @@ enum MarkdownImagePath {
     }
 
     /// Match `_attachments/<file>` segment anywhere in the relative path.
+    /// Returns the immediate child filename after the first `_attachments` segment.
     private static func attachmentsBasename(from path: String) -> String? {
+        // Only consider local relative paths — scheme and absolute paths already handled above.
         let parts = path.split(separator: "/").map(String.init)
         guard let idx = parts.firstIndex(of: AttachmentStore.folderName),
               idx + 1 < parts.count else { return nil }
         let name = parts[idx + 1]
         guard !name.isEmpty, name != "..", name != "." else { return nil }
+        // Reject names that would not be valid on disk (control chars, leading ".", ":" etc.)
+        if case .invalid = FilenameValidation.validate(name, isDirectory: false) {
+            return nil
+        }
+        // Only accept the immediate child — disallow traversal payloads smuggled as filename.
+        if name.contains("\\") || name.contains("%2F") || name.contains("%5C") { return nil }
         return name
     }
 }

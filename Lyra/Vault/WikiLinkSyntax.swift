@@ -88,7 +88,8 @@ enum WikiLinkSyntax {
             url.appendPathComponent(name)
         }
 
-        guard FileSystemVault.isWithin(url, root: vaultRoot) else { return nil }
+        guard FileSystemVault.isWithin(url, root: vaultRoot),
+              !FileSystemVault.hasSymlink(url, relativeTo: vaultRoot) else { return nil }
         return url
     }
 
