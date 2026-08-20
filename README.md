@@ -15,7 +15,7 @@
   </a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-informational?style=flat-square">
+  <img alt="Version 0.10.1" src="https://img.shields.io/badge/version-0.10.1-informational?style=flat-square">
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   </a>
@@ -35,7 +35,7 @@ Writing is the first job. Wiki links and the vault tree support that job. They a
 
 ## Download
 
-Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.10.0), then drag Lyra to Applications.
+Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.10.1), then drag Lyra to Applications.
 
 The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
