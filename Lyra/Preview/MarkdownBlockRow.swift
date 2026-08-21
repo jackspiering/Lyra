@@ -125,11 +125,15 @@ private struct MarkdownPreviewImage: View {
         .task(id: url) {
             image = nil
             finishedLoading = false
-            let loaded = await Task.detached(priority: .utility) {
-                PreviewImage.decode(contentsOf: url)
+            // Load bytes off the main actor. `NSImage` is not Sendable, so
+            // decode on this actor after the Data hop (same pattern as before).
+            let data = await Task.detached(priority: .utility) {
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                if size > PreviewImage.maxEncodedBytes { return Data?.none }
+                return try? Data(contentsOf: url)
             }.value
             guard !Task.isCancelled else { return }
-            image = loaded
+            image = data.flatMap { PreviewImage.decode($0) }
             finishedLoading = true
         }
     }
