@@ -191,4 +191,57 @@ final class FileSystemVaultTests: XCTestCase {
         // locked may be absent (skipped on recurse) or present empty — either way keeper survives.
         XCTAssertFalse(names.contains("secret.md"))
     }
+
+    func testScanStopsAtMaxDepth() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var current = root
+        for name in ["a", "b", "c"] {
+            current = current.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
+            FileManager.default.createFile(
+                atPath: current.appendingPathComponent("\(name).md").path,
+                contents: Data("# \(name)".utf8),
+                attributes: nil
+            )
+        }
+
+        let shallow = try FileSystemVault.scanResult(root: root, maxDepth: 1)
+        XCTAssertTrue(shallow.didTruncate)
+        let urls = FileSystemVault.collectNoteURLs(from: shallow.node)
+        let names = Set(urls.map(\.lastPathComponent))
+        XCTAssertTrue(names.contains("a.md"))
+        XCTAssertFalse(names.contains("c.md"))
+
+        let deep = try FileSystemVault.scanResult(root: root, maxDepth: 8)
+        XCTAssertFalse(deep.didTruncate)
+        XCTAssertEqual(
+            Set(FileSystemVault.collectNoteURLs(from: deep.node).map(\.lastPathComponent)),
+            Set(["a.md", "b.md", "c.md"])
+        )
+    }
+
+    func testIndexedUTF8BodySkipsOversizedFiles() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let small = root.appendingPathComponent("small.md")
+        try "hello".write(to: small, atomically: true, encoding: .utf8)
+        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: small, maxBytes: 16), "hello")
+
+        let large = root.appendingPathComponent("large.md")
+        try String(repeating: "x", count: 64).write(to: large, atomically: true, encoding: .utf8)
+        XCTAssertNil(FileSystemVault.indexedUTF8Body(at: large, maxBytes: 16))
+    }
 }

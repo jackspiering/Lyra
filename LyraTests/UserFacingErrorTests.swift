@@ -51,4 +51,27 @@ final class UserFacingErrorTests: XCTestCase {
             "got: \(message)"
         )
     }
+
+    func testFallbackLocalizedDescriptionRedactsAbsolutePaths() {
+        let error = NSError(
+            domain: "LyraTests",
+            code: 42,
+            userInfo: [
+                NSLocalizedDescriptionKey:
+                    "The file “/Users/x/secret/vault/note.md” couldn’t be opened."
+            ]
+        )
+        let message = UserFacingError.message(for: error, context: .openNote)
+        XCTAssertFalse(message.contains("/Users/x/secret"))
+        XCTAssertFalse(message.contains("/secret/vault"))
+        XCTAssertTrue(message.contains("note.md"), "got: \(message)")
+    }
+
+    func testRedactAbsolutePathsKeepsLastComponent() {
+        let redacted = UserFacingError.redactAbsolutePaths(
+            "Couldn't save /tmp/lyra-vault/Projects/Roadmap.md today"
+        )
+        XCTAssertEqual(redacted, "Couldn't save Roadmap.md today")
+        XCTAssertFalse(redacted.contains("/tmp"))
+    }
 }

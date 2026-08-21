@@ -6,7 +6,8 @@ struct ContentView: View {
     @Bindable var store: VaultStore
     @Bindable var tabs: NoteTabController
     /// When this window already has a vault, Open Vault can spawn another window first.
-    var openNewVaultWindow: (() -> Void)?
+    /// The UUID is the handoff token for the folder that window should open.
+    var openNewVaultWindow: ((UUID) -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
     @State private var showDeleteConfirm = false
     @State private var deleteDontAskAgain = false
@@ -365,9 +366,15 @@ struct ContentView: View {
             store.openVault(at: url)
             return
         }
-        // Already have a vault — open the chosen folder in a new window.
-        AppSession.shared.setPendingVaultURL(url)
-        openNewVaultWindow?()
+        // Already have a vault — open the chosen folder in a new window bound
+        // to this pick, not to whatever URL happens to be next in a queue.
+        let token = AppSession.shared.setPendingVaultURL(url)
+        if let openNewVaultWindow {
+            openNewVaultWindow(token)
+        } else {
+            AppSession.shared.discardPendingVaultURL(for: token)
+            store.openVault(at: url)
+        }
     }
 
     /// Empty-tab “Go to file” / ⌘O when a vault is open: pick a Markdown note and open it.

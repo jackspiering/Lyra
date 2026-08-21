@@ -54,6 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// One vault window: one store + note-tab controller (multi-vault = multiple windows).
 struct VaultWindowRoot: View {
+    /// Identifies this window for the Open Vault handoff. Nil on a restored
+    /// scene that has not received a value yet.
+    var handoffID: UUID?
     @State private var store = VaultStore()
     @State private var tabs = NoteTabController()
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
@@ -64,8 +67,8 @@ struct VaultWindowRoot: View {
     }
 
     var body: some View {
-        ContentView(store: store, tabs: tabs, openNewVaultWindow: {
-            openWindow(id: "vault")
+        ContentView(store: store, tabs: tabs, openNewVaultWindow: { token in
+            openWindow(id: "vault", value: token)
         })
         // nil for System so SwiftUI does not pin light/dark after a forced scheme.
         .preferredColorScheme(appearance.colorScheme)
@@ -74,7 +77,8 @@ struct VaultWindowRoot: View {
             for editor in tabs.allEditors() {
                 AppSession.shared.register(editor: editor, store: store)
             }
-            if let pending = AppSession.shared.takePendingVaultURL() {
+            if let handoffID,
+               let pending = AppSession.shared.takePendingVaultURL(for: handoffID) {
                 store.openVault(at: pending)
             }
         }
@@ -108,8 +112,10 @@ struct LyraApp: App {
 
     var body: some Scene {
         // One vault per window — open multiple windows for multiple vaults.
-        WindowGroup(id: "vault") {
-            VaultWindowRoot()
+        WindowGroup(id: "vault", for: UUID.self) { $handoffID in
+            VaultWindowRoot(handoffID: handoffID)
+        } defaultValue: {
+            UUID()
         }
         .defaultSize(width: 1100, height: 700)
         .commands {
@@ -209,7 +215,7 @@ private struct NewVaultWindowButton: View {
 
     var body: some View {
         Button("New Window") {
-            openWindow(id: "vault")
+            openWindow(id: "vault", value: UUID())
         }
         .keyboardShortcut("n", modifiers: [.command, .shift])
     }

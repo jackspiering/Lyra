@@ -20,7 +20,12 @@ final class VaultStore {
     private var isAccessingSecurityScope = false
     private var wikiResolver = WikiLinkResolver()
     private var searchDocuments: [VaultFullTextSearch.Document] = []
-    private var noteBodiesByPath: [String: String] = [:]
+    /// True when scan stopped walking folders deeper than `FileSystemVault.maxDirectoryDepth`.
+    private(set) var scanDidTruncate = false
+    /// True when at least one note was too large to index for search/backlinks.
+    private(set) var scanSkippedLargeNotes = false
+    /// Resolved bookmark that macOS marked stale. Open only after the user confirms.
+    private(set) var staleRestoreURL: URL?
     /// Drops stale async scan results when a newer refresh was requested.
     private var refreshGeneration = 0
     private var refreshTask: Task<Void, Never>?
@@ -49,7 +54,25 @@ final class VaultStore {
         errorMessage = nil
     }
 
+    var needsStaleVaultConfirmation: Bool { staleRestoreURL != nil }
+
+    func confirmStaleVaultRestore() {
+        guard let url = staleRestoreURL else { return }
+        staleRestoreURL = nil
+        openVault(at: url)
+    }
+
+    func declineStaleVaultRestore() {
+        staleRestoreURL = nil
+    }
+
+    func replaceStaleVaultRestore(with url: URL) {
+        staleRestoreURL = nil
+        openVault(at: url)
+    }
+
     func openVault(at url: URL) {
+        staleRestoreURL = nil
         clearError()
 
         let startedAccess = url.startAccessingSecurityScopedResource()
@@ -80,6 +103,8 @@ final class VaultStore {
         lastCreateParentPath = nil
         selection = nil
         rootNode = nil
+        scanDidTruncate = false
+        scanSkippedLargeNotes = false
         refresh()
     }
 
@@ -93,14 +118,20 @@ final class VaultStore {
         refreshTask = Task { [weak self] in
             do {
                 let scanTask = Task.detached(priority: .userInitiated) {
-                    let node = try FileSystemVault.scan(root: url, shouldCancel: { Task.isCancelled })
-                    let noteURLs = FileSystemVault.collectNoteURLs(from: node)
+                    let scanned = try FileSystemVault.scanResult(
+                        root: url,
+                        shouldCancel: { Task.isCancelled }
+                    )
+                    let noteURLs = FileSystemVault.collectNoteURLs(from: scanned.node)
                     var notes: [WikiNote] = []
                     var documents: [VaultFullTextSearch.Document] = []
-                    var bodies: [String: String] = [:]
+                    var urlBodies: [URL: String] = [:]
+                    var skippedLarge = false
                     for noteURL in noteURLs {
                         if Task.isCancelled { throw CancellationError() }
-                        let body = (try? String(contentsOf: noteURL, encoding: .utf8)) ?? ""
+                        let indexed = FileSystemVault.indexedUTF8Body(at: noteURL)
+                        if indexed == nil { skippedLarge = true }
+                        let body = indexed ?? ""
                         let relative = WikiLinkSyntax.relativePath(for: noteURL, vaultRoot: url)
                         notes.append(
                             WikiNote(
@@ -116,20 +147,22 @@ final class VaultStore {
                                 body: body
                             )
                         )
-                        bodies[noteURL.path] = body
+                        urlBodies[noteURL] = body
                     }
-                    return (node, notes, documents, bodies)
+                    let resolver = WikiLinkResolver(notes: notes, bodies: urlBodies)
+                    return (scanned.node, resolver, documents, scanned.didTruncate, skippedLarge)
                 }
-                let (node, notes, documents, bodies) = try await withTaskCancellationHandler(
+                let (node, resolver, documents, didTruncate, skippedLarge) = try await withTaskCancellationHandler(
                     operation: { try await scanTask.value },
                     onCancel: { scanTask.cancel() }
                 )
                 try Task.checkCancellation()
                 guard let self, generation == self.refreshGeneration else { return }
                 self.rootNode = node
-                self.wikiResolver = WikiLinkResolver(notes: notes)
+                self.wikiResolver = resolver
                 self.searchDocuments = documents
-                self.noteBodiesByPath = bodies
+                self.scanDidTruncate = didTruncate
+                self.scanSkippedLargeNotes = skippedLarge
                 // Apply pending selection only after the tree contains the new path.
                 if let pending = self.pendingSelection {
                     self.selection = pending
@@ -143,7 +176,8 @@ final class VaultStore {
                 self.pendingSelection = nil
                 self.wikiResolver = WikiLinkResolver()
                 self.searchDocuments = []
-                self.noteBodiesByPath = [:]
+                self.scanDidTruncate = false
+                self.scanSkippedLargeNotes = false
                 self.present(error: error, context: .readVault)
             }
         }
@@ -164,11 +198,13 @@ final class VaultStore {
     }
 
     func backlinks(to url: URL, liveBodies: [String: String]) -> [WikiCandidate] {
-        var bodies: [URL: String] = [:]
+        var live: [URL: String] = [:]
         for doc in searchDocuments {
-            bodies[doc.url] = liveBodies[doc.url.path] ?? noteBodiesByPath[doc.url.path] ?? doc.body
+            if let body = liveBodies[doc.url.path] {
+                live[doc.url] = body
+            }
         }
-        return wikiResolver.backlinks(to: url, bodies: bodies)
+        return wikiResolver.backlinks(to: url, liveBodies: live)
     }
 
     func searchNoteBodies(query: String, liveBodies: [String: String]) -> [VaultFullTextSearch.Hit] {
@@ -474,14 +510,23 @@ final class VaultStore {
     private func restoreLastVaultIfPossible() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
         var isStale = false
-        guard let url = try? URL(
+        let url = try? URL(
             resolvingBookmarkData: data,
             options: [.withSecurityScope],
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
-        ) else { return }
-        // openVault re-persists the bookmark, including when the resolved one was stale.
-        openVault(at: url)
+        )
+        switch VaultBookmarkRestore.decision(didResolve: url != nil, isStale: isStale) {
+        case .skip:
+            return
+        case .promptUser:
+            // Do not auto-open or re-persist. The window asks the user first.
+            staleRestoreURL = url
+        case .autoOpen:
+            if let url {
+                openVault(at: url)
+            }
+        }
     }
 
     private func persistBookmark(for url: URL) {

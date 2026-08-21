@@ -212,74 +212,73 @@ final class EditorViewModel {
             var didWrite = false
             var detectedConflict = false
             let itemExists = FileManager.default.fileExists(atPath: url.path)
-            // Force-recreate (missing-file recovery) must still use the coordinator
-            // when possible so the vault-boundary checks are re-validated inside
-            // the coordinated block. Direct write without coordination is only a
-            // fallback when the coordinator itself is unavailable.
-            let shouldCoordinate = itemExists || force
-            if !shouldCoordinate {
-                try text.write(to: url, atomically: true, encoding: .utf8)
-                didWrite = true
-            } else {
-                let options: NSFileCoordinator.WritingOptions = itemExists ? .forReplacing : []
+            let options: NSFileCoordinator.WritingOptions = itemExists ? .forReplacing : []
 
-                // Re-check inside the coordinated write. This closes the obvious
-                // check-then-write window for cooperating file presenters; a
-                // non-cooperating process can still race at the filesystem level.
-                NSFileCoordinator(filePresenter: nil).coordinate(
-                    writingItemAt: url,
-                    options: options,
-                    error: &coordinationError
-                ) { coordinatedURL in
-                    // Re-validate vault containment and symlink status inside the
-                    // coordinator, even for force-recreate.
-                    if FileSystemVault.hasSymlink(url) || FileSystemVault.hasSymlink(parent) {
-                        writeError = CocoaError(.fileWriteNoPermission)
+            // Always coordinate. The old uncoordinated "file missing" fast path
+            // could recreate or clobber a file that appeared between the
+            // existence check and the write.
+            NSFileCoordinator(filePresenter: nil).coordinate(
+                writingItemAt: url,
+                options: options,
+                error: &coordinationError
+            ) { coordinatedURL in
+                if FileSystemVault.hasSymlink(url) || FileSystemVault.hasSymlink(parent) {
+                    writeError = CocoaError(.fileWriteNoPermission)
+                    return
+                }
+                if let vaultRoot, !FileSystemVault.isSafePath(url, within: vaultRoot) {
+                    writeError = CocoaError(.fileWriteNoPermission)
+                    return
+                }
+                if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
+                    writeError = CocoaError(.fileWriteNoPermission)
+                    return
+                }
+                let coordinatedExists = FileManager.default.fileExists(atPath: coordinatedURL.path)
+                if !force {
+                    if !coordinatedExists {
+                        hasMissingFile = true
+                        lastSaveFailed = true
+                        detectedConflict = true
                         return
                     }
-                    if let vaultRoot, !FileSystemVault.isSafePath(url, within: vaultRoot) {
-                        writeError = CocoaError(.fileWriteNoPermission)
+                    guard let known = diskSnapshot, known.path == url.path else {
+                        detectedConflict = true
                         return
                     }
-                    if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
-                        writeError = CocoaError(.fileWriteNoPermission)
+                    guard let current = Self.captureSnapshot(of: coordinatedURL) else {
+                        hasMissingFile = true
+                        lastSaveFailed = true
+                        detectedConflict = true
                         return
                     }
-                    if !force {
-                        guard let known = diskSnapshot, known.path == url.path else {
-                            detectedConflict = true
-                            return
-                        }
-                        guard let current = Self.captureSnapshot(of: coordinatedURL) else {
-                            hasMissingFile = true
-                            lastSaveFailed = true
-                            detectedConflict = true
-                            return
-                        }
-                        guard current.hasSameFileIdentity(as: known) else {
-                            hasExternalConflict = true
-                            conflictDeferred = false
-                            detectedConflict = true
-                            return
-                        }
+                    guard current.hasSameFileIdentity(as: known) else {
+                        hasExternalConflict = true
+                        conflictDeferred = false
+                        detectedConflict = true
+                        return
                     }
+                }
 
-                    do {
-                        // Ensure parent still exists inside the coordinated block for force-recreate.
-                        if force, !FileManager.default.fileExists(atPath: parent.path) {
-                            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-                            if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
-                                throw CocoaError(.fileWriteNoPermission)
-                            }
-                            guard !FileSystemVault.hasSymlink(parent) else {
-                                throw CocoaError(.fileWriteNoPermission)
-                            }
+                do {
+                    // Ensure parent still exists inside the coordinated block for force-recreate.
+                    if force, !FileManager.default.fileExists(atPath: parent.path) {
+                        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+                        if let vaultRoot, !FileSystemVault.isSafePath(parent, within: vaultRoot) {
+                            throw CocoaError(.fileWriteNoPermission)
                         }
-                        try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
-                        didWrite = true
-                    } catch {
-                        writeError = error
+                        guard !FileSystemVault.hasSymlink(parent) else {
+                            throw CocoaError(.fileWriteNoPermission)
+                        }
                     }
+                    try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
+                    if let vaultRoot, !FileSystemVault.isSafePath(coordinatedURL, within: vaultRoot) {
+                        writeError = CocoaError(.fileWriteNoPermission)
+                        return
+                    }
+                    didWrite = true
+                } catch {
+                    writeError = error
                 }
             }
 

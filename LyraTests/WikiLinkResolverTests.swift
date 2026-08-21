@@ -11,9 +11,10 @@ final class WikiLinkResolverTests: XCTestCase {
 
     private func makeResolver(
         urls: [URL],
-        aliases: [URL: [String]] = [:]
+        aliases: [URL: [String]] = [:],
+        bodies: [URL: String] = [:]
     ) -> WikiLinkResolver {
-        WikiLinkResolver(noteURLs: urls, vaultRoot: root, aliases: aliases)
+        WikiLinkResolver(noteURLs: urls, vaultRoot: root, aliases: aliases, bodies: bodies)
     }
 
     func testResolvesPlainName() {
@@ -99,21 +100,36 @@ final class WikiLinkResolverTests: XCTestCase {
     }
 
     func testBacklinksCountUniqueWikiOnly() {
-        let resolver = makeResolver(urls: [hello, world])
         let urlBodies = [
             world: "See [[Hello]] and a [file](Hello.md)",
             hello: "self [[Hello]] ignored",
         ]
-        let links = resolver.backlinks(to: hello, bodies: urlBodies)
+        let resolver = makeResolver(urls: [hello, world], bodies: urlBodies)
+        let links = resolver.backlinks(to: hello)
         XCTAssertEqual(links.map(\.url), [world])
     }
 
     func testBacklinksIgnoreAmbiguousMentions() {
-        let resolver = makeResolver(urls: [dupA, dupB, hello])
         let bodies = [
             hello: "See [[Dup]]",
         ]
-        XCTAssertTrue(resolver.backlinks(to: dupA, bodies: bodies).isEmpty)
-        XCTAssertTrue(resolver.backlinks(to: dupB, bodies: bodies).isEmpty)
+        let resolver = makeResolver(urls: [dupA, dupB, hello], bodies: bodies)
+        XCTAssertTrue(resolver.backlinks(to: dupA).isEmpty)
+        XCTAssertTrue(resolver.backlinks(to: dupB).isEmpty)
+    }
+
+    func testBacklinksLiveOverlayRecomputesOpenNote() {
+        let indexed = [
+            world: "See [[Hello]]",
+            hello: "",
+        ]
+        let resolver = makeResolver(urls: [hello, world], bodies: indexed)
+        XCTAssertEqual(resolver.backlinks(to: hello).map(\.url), [world])
+
+        let afterEdit = resolver.backlinks(to: hello, liveBodies: [world: "no links"])
+        XCTAssertTrue(afterEdit.isEmpty)
+
+        let added = resolver.backlinks(to: world, liveBodies: [hello: "now [[World]]"])
+        XCTAssertEqual(added.map(\.url), [hello])
     }
 }

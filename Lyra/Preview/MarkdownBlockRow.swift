@@ -125,11 +125,11 @@ private struct MarkdownPreviewImage: View {
         .task(id: url) {
             image = nil
             finishedLoading = false
-            let data = await Task.detached(priority: .utility) {
-                try? Data(contentsOf: url)
+            let loaded = await Task.detached(priority: .utility) {
+                PreviewImage.decode(contentsOf: url)
             }.value
             guard !Task.isCancelled else { return }
-            image = data.flatMap { NSImage(data: $0) }
+            image = loaded
             finishedLoading = true
         }
     }

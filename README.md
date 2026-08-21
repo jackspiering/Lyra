@@ -39,6 +39,8 @@ Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases
 
 The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
+Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the release notes). Verify the DMG before you open it.
+
 ## Features
 
 - **Source mode:** TextKit editing with Markdown syntax highlighting, undo, autosave, and standard text editing behavior. Command-click a wiki link to follow it.
@@ -52,7 +54,7 @@ The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS 
 - **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. There is no graph view.
 - **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link.
 - **PDF export:** Export the open note.
-- **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window.
+- **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window. If a remembered vault folder moved, Lyra asks before reopening it.
 - **Preferences:** Configure appearance, new-note naming, and Trash confirmations.
 
 ## Quick Start
@@ -95,6 +97,8 @@ My Vault/
 ```
 
 Lyra does not create a sidecar database or proprietary note format. Hidden files, package directories, and symlinked entries are ignored by the vault tree. Clipboard images are stored in `_attachments/` and referenced with relative paths.
+
+Search, aliases, and backlinks skip note bodies larger than 2 MB (the editor can still open those files). Folders nested deeper than 64 levels are listed empty. PDF export of a single note stops at 2,000 pages.
 
 ## Build From Source
 

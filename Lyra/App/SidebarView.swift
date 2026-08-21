@@ -23,8 +23,27 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
+            scanLimitsBanner
             Divider()
             treeList
+        }
+    }
+
+    @ViewBuilder
+    private var scanLimitsBanner: some View {
+        if store.scanDidTruncate || store.scanSkippedLargeNotes {
+            VStack(alignment: .leading, spacing: 2) {
+                if store.scanDidTruncate {
+                    Text("Nested folders deeper than 64 levels were skipped.")
+                }
+                if store.scanSkippedLargeNotes {
+                    Text("Notes larger than 2 MB were left out of search and backlinks.")
+                }
+            }
+            .font(LyraFonts.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
         }
     }
 

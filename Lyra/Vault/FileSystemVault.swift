@@ -1,11 +1,56 @@
 import Foundation
 
 enum FileSystemVault {
+    /// Directories nested deeper than this are listed empty and not walked.
+    static let maxDirectoryDepth = 64
+    /// Notes larger than this are still openable, but are left out of search,
+    /// aliases, and the backlink index.
+    static let maxIndexedBodyBytes = 2 * 1024 * 1024
+
+    struct ScanResult: Equatable {
+        var node: VaultNode
+        var didTruncate: Bool
+    }
+
     static func shouldInclude(name: String) -> Bool {
         !name.hasPrefix(".")
     }
 
-    static func scan(root: URL, shouldCancel: () -> Bool = { false }) throws -> VaultNode {
+    static func scan(
+        root: URL,
+        shouldCancel: () -> Bool = { false },
+        maxDepth: Int = maxDirectoryDepth
+    ) throws -> VaultNode {
+        try scanResult(root: root, shouldCancel: shouldCancel, maxDepth: maxDepth).node
+    }
+
+    static func scanResult(
+        root: URL,
+        shouldCancel: () -> Bool = { false },
+        maxDepth: Int = maxDirectoryDepth
+    ) throws -> ScanResult {
+        try scanNode(root: root, shouldCancel: shouldCancel, depth: 0, maxDepth: maxDepth)
+    }
+
+    /// Reads at most `maxBytes` of UTF-8. Returns `nil` when the file is larger
+    /// so callers can skip it from in-memory indexes without loading it fully.
+    static func indexedUTF8Body(
+        at url: URL,
+        maxBytes: Int = maxIndexedBodyBytes
+    ) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: maxBytes + 1) else { return "" }
+        if data.count > maxBytes { return nil }
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    private static func scanNode(
+        root: URL,
+        shouldCancel: () -> Bool,
+        depth: Int,
+        maxDepth: Int
+    ) throws -> ScanResult {
         if shouldCancel() { throw CancellationError() }
         guard !isSymbolicLink(root) else {
             throw CocoaError(.fileReadNoPermission)
@@ -17,7 +62,10 @@ enum FileSystemVault {
         }
 
         if !isDir.boolValue {
-            return VaultNode(name: name, url: root, isDirectory: false, children: nil)
+            return ScanResult(
+                node: VaultNode(name: name, url: root, isDirectory: false, children: nil),
+                didTruncate: false
+            )
         }
 
         // Note: `.skipsPackageDescendants` only applies to directory enumerators, not
@@ -29,6 +77,7 @@ enum FileSystemVault {
         )
 
         var children: [VaultNode] = []
+        var didTruncate = false
         for childURL in contents {
             if shouldCancel() { throw CancellationError() }
             do {
@@ -52,7 +101,21 @@ enum FileSystemVault {
                     if childName.caseInsensitiveCompare(AttachmentStore.folderName) == .orderedSame {
                         continue
                     }
-                    children.append(try scan(root: childURL, shouldCancel: shouldCancel))
+                    if depth >= maxDepth {
+                        didTruncate = true
+                        children.append(
+                            VaultNode(name: childName, url: childURL, isDirectory: true, children: [])
+                        )
+                        continue
+                    }
+                    let nested = try scanNode(
+                        root: childURL,
+                        shouldCancel: shouldCancel,
+                        depth: depth + 1,
+                        maxDepth: maxDepth
+                    )
+                    didTruncate = didTruncate || nested.didTruncate
+                    children.append(nested.node)
                 } else if childURL.pathExtension.lowercased() == "md" {
                     children.append(VaultNode(name: childName, url: childURL, isDirectory: false, children: nil))
                 }
@@ -67,7 +130,10 @@ enum FileSystemVault {
         children.sort {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        return VaultNode(name: name, url: root, isDirectory: true, children: children)
+        return ScanResult(
+            node: VaultNode(name: name, url: root, isDirectory: true, children: children),
+            didTruncate: didTruncate
+        )
     }
 
     /// Returns whether `candidate` resolves below `root`, including the root

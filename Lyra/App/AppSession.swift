@@ -8,9 +8,10 @@ final class AppSession {
 
     /// Only the first vault window restores the last-opened bookmark.
     private(set) var didRestoreLaunchVault = false
-    /// Folders chosen for newly created windows. Keep request order so two
-    /// Open Vault actions cannot overwrite one another before onAppear runs.
-    private var pendingVaultURLs: [URL] = []
+    /// Folders chosen for newly created windows, keyed by the window that
+    /// should consume them. A FIFO list would let a later window bind to the
+    /// wrong pick if scene creation order differs from enqueue order.
+    private var pendingVaultHandoff = PendingVaultHandoff()
 
     private struct Entry {
         // Keep a failed editor alive across an unexpected scene teardown so a
@@ -28,13 +29,17 @@ final class AppSession {
         return true
     }
 
-    func setPendingVaultURL(_ url: URL) {
-        pendingVaultURLs.append(url)
+    @discardableResult
+    func setPendingVaultURL(_ url: URL) -> UUID {
+        pendingVaultHandoff.enqueue(url)
     }
 
-    func takePendingVaultURL() -> URL? {
-        guard !pendingVaultURLs.isEmpty else { return nil }
-        return pendingVaultURLs.removeFirst()
+    func takePendingVaultURL(for id: UUID) -> URL? {
+        pendingVaultHandoff.take(id)
+    }
+
+    func discardPendingVaultURL(for id: UUID) {
+        pendingVaultHandoff.discard(id)
     }
 
     func register(editor: EditorViewModel, store: VaultStore) {
@@ -78,4 +83,27 @@ final class AppSession {
     private func prune() {
         entries = entries.filter { $0.value.editor != nil }
     }
+}
+
+/// One-shot vault URL handoff from the window that picked a folder to the
+/// window created for that pick. Tokens are not reusable.
+struct PendingVaultHandoff: Equatable {
+    private var pending: [UUID: URL] = [:]
+
+    @discardableResult
+    mutating func enqueue(_ url: URL) -> UUID {
+        let id = UUID()
+        pending[id] = url
+        return id
+    }
+
+    mutating func take(_ id: UUID) -> URL? {
+        pending.removeValue(forKey: id)
+    }
+
+    mutating func discard(_ id: UUID) {
+        pending.removeValue(forKey: id)
+    }
+
+    var isEmpty: Bool { pending.isEmpty }
 }
