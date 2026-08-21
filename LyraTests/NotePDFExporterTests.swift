@@ -142,6 +142,31 @@ final class NotePDFExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("bold"), "got: \(text)")
     }
 
+    func testExportStopsAtPageCap() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var lines: [String] = ["```"]
+        for i in 1...400 {
+            lines.append("page-cap-line-\(i)")
+        }
+        lines.append("```")
+        let data = try NotePDFExporter.pdfData(
+            markdown: lines.joined(separator: "\n"),
+            noteDirectory: root,
+            vaultRoot: root,
+            maxPages: 2
+        )
+        let doc = try XCTUnwrap(PDFDocument(data: data))
+        XCTAssertLessThanOrEqual(doc.pageCount, 2)
+        XCTAssertGreaterThanOrEqual(doc.pageCount, 1)
+        let text = try extractedText(from: data)
+        XCTAssertTrue(
+            text.contains("Export stopped at 2 pages"),
+            "expected truncation notice; got: \(text.suffix(240))"
+        )
+    }
+
     func testCombinedNotesPDFContainsBothTitles() throws {
         let root = try tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

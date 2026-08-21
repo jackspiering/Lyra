@@ -73,9 +73,56 @@ enum UserFacingError {
 
         let localized = ns.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         if !localized.isEmpty, localized.count < 180, !localized.hasPrefix("The operation") {
-            return localized
+            return redactAbsolutePaths(localized)
         }
-        return ns.localizedFailureReason ?? "Something unexpected went wrong."
+        if let reason = ns.localizedFailureReason, !reason.isEmpty {
+            return redactAbsolutePaths(reason)
+        }
+        return "Something unexpected went wrong."
+    }
+
+    /// Replace POSIX absolute paths with the last path component so alerts
+    /// do not leak directory structure in screenshots or support paste.
+    static func redactAbsolutePaths(_ text: String) -> String {
+        var result = ""
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            let startsPath = chars[i] == "/" && (i == 0 || isPathBoundary(chars[i - 1]))
+            if startsPath {
+                var j = i + 1
+                while j < chars.count, isPathChar(chars[j]) {
+                    j += 1
+                }
+                var path = String(chars[i..<j])
+                while let last = path.last, last == "." || last == "," || last == ";" || last == ":" {
+                    path.removeLast()
+                }
+                result += URL(fileURLWithPath: path).lastPathComponent
+                i = j
+                continue
+            }
+            result.append(chars[i])
+            i += 1
+        }
+        return result
+    }
+
+    private static func isPathBoundary(_ character: Character) -> Bool {
+        character.isWhitespace
+            || character == "\""
+            || character == "'"
+            || character == "“"
+            || character == "‘"
+            || character == "("
+    }
+
+    private static func isPathChar(_ character: Character) -> Bool {
+        if character.isWhitespace { return false }
+        if character == "\"" || character == "'" || character == "”" || character == "’" {
+            return false
+        }
+        return true
     }
 
     private static let permission = "Lyra doesn't have permission to access that location."

@@ -78,6 +78,12 @@
 		A1000000000000000000004D /* WikiLinkSyntaxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004D /* WikiLinkSyntaxTests.swift */; };
 		A1000000000000000000004E /* FrontmatterAliasesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004E /* FrontmatterAliasesTests.swift */; };
 		A1000000000000000000004F /* VaultFullTextSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000004F /* VaultFullTextSearchTests.swift */; };
+		A10000000000000000000050 /* PreviewImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000050 /* PreviewImage.swift */; };
+		A10000000000000000000051 /* VaultBookmarkRestore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000051 /* VaultBookmarkRestore.swift */; };
+		A10000000000000000000052 /* PendingVaultHandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000052 /* PendingVaultHandoffTests.swift */; };
+		A10000000000000000000053 /* VaultBookmarkRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */; };
+		A10000000000000000000054 /* ParserFuzzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000054 /* ParserFuzzTests.swift */; };
+		A10000000000000000000055 /* PreviewImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000055 /* PreviewImageTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -166,6 +172,12 @@
 		B1000000000000000000004D /* WikiLinkSyntaxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiLinkSyntaxTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000004E /* FrontmatterAliasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterAliasesTests.swift; sourceTree = "<group>"; };
 		B1000000000000000000004F /* VaultFullTextSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFullTextSearchTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000050 /* PreviewImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewImage.swift; sourceTree = "<group>"; };
+		B10000000000000000000051 /* VaultBookmarkRestore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkRestore.swift; sourceTree = "<group>"; };
+		B10000000000000000000052 /* PendingVaultHandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingVaultHandoffTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkRestoreTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000054 /* ParserFuzzTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserFuzzTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000055 /* PreviewImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewImageTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -232,6 +244,10 @@
 				B1000000000000000000004D /* WikiLinkSyntaxTests.swift */,
 				B1000000000000000000004E /* FrontmatterAliasesTests.swift */,
 				B1000000000000000000004F /* VaultFullTextSearchTests.swift */,
+				B10000000000000000000052 /* PendingVaultHandoffTests.swift */,
+				B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */,
+				B10000000000000000000054 /* ParserFuzzTests.swift */,
+				B10000000000000000000055 /* PreviewImageTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -300,6 +316,7 @@
 				B10000000000000000000047 /* WikiLinkSyntax.swift */,
 				B10000000000000000000048 /* FrontmatterAliases.swift */,
 				B10000000000000000000049 /* VaultFullTextSearch.swift */,
+				B10000000000000000000051 /* VaultBookmarkRestore.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -322,6 +339,7 @@
 				B1000000000000000000001E /* MarkdownImagePath.swift */,
 				B10000000000000000000020 /* NotePDFExporter.swift */,
 				B10000000000000000000024 /* MarkdownBlockRow.swift */,
+				B10000000000000000000050 /* PreviewImage.swift */,
 			);
 			path = Preview;
 			sourceTree = "<group>";
@@ -488,6 +506,8 @@
 				A1000000000000000000004A /* WikiFollowSheet.swift in Sources */,
 				A1000000000000000000004B /* VaultSearchPalette.swift in Sources */,
 				A1000000000000000000004C /* BacklinksInspector.swift in Sources */,
+				A10000000000000000000050 /* PreviewImage.swift in Sources */,
+				A10000000000000000000051 /* VaultBookmarkRestore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -513,6 +533,10 @@
 				A1000000000000000000004D /* WikiLinkSyntaxTests.swift in Sources */,
 				A1000000000000000000004E /* FrontmatterAliasesTests.swift in Sources */,
 				A1000000000000000000004F /* VaultFullTextSearchTests.swift in Sources */,
+				A10000000000000000000052 /* PendingVaultHandoffTests.swift in Sources */,
+				A10000000000000000000053 /* VaultBookmarkRestoreTests.swift in Sources */,
+				A10000000000000000000054 /* ParserFuzzTests.swift in Sources */,
+				A10000000000000000000055 /* PreviewImageTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

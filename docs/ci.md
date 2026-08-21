@@ -17,7 +17,7 @@
 
 | Setting | Value |
 |---------|--------|
-| Actions | `actions/checkout@v7` |
+| Actions | `actions/checkout` pinned to the v7.0.1 commit SHA |
 | Permissions | `contents: read` |
 | Concurrency | cancel in-progress runs on the same ref |
 | Timeouts | smoke 5m, macos 30m |
@@ -33,7 +33,8 @@ Version guard: the tag (or dispatch input) must be three-part semver and match `
 
 | Setting | Value |
 |---------|--------|
-| Actions | `checkout@v7`, `upload-artifact@v7`, `softprops/action-gh-release@v3` |
+| Actions | SHA-pinned `checkout` v7.0.1, `upload-artifact` v7.0.1, `softprops/action-gh-release` v3.0.2 |
+| Checksums | SHA-256 of the DMG is written to `SHA256SUMS.txt` and included in the release notes |
 | Permissions | `contents: write` (releases only) |
 | Artifact retention | 14 days |
 | Timeout | 45m |
@@ -84,12 +85,12 @@ What we researched and intentionally chose:
 
 | Topic | Choice | Why |
 |-------|--------|-----|
-| Checkout / artifacts | `@v7` majors | Current maintained lines (`checkout` v7, `upload-artifact` v7); Node 20-era `@v4` is aging |
-| Releases | `softprops/action-gh-release@v3` | Replaces ad-hoc `gh release` shell; v2 unmaintained (Node 20 deprecation) |
+| Checkout / artifacts | SHA-pinned v7.0.1 | Current maintained lines (`checkout` v7, `upload-artifact` v7); Node 20-era `@v4` is aging |
+| Releases | SHA-pinned `softprops/action-gh-release` v3.0.2 | Replaces ad-hoc `gh release` shell; v2 unmaintained (Node 20 deprecation) |
 | Runner | Keep **`macos-15`** | Matches deployment target (macOS 15+); `macos-26` exists but is unnecessary churn for now |
 | Permissions | Read-only CI; write only on Release | Least privilege for `GITHUB_TOKEN` |
 | Caching / lint matrix | Not added | Single target, small app; DerivedData cache is YAGNI until pain shows. A lightweight `Scripts/lint.sh` (trailing whitespace, final newline, and shell syntax) runs inside smoke; SwiftLint and multi-config lint matrices are still deferred |
-| Action pins | Floating major tags (`@v7`, `@v3`) | Dependabot bumps majors; avoid fragile full SHAs without automation |
+| Action pins | Full commit SHAs with version comments | Release job has `contents: write`; Dependabot still opens PRs that bump the SHA + comment |
 | Smoke script | Lean invariants, not every Swift path | macOS build is the compiler check; smoke covers docs/fonts/entitlements/version |
 
 ## Non-goals

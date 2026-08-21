@@ -25,16 +25,28 @@ enum NotePDFExporter {
         var noteDirectory: URL
     }
 
-    static func pdfData(markdown: String, noteDirectory: URL, vaultRoot: URL) throws -> Data {
+    static let defaultMaxPageCount = 2000
+
+    static func pdfData(
+        markdown: String,
+        noteDirectory: URL,
+        vaultRoot: URL,
+        maxPages: Int = defaultMaxPageCount
+    ) throws -> Data {
         try pdfData(
             notes: [NoteSource(title: "", markdown: markdown, noteDirectory: noteDirectory)],
-            vaultRoot: vaultRoot
+            vaultRoot: vaultRoot,
+            maxPages: maxPages
         )
     }
 
     /// Multiple notes in one PDF (each optional title as H1; page break between notes).
-    static func pdfData(notes: [NoteSource], vaultRoot: URL) throws -> Data {
-        try Renderer(notes: notes, vaultRoot: vaultRoot).run()
+    static func pdfData(
+        notes: [NoteSource],
+        vaultRoot: URL,
+        maxPages: Int = defaultMaxPageCount
+    ) throws -> Data {
+        try Renderer(notes: notes, vaultRoot: vaultRoot, maxPages: maxPages).run()
     }
 
     // MARK: - Renderer
@@ -42,16 +54,19 @@ enum NotePDFExporter {
     private final class Renderer {
         let notes: [NoteSource]
         let vaultRoot: URL
+        let maxPages: Int
 
         private var ctx: CGContext!
         private var y: CGFloat = 0
         private var pageNumber = 1
         private var noteDirectory: URL
+        private var stopped = false
         private let contentBottom = NotePDFExporter.pageHeight - NotePDFExporter.margin
 
-        init(notes: [NoteSource], vaultRoot: URL) {
+        init(notes: [NoteSource], vaultRoot: URL, maxPages: Int) {
             self.notes = notes
             self.vaultRoot = vaultRoot
+            self.maxPages = max(1, maxPages)
             self.noteDirectory = notes.first?.noteDirectory ?? vaultRoot
         }
 
@@ -73,7 +88,12 @@ enum NotePDFExporter {
 
             beginPage()
             for (index, note) in notes.enumerated() {
+                if stopped { break }
                 if index > 0 {
+                    if pageNumber >= maxPages {
+                        stopWithNotice()
+                        break
+                    }
                     endPage()
                     beginPage()
                 }
@@ -82,10 +102,15 @@ enum NotePDFExporter {
                     drawTextSpanning(note.title, font: headingFont(1), color: NotePDFExporter.bodyColor)
                 }
                 for block in MarkdownPreviewBlocks.parse(note.markdown) {
+                    if stopped { break }
                     draw(block)
                 }
             }
-            endPage()
+            if !stopped {
+                endPage()
+            } else {
+                finishStoppedPage()
+            }
             ctx.closePDF()
             return data as Data
         }
@@ -93,6 +118,7 @@ enum NotePDFExporter {
         // MARK: Pages
 
         private func beginPage() {
+            guard !stopped else { return }
             ctx.beginPDFPage(nil)
             // PDF media box is bottom-up. Map layout coords (origin top-left, y down) onto it
             // so AppKit text/images are upright in Preview.app.
@@ -129,15 +155,50 @@ enum NotePDFExporter {
 
         /// Start a new page when the next fragment needs more room (unless already at top).
         private func ensureSpace(_ height: CGFloat) {
+            guard !stopped else { return }
             if height > remainingHeight, y > NotePDFExporter.margin + 0.5 {
+                if pageNumber >= maxPages {
+                    stopWithNotice()
+                    return
+                }
                 endPage()
                 beginPage()
             }
         }
 
+        private func stopWithNotice() {
+            guard !stopped else { return }
+            let notice = makeAttributed(
+                "Export stopped at \(maxPages) pages.",
+                font: LyraFonts.ui(size: 11),
+                color: NotePDFExporter.secondaryColor
+            )
+            let height = measure(notice, width: NotePDFExporter.contentWidth)
+            notice.draw(
+                with: CGRect(
+                    x: NotePDFExporter.margin,
+                    y: y,
+                    width: NotePDFExporter.contentWidth,
+                    height: height
+                ),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+            y += height
+            stopped = true
+        }
+
+        private func finishStoppedPage() {
+            drawPageNumber()
+            NSGraphicsContext.current = nil
+            ctx.restoreGState()
+            ctx.endPDFPage()
+        }
+
         // MARK: Blocks
 
         private func draw(_ block: MarkdownPreviewBlocks.Block) {
+            guard !stopped else { return }
             switch block {
             case .heading(let level, let text):
                 drawTextSpanning(text, font: headingFont(level), color: NotePDFExporter.bodyColor)
@@ -197,8 +258,10 @@ enum NotePDFExporter {
             guard total > 0 else { return }
 
             while offset < total {
+                if stopped { return }
                 let minimumFragmentHeight = minimumHeight + topPadding + bottomPadding
                 ensureSpace(minimumFragmentHeight)
+                if stopped { return }
                 let available = max(1, remainingHeight - topPadding - bottomPadding)
                 let fit = charactersFitting(
                     full,
@@ -232,6 +295,10 @@ enum NotePDFExporter {
                 y += blockHeight
                 offset += range.length
                 if offset < total {
+                    if pageNumber >= maxPages {
+                        stopWithNotice()
+                        return
+                    }
                     endPage()
                     beginPage()
                 }
@@ -400,7 +467,7 @@ enum NotePDFExporter {
                 path: path,
                 noteDirectory: noteDirectory,
                 vaultRoot: vaultRoot
-            ), let image = NSImage(contentsOf: url), image.size.width > 0, image.size.height > 0 {
+            ), let image = PreviewImage.decode(contentsOf: url), image.size.width > 0, image.size.height > 0 {
                 let imgSize = image.size
                 let maxH = NotePDFExporter.contentHeight
                 let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)

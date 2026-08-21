@@ -8,7 +8,7 @@ Lyra is a single macOS app target with module-shaped folders. This doc is the de
 
 **Why:** The old “focused writer only” sentence fought the vault features. A full Obsidian clone (graph, plugins, sync) fights the invariants. Writing-first PKM is the middle that matches the user.
 
-**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index.
+**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. PDF export stops at 2,000 pages.
 
 ## Invariants
 
@@ -76,7 +76,7 @@ One primary type per file when practical.
 
 **Why:** Users need two folders open at once without a multi-vault tab bar. Menu commands target the key window only; quit flushes every open editor via `AppSession`.
 
-**Consequence:** Opening a vault while one is already open creates a new window for the chosen folder.
+**Consequence:** Opening a vault while one is already open creates a new window for the chosen folder. That window is bound to the pick with a UUID handoff so a later Open Vault cannot consume the earlier folder.
 
 ### In-window note tabs (v0.9+)
 
@@ -102,9 +102,9 @@ One primary type per file when practical.
 
 ### Plain-language errors (v0.5)
 
-**Choice:** `UserFacingError` maps Cocoa/POSIX failures to short titles and actionable tips before alerts.
+**Choice:** `UserFacingError` maps Cocoa/POSIX failures to short titles and actionable tips before alerts. Fallback Cocoa copy has POSIX absolute paths reduced to the last path component.
 
-**Why:** Domain codes and raw `localizedDescription` are hard to act on.
+**Why:** Domain codes and raw `localizedDescription` are hard to act on. Absolute paths in alerts leak directory structure in screenshots.
 
 ### Wiki links
 
@@ -130,7 +130,7 @@ Reading click and Source Command-click use the same rules. Preview still rewrite
 
 **Why:** Backlinks are what a person leaving Obsidian looks for. A graph view is a second product.
 
-**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading.
+**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading. The backlink index is rebuilt on each vault scan. Open editors overlay their live text onto that index.
 
 ### Search and Find
 
@@ -155,13 +155,15 @@ The sidebar name filter is labeled Filter. It is not bound to ⌘F.
 - UI / stores: `@MainActor`
 - Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
 - Autosave: ~500ms debounce; also save on note switch, background, and quit
-- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload
+- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently
 - Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root
-- PDF export: rendering and file I/O run in a detached task; UI panels and error state return to the main actor
+- PDF export: rendering and file I/O run in a detached task; UI panels and error state return to the main actor. Export stops at 2,000 pages and writes a truncation line in the PDF
+- Reading and PDF image decode use ImageIO metadata and a 50-megapixel / 16,384-px budget before materializing a bitmap
+- A stale security-scoped bookmark does not auto-open or re-persist. The first window asks before binding to the resolved folder
 
 ## Attachments
 
-**Choice:** Clipboard image paste writes under `{vaultRoot}/_attachments/` and inserts a relative `![](…)` path at the caret (`AttachmentStore`). Hide `_attachments` from the sidebar tree.
+**Choice:** Clipboard image paste writes under `{vaultRoot}/_attachments/` and inserts a relative `![](…)` path at the caret (`AttachmentStore`). Hide `_attachments` from the sidebar tree. Generated names are timestamp-based (`pasted-image-yyyyMMdd-HHmmss.png`) with a numeric suffix on collision. Occupancy checks are case-insensitive; Unicode-normalization aliases are not treated as a practical risk for same-second generated names.
 
 **Why:** Plain files next to notes; other Markdown tools can open the vault without Lyra.
 
@@ -175,9 +177,9 @@ Folder batch export is not offered. The exporter can still stitch notes in tests
 
 ## Release
 
-**Choice:** macOS 15+. Ad-hoc signed DMG. Not notarized. README must say how to open a blocked app.
+**Choice:** macOS 15+. Ad-hoc signed DMG. Not notarized. README must say how to open a blocked app. Each release publishes a SHA-256 of the DMG.
 
-**Why:** Public and small. Developer ID and notarization stay a later human step (`docs/ci.md`).
+**Why:** Public and small. Developer ID and notarization stay a later human step (`docs/ci.md`). The checksum lets a download be checked against the GitHub release until notarization exists.
 
 ## Non-goals
 

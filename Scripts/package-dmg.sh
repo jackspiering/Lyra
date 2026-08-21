@@ -267,6 +267,9 @@ if [[ ! -s "$DMG_PATH" || -L "$DMG_PATH" ]]; then
   echo "error: hdiutil did not create a regular DMG at $DMG_PATH" >&2
   exit 1
 fi
+SUMS_PATH="${OUT_DIR}/SHA256SUMS.txt"
+shasum -a 256 "$DMG_PATH" | tee "$SUMS_PATH"
 ls -lh "$DMG_PATH"
 echo "DMG_PATH=$DMG_PATH"
+echo "SUMS_PATH=$SUMS_PATH"
 echo "VERSION=$VERSION"

@@ -25,7 +25,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Select Xcode
         run: |
@@ -94,19 +94,36 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: bash Scripts/package-dmg.sh
 
+      - name: Checksums
+        id: sums
+        run: |
+          set -euo pipefail
+          HASHES="$(shasum -a 256 build/dist/*.dmg)"
+          echo "$HASHES"
+          printf '%s\n' "$HASHES" > build/dist/SHA256SUMS.txt
+          {
+            echo "hashes<<EOF"
+            echo "$HASHES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Upload DMG artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Lyra-dmg
-          path: build/dist/*.dmg
+          path: |
+            build/dist/*.dmg
+            build/dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          files: build/dist/*.dmg
+          files: |
+            build/dist/*.dmg
+            build/dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
@@ -115,5 +132,11 @@ jobs:
             - Open the DMG and drag **Lyra** to **Applications**.
             - First launch: right-click → **Open** if Gatekeeper warns (ad-hoc CI build).
             - Built by GitHub Actions on `macos-15`.
+            - Verify the DMG against the SHA-256 below (also in `SHA256SUMS.txt`).
+
+            SHA-256:
+            ```
+            ${{ steps.sums.outputs.hashes }}
+            ```
 
             Commit: `${{ github.sha }}`

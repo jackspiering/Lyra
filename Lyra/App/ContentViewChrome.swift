@@ -194,5 +194,31 @@ struct ContentViewDialogs: ViewModifier {
             .sheet(isPresented: $showDeleteConfirm) {
                 deleteConfirmSheet()
             }
+            .confirmationDialog(
+                "Your vault moved",
+                isPresented: Binding(
+                    get: { store.needsStaleVaultConfirmation },
+                    set: { if !$0 { store.declineStaleVaultRestore() } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Open This Folder") {
+                    store.confirmStaleVaultRestore()
+                }
+                Button("Choose Folder…") {
+                    if let url = VaultFolderPicker.pick(
+                        message: "Your vault folder moved. Choose it again."
+                    ) {
+                        store.replaceStaleVaultRestore(with: url)
+                    } else {
+                        store.declineStaleVaultRestore()
+                    }
+                }
+                Button("Not Now", role: .cancel) {
+                    store.declineStaleVaultRestore()
+                }
+            } message: {
+                Text("Lyra found a vault folder that may have moved. Open it only if this is the folder you expect.")
+            }
     }
 }
