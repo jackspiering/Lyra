@@ -48,7 +48,6 @@ struct ContentView: View {
     }
 
     var body: some View {
-        @Bindable var flow = wikiFlow
         rootShell
             // Empty chrome title — vault name must not repeat in toolbar principal.
             .navigationTitle("")
@@ -155,18 +154,21 @@ struct ContentView: View {
                     }
                 }
         }
-        .sheet(item: $flow.prompt) { prompt in
+        .sheet(item: Binding(
+            get: { wikiFlow.prompt },
+            set: { wikiFlow.prompt = $0 }
+        )) { prompt in
             WikiFollowSheet(
                 prompt: prompt,
                 onPick: { url in
-                    flow.cancelPrompt()
-                    flow.open(url)
+                    wikiFlow.cancelPrompt()
+                    wikiFlow.open(url)
                 },
                 onCreate: { dest in
-                    flow.cancelPrompt()
-                    flow.create(at: dest)
+                    wikiFlow.cancelPrompt()
+                    wikiFlow.create(at: dest)
                 },
-                onCancel: { flow.cancelPrompt() }
+                onCancel: { wikiFlow.cancelPrompt() }
             )
         }
         .sheet(isPresented: $showVaultSearch) {
@@ -175,7 +177,7 @@ struct ContentView: View {
                 search: { store.searchNoteBodies(query: $0, liveBodies: liveBodies()) },
                 onOpen: { url in
                     showVaultSearch = false
-                    flow.open(url)
+                    wikiFlow.open(url)
                 },
                 onClose: { showVaultSearch = false }
             )
@@ -263,7 +265,7 @@ struct ContentView: View {
                         Divider()
                         BacklinksInspector(
                             items: store.backlinks(to: url, liveBodies: liveBodies()),
-                            onOpen: { flow.open($0) },
+                            onOpen: { wikiFlow.open($0) },
                             onHide: { showBacklinks = false }
                         )
                     }
@@ -292,7 +294,7 @@ struct ContentView: View {
                 noteURL: editor.fileURL,
                 onEdit: { editor.noteEdited() },
                 onPasteError: { store.present(context: .pasteImage, message: $0) },
-                onWikiLink: { flow.followLink($0, from: editor.fileURL) },
+                onWikiLink: { wikiFlow.followLink($0, from: editor.fileURL) },
                 findBarToken: findBarToken
             )
             // Per-file identity: reset selection, scroll, and undo when switching notes/tabs.
@@ -302,7 +304,7 @@ struct ContentView: View {
                 text: editor.text,
                 noteDirectory: editor.fileURL?.deletingLastPathComponent(),
                 vaultRoot: store.rootURL,
-                onWikiLink: { flow.followLink($0, from: editor.fileURL) }
+                onWikiLink: { wikiFlow.followLink($0, from: editor.fileURL) }
             )
         }
     }

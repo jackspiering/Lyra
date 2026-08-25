@@ -84,7 +84,7 @@ final class WikiFlow {
         if tabs.selectedEditor.fileURL == nil {
             // empty active tab — fill it
             _ = tabs.openInActiveTab(url: url) { created in
-                AppSession.shared.register(editor: created.editor, store: store)
+                AppSession.shared.register(editor: created.editor, store: self.store)
             }
             // Whether the fill succeeded or not, surface any failure from the previous save/open.
             flushError(tabs.selectedEditor)
@@ -95,7 +95,7 @@ final class WikiFlow {
         let ok = tabs.openInNewTab(
             url: url,
             onCreated: { created in
-                AppSession.shared.register(editor: created.editor, store: store)
+                AppSession.shared.register(editor: created.editor, store: self.store)
             },
             onFailed: { failed in
                 self.flushError(failed)
