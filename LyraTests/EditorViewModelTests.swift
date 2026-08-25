@@ -344,4 +344,92 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertNotNil(editor.lastError)
         XCTAssertTrue(editor.hasError)
     }
+
+    func testExplicitSaveWhileDeferredResurfacesConflict() throws {
+        let a = tempRoot.appendingPathComponent("defer-explicit.md")
+        try "mine".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        editor.text = "local"
+        editor.isDirty = true
+        try "theirs".write(to: a, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: known.addingTimeInterval(5)],
+            ofItemAtPath: a.path
+        )
+        XCTAssertFalse(editor.saveIfNeeded())
+        editor.deferConflict()
+        XCTAssertTrue(editor.conflictDeferred)
+
+        // The ⌘S path is a non-force save: it must not silently overwrite
+        // "theirs" while a conflict is deferred. It re-checks disk identity
+        // and clears the deferral so the conflict dialog can reappear.
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertFalse(editor.conflictDeferred)
+        XCTAssertTrue(editor.hasExternalConflict)
+        XCTAssertTrue(editor.isDirty)
+        XCTAssertEqual(editor.text, "local")
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "theirs")
+    }
+
+    func testLastSaveFailedClearsOnSuccessfulSave() throws {
+        let roDir = tempRoot.appendingPathComponent("ro-recover", isDirectory: true)
+        try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
+        let a = roDir.appendingPathComponent("note.md")
+        try "x".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "dirty"
+        editor.isDirty = true
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: roDir.path)
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertTrue(editor.lastSaveFailed)
+        XCTAssertTrue(editor.hasError)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: roDir.path)
+        XCTAssertTrue(editor.saveIfNeeded())
+        // Sticky failure state clears only on a successful write.
+        XCTAssertFalse(editor.lastSaveFailed)
+        XCTAssertNil(editor.lastError)
+        XCTAssertFalse(editor.hasError)
+    }
+
+    func testNoteEditedTracksOnlyOpenFiles() throws {
+        let editor = EditorViewModel()
+        editor.noteEdited()
+        XCTAssertFalse(editor.isDirty)
+
+        let a = tempRoot.appendingPathComponent("edited.md")
+        try "x".write(to: a, atomically: true, encoding: .utf8)
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "changed"
+        editor.noteEdited()
+        XCTAssertTrue(editor.isDirty)
+    }
+
+    func testAutosavePersistsEditsAfterDebounce() async throws {
+        let a = tempRoot.appendingPathComponent("autosave.md")
+        try "original".write(to: a, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "autosaved"
+        editor.noteEdited()
+
+        // Poll instead of sleeping a fixed debounce: CI boxes are slow, and
+        // awaiting keeps the main actor free so the debounced task can run.
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if (try? String(contentsOf: a, encoding: .utf8)) == "autosaved" {
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertEqual(try String(contentsOf: a, encoding: .utf8), "autosaved")
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertNil(editor.lastError)
+    }
 }
