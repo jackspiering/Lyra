@@ -2,31 +2,10 @@ import AppKit
 import SwiftUI
 
 extension Notification.Name {
-    static let lyraSaveNote = Notification.Name("lyraSaveNote")
-    static let lyraExportPDF = Notification.Name("lyraExportPDF")
-    static let lyraNewNote = Notification.Name("lyraNewNote")
-    static let lyraNewFolder = Notification.Name("lyraNewFolder")
-    static let lyraOpenVault = Notification.Name("lyraOpenVault")
-    /// Open a Markdown note from the current vault (⌘O when a vault is open).
-    static let lyraGoToFile = Notification.Name("lyraGoToFile")
-    static let lyraToggleViewMode = Notification.Name("lyraToggleViewMode")
-    static let lyraRefreshVault = Notification.Name("lyraRefreshVault")
-    /// Move the sidebar selection to the Trash (⌘⌫).
-    static let lyraDeleteSelection = Notification.Name("lyraDeleteSelection")
-    /// Show the Source find bar (⌘F).
-    static let lyraFindInNote = Notification.Name("lyraFindInNote")
-    /// Open in-memory vault full-text search (⇧⌘F).
-    static let lyraFindInVault = Notification.Name("lyraFindInVault")
-    /// Show or hide the backlinks inspector.
-    static let lyraToggleBacklinks = Notification.Name("lyraToggleBacklinks")
-    /// New empty note tab in the key vault window (⌘T).
-    static let lyraNewTab = Notification.Name("lyraNewTab")
-    /// Open the sidebar selection in a new note tab (File → Open in New Tab).
-    static let lyraOpenInNewTab = Notification.Name("lyraOpenInNewTab")
-    /// Close the selected note tab (File → Close Tab). Last tab becomes empty.
-    static let lyraCloseTab = Notification.Name("lyraCloseTab")
     /// Posted when quit was cancelled because one or more saves failed. The
-    /// owning window surfaces the first failed editor.
+    /// owning window surfaces the first failed editor. App-global by design:
+    /// the failing editor may belong to a background window, so this cannot
+    /// ride the per-window `VaultCommands` focused value.
     static let lyraQuitSaveFailed = Notification.Name("lyraQuitSaveFailed")
 }
 
@@ -104,6 +83,7 @@ struct VaultWindowRoot: View {
 @main
 struct LyraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @FocusedValue(\.vaultCommands) private var vaultCommands: VaultCommands?
 
     init() {
         LyraFonts.registerBundledFonts()
@@ -123,79 +103,79 @@ struct LyraApp: App {
                 NewVaultWindowButton()
 
                 Button("New Note") {
-                    NotificationCenter.default.post(name: .lyraNewNote, object: nil)
+                    vaultCommands?.createNote()
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
                 Button("New Folder") {
-                    NotificationCenter.default.post(name: .lyraNewFolder, object: nil)
+                    vaultCommands?.createFolder()
                 }
 
                 Button("New Tab") {
-                    NotificationCenter.default.post(name: .lyraNewTab, object: nil)
+                    vaultCommands?.newTab()
                 }
                 .keyboardShortcut("t", modifiers: .command)
 
                 Button("Open in New Tab") {
-                    NotificationCenter.default.post(name: .lyraOpenInNewTab, object: nil)
+                    vaultCommands?.openInNewTab()
                 }
 
                 Button("Close Tab") {
-                    NotificationCenter.default.post(name: .lyraCloseTab, object: nil)
+                    vaultCommands?.closeTab()
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {
-                    NotificationCenter.default.post(name: .lyraSaveNote, object: nil)
+                    vaultCommands?.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
             }
             CommandGroup(after: .importExport) {
                 Button("Export PDF…") {
-                    NotificationCenter.default.post(name: .lyraExportPDF, object: nil)
+                    vaultCommands?.exportPDF()
                 }
             }
             CommandGroup(after: .newItem) {
                 Button("Go to File…") {
-                    NotificationCenter.default.post(name: .lyraGoToFile, object: nil)
+                    vaultCommands?.goToFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
 
                 Button("Open Vault…") {
-                    NotificationCenter.default.post(name: .lyraOpenVault, object: nil)
+                    vaultCommands?.openVault()
                 }
 
                 Button("Refresh Vault") {
-                    NotificationCenter.default.post(name: .lyraRefreshVault, object: nil)
+                    vaultCommands?.refresh()
                 }
                 .keyboardShortcut("r", modifiers: .command)
 
                 Divider()
 
                 Button("Move to Trash") {
-                    NotificationCenter.default.post(name: .lyraDeleteSelection, object: nil)
+                    vaultCommands?.requestDelete()
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {
-                    NotificationCenter.default.post(name: .lyraToggleViewMode, object: nil)
+                    vaultCommands?.toggleViewMode()
                 }
                 .keyboardShortcut("e", modifiers: .command)
 
                 Button("Backlinks") {
-                    NotificationCenter.default.post(name: .lyraToggleBacklinks, object: nil)
+                    vaultCommands?.toggleBacklinks()
                 }
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") {
-                    NotificationCenter.default.post(name: .lyraFindInNote, object: nil)
+                    vaultCommands?.findInNote()
                 }
                 .keyboardShortcut("f", modifiers: .command)
 
                 Button("Search Vault…") {
-                    NotificationCenter.default.post(name: .lyraFindInVault, object: nil)
+                    vaultCommands?.findInVault()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             }

@@ -92,7 +92,7 @@ One primary type per file when practical.
 
 **Why:** The monolith had outgrown “one primary type per file”; the split keeps the module map honest without changing behavior.
 
-**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands are still routed via notifications gated by the key window (`ContentViewCommands`); a `@FocusedValue`-based rewrite is the deferred follow-up.
+**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window (`ContentViewCommands`); from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
 
 ### Inter typeface (v0.5)
 

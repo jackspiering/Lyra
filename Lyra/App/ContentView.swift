@@ -32,17 +32,12 @@ struct ContentView: View {
         tabs.selectedEditor
     }
 
-    @State private var hostWindowNumber: Int?
-
     var body: some View {
         rootShell
             // Empty chrome title — vault name must not repeat in toolbar principal.
             .navigationTitle("")
             .frame(minWidth: 900, minHeight: 560)
             .font(LyraFonts.body)
-            .background(
-                WindowNumberReader { hostWindowNumber = $0 }
-            )
             .background(
                 DocumentEditedReader(isEdited: tabs.anyDirty)
             )
@@ -63,25 +58,31 @@ struct ContentView: View {
                 onSelectionChange: handleSelectionChange,
                 onHasErrorChange: handleHasErrorChange,
                 flushEditorError: flushEditorError,
-                exportPDF: exportPDF,
                 quitSaveFailed: handleEditorSaveFailures,
+                newNoteSheet: newNoteSheet,
+                deleteConfirmSheet: deleteConfirmSheet
+            ))
+            // Menu commands ride the focused scene: the key vault window
+            // publishes its command set; unfocused windows stay inert.
+            .focusedSceneValue(\.vaultCommands, VaultCommands(
+                save: {
+                    _ = editor.saveIfNeeded()
+                    flushEditorError()
+                },
+                exportPDF: exportPDF,
                 openVault: openVault,
                 goToFile: goToFile,
-                beginNewNote: beginNewNote,
-                requestDelete: requestDelete,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
+                createNote: beginNewNote,
+                createFolder: { store.createFolder() },
+                requestDelete: requestDelete,
+                refresh: { store.refresh() },
                 findInNote: findInNote,
                 findInVault: { showVaultSearch = true },
                 toggleBacklinks: { showBacklinks.toggle() },
                 newTab: newTab,
                 openInNewTab: openSelectionInNewTab,
-                closeTab: { closeTab(id: tabs.selectedTabID) },
-                newNoteSheet: newNoteSheet,
-                deleteConfirmSheet: deleteConfirmSheet,
-                shouldHandleCommands: {
-                    guard let hostWindowNumber else { return false }
-                    return NSApp.keyWindow?.windowNumber == hostWindowNumber
-                }
+                closeTab: { closeTab(id: tabs.selectedTabID) }
             ))
     }
 

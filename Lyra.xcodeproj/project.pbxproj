@@ -26,7 +26,6 @@
 		A10000000000000000000018 /* VaultFolderPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* VaultFolderPicker.swift */; };
 		A10000000000000000000042 /* VaultNotePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000042 /* VaultNotePicker.swift */; };
 		A10000000000000000000043 /* ContentViewChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000043 /* ContentViewChrome.swift */; };
-		A10000000000000000000044 /* ContentViewCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000044 /* ContentViewCommands.swift */; };
 		A10000000000000000000045 /* WindowStateReaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000045 /* WindowStateReaders.swift */; };
 		A10000000000000000000046 /* NewNoteNameField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000046 /* NewNoteNameField.swift */; };
 		A10000000000000000000019 /* LyraTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* LyraTheme.swift */; };
@@ -85,6 +84,7 @@
 		A10000000000000000000054 /* ParserFuzzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000054 /* ParserFuzzTests.swift */; };
 		A10000000000000000000055 /* PreviewImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000055 /* PreviewImageTests.swift */; };
 		A10000000000000000000056 /* NoteTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000056 /* NoteTabModelTests.swift */; };
+		A10000000000000000000057 /* VaultCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000057 /* VaultCommands.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -121,7 +121,6 @@
 		B10000000000000000000018 /* VaultFolderPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFolderPicker.swift; sourceTree = "<group>"; };
 		B10000000000000000000042 /* VaultNotePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNotePicker.swift; sourceTree = "<group>"; };
 		B10000000000000000000043 /* ContentViewChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewChrome.swift; sourceTree = "<group>"; };
-		B10000000000000000000044 /* ContentViewCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewCommands.swift; sourceTree = "<group>"; };
 		B10000000000000000000045 /* WindowStateReaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowStateReaders.swift; sourceTree = "<group>"; };
 		B10000000000000000000046 /* NewNoteNameField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNoteNameField.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* LyraTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyraTheme.swift; sourceTree = "<group>"; };
@@ -180,6 +179,7 @@
 		B10000000000000000000054 /* ParserFuzzTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserFuzzTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000055 /* PreviewImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewImageTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000056 /* NoteTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabModelTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000057 /* VaultCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultCommands.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -272,7 +272,6 @@
 				B10000000000000000000018 /* VaultFolderPicker.swift */,
 				B10000000000000000000042 /* VaultNotePicker.swift */,
 				B10000000000000000000043 /* ContentViewChrome.swift */,
-				B10000000000000000000044 /* ContentViewCommands.swift */,
 				B10000000000000000000045 /* WindowStateReaders.swift */,
 				B10000000000000000000046 /* NewNoteNameField.swift */,
 				B10000000000000000000019 /* LyraTheme.swift */,
@@ -295,6 +294,7 @@
 				B1000000000000000000004A /* WikiFollowSheet.swift */,
 				B1000000000000000000004B /* VaultSearchPalette.swift */,
 				B1000000000000000000004C /* BacklinksInspector.swift */,
+				B10000000000000000000057 /* VaultCommands.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -465,10 +465,9 @@
 				A10000000000000000000001 /* LyraApp.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				A10000000000000000000004 /* SidebarView.swift in Sources */,
-				A10000000000000000000018 /* VaultFolderPicker.swift in Sources */,
 				A10000000000000000000042 /* VaultNotePicker.swift in Sources */,
 				A10000000000000000000043 /* ContentViewChrome.swift in Sources */,
-				A10000000000000000000044 /* ContentViewCommands.swift in Sources */,
+				A10000000000000000000018 /* VaultFolderPicker.swift in Sources */,
 				A10000000000000000000045 /* WindowStateReaders.swift in Sources */,
 				A10000000000000000000046 /* NewNoteNameField.swift in Sources */,
 				A10000000000000000000005 /* VaultNode.swift in Sources */,
@@ -508,6 +507,7 @@
 				A10000000000000000000049 /* VaultFullTextSearch.swift in Sources */,
 				A1000000000000000000004A /* WikiFollowSheet.swift in Sources */,
 				A1000000000000000000004B /* VaultSearchPalette.swift in Sources */,
+				A10000000000000000000057 /* VaultCommands.swift in Sources */,
 				A1000000000000000000004C /* BacklinksInspector.swift in Sources */,
 				A10000000000000000000050 /* PreviewImage.swift in Sources */,
 				A10000000000000000000051 /* VaultBookmarkRestore.swift in Sources */,
