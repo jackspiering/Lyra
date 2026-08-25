@@ -1,6 +1,4 @@
-import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Bindable var store: VaultStore
@@ -16,7 +14,8 @@ struct ContentView: View {
     @State private var didAlertSaveFailure = false
     /// Bumped when ⌘F should show the Source find bar.
     @State private var findBarToken = 0
-    @State private var wikiPrompt: WikiFollowPrompt?
+    @State private var wikiFlow: WikiFlow
+    @State private var pdfExport: PDFExportFlow
     @State private var showVaultSearch = false
     @State private var vaultSearchQuery = ""
     @SceneStorage("lyra.showBacklinks") private var showBacklinks = false
@@ -32,7 +31,24 @@ struct ContentView: View {
         tabs.selectedEditor
     }
 
+    init(
+        store: VaultStore,
+        tabs: NoteTabController,
+        openNewVaultWindow: ((UUID) -> Void)?
+    ) {
+        self.store = store
+        self.tabs = tabs
+        self.openNewVaultWindow = openNewVaultWindow
+        // One presentation policy shared by both flows.
+        let flushError: (EditorViewModel) -> Void = {
+            Self.flushEditorError($0, presentingOn: store)
+        }
+        _wikiFlow = State(initialValue: WikiFlow(store: store, tabs: tabs, flushError: flushError))
+        _pdfExport = State(initialValue: PDFExportFlow(store: store, tabs: tabs, flushError: flushError))
+    }
+
     var body: some View {
+        @Bindable var flow = wikiFlow
         rootShell
             // Empty chrome title — vault name must not repeat in toolbar principal.
             .navigationTitle("")
@@ -57,7 +73,7 @@ struct ContentView: View {
                 showNewNoteSheet: $showNewNoteSheet,
                 onSelectionChange: handleSelectionChange,
                 onHasErrorChange: handleHasErrorChange,
-                flushEditorError: flushEditorError,
+                flushEditorError: { Self.flushEditorError(editor, presentingOn: store) },
                 quitSaveFailed: handleEditorSaveFailures,
                 newNoteSheet: newNoteSheet,
                 deleteConfirmSheet: deleteConfirmSheet
@@ -67,9 +83,9 @@ struct ContentView: View {
             .focusedSceneValue(\.vaultCommands, VaultCommands(
                 save: {
                     _ = editor.saveIfNeeded()
-                    flushEditorError()
+                    Self.flushEditorError(editor, presentingOn: store)
                 },
-                exportPDF: exportPDF,
+                exportPDF: { pdfExport.exportActiveNote() },
                 openVault: openVault,
                 goToFile: goToFile,
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
@@ -111,7 +127,7 @@ struct ContentView: View {
                 onCommitRename: commitSidebarRename,
                 onRequestDelete: requestDelete,
                 onNewNote: beginNewNote,
-                onExportNotePDF: exportNotePDF
+                onExportNotePDF: { pdfExport.exportNote($0) }
             )
             .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
             .toolbar {
@@ -139,18 +155,18 @@ struct ContentView: View {
                     }
                 }
         }
-        .sheet(item: $wikiPrompt) { prompt in
+        .sheet(item: $flow.prompt) { prompt in
             WikiFollowSheet(
                 prompt: prompt,
                 onPick: { url in
-                    wikiPrompt = nil
-                    openResolvedNote(url)
+                    flow.cancelPrompt()
+                    flow.open(url)
                 },
                 onCreate: { dest in
-                    wikiPrompt = nil
-                    createWikiNote(at: dest)
+                    flow.cancelPrompt()
+                    flow.create(at: dest)
                 },
-                onCancel: { wikiPrompt = nil }
+                onCancel: { flow.cancelPrompt() }
             )
         }
         .sheet(isPresented: $showVaultSearch) {
@@ -159,7 +175,7 @@ struct ContentView: View {
                 search: { store.searchNoteBodies(query: $0, liveBodies: liveBodies()) },
                 onOpen: { url in
                     showVaultSearch = false
-                    openResolvedNote(url)
+                    flow.open(url)
                 },
                 onClose: { showVaultSearch = false }
             )
@@ -180,7 +196,7 @@ struct ContentView: View {
         .help("Source or Reading (⌘E)")
 
         Button {
-            exportPDF()
+            pdfExport.exportActiveNote()
         } label: {
             Label("Export PDF", systemImage: "doc.richtext")
         }
@@ -247,7 +263,7 @@ struct ContentView: View {
                         Divider()
                         BacklinksInspector(
                             items: store.backlinks(to: url, liveBodies: liveBodies()),
-                            onOpen: { openResolvedNote($0) },
+                            onOpen: { flow.open($0) },
                             onHide: { showBacklinks = false }
                         )
                     }
@@ -276,7 +292,7 @@ struct ContentView: View {
                 noteURL: editor.fileURL,
                 onEdit: { editor.noteEdited() },
                 onPasteError: { store.present(context: .pasteImage, message: $0) },
-                onWikiLink: { openWikiLink($0) },
+                onWikiLink: { flow.followLink($0, from: editor.fileURL) },
                 findBarToken: findBarToken
             )
             // Per-file identity: reset selection, scroll, and undo when switching notes/tabs.
@@ -286,7 +302,7 @@ struct ContentView: View {
                 text: editor.text,
                 noteDirectory: editor.fileURL?.deletingLastPathComponent(),
                 vaultRoot: store.rootURL,
-                onWikiLink: { openWikiLink($0) }
+                onWikiLink: { flow.followLink($0, from: editor.fileURL) }
             )
         }
     }
@@ -329,7 +345,7 @@ struct ContentView: View {
         } else {
             // Flush the tab that failed to save, not necessarily the previously selected editor.
             selectTab(containing: editorRef)
-            flushEditorError(for: editorRef)
+            Self.flushEditorError(editorRef, presentingOn: store)
         }
     }
 
@@ -352,7 +368,7 @@ struct ContentView: View {
         // Surface autosave failures once; the toolbar indicator covers the ongoing state.
         if has && !didAlertSaveFailure {
             didAlertSaveFailure = true
-            flushEditorError()
+            Self.flushEditorError(editor, presentingOn: store)
         }
         if !has {
             didAlertSaveFailure = false
@@ -386,7 +402,7 @@ struct ContentView: View {
         }
         guard let url = VaultNotePicker.pick(vaultRoot: root) else { return }
         store.selection = url.path
-        activateNote(url: url)
+        wikiFlow.activate(url)
     }
 
     private func beginNewNote() {
@@ -424,7 +440,7 @@ struct ContentView: View {
             let affected = openPath == path || (node.isDirectory && openPath.hasPrefix(path + "/"))
             guard affected else { continue }
             if !tab.editor.close() {
-                flushEditorError(for: tab.editor)
+                Self.flushEditorError(tab.editor, presentingOn: store)
                 return
             }
         }
@@ -499,7 +515,7 @@ struct ContentView: View {
         let oldPath = node.url.path
         for tab in tabs.tabs {
             guard tab.editor.saveIfNeeded() else {
-                flushEditorError(for: tab.editor)
+                Self.flushEditorError(tab.editor, presentingOn: store)
                 return false
             }
         }
@@ -525,7 +541,7 @@ struct ContentView: View {
         // Flush this note (and siblings) before the path changes.
         for tab in tabs.tabs {
             guard tab.editor.saveIfNeeded() else {
-                flushEditorError(for: tab.editor)
+                Self.flushEditorError(tab.editor, presentingOn: store)
                 return
             }
         }
@@ -550,39 +566,9 @@ struct ContentView: View {
             return
         }
 
-        activateNote(url: node.url)
+        wikiFlow.activate(node.url)
     }
 
-    /// Open a note from sidebar / wiki: already open → select; empty active → fill; else new tab.
-    private func activateNote(url: URL) {
-        if tabs.selectOpenNote(path: url.path) { return }
-        if editor.fileURL == nil {
-            // empty active tab — fill it
-            _ = tabs.openInActiveTab(url: url) { created in
-                AppSession.shared.register(editor: created.editor, store: store)
-            }
-            // Whether the fill succeeded or not, surface any failure from the previous save/open.
-            flushEditorError()
-            return
-        }
-        if editor.fileURL?.path == url.path { return }
-        // Active has another note → new tab
-        let ok = tabs.openInNewTab(
-            url: url,
-            onCreated: { created in
-                AppSession.shared.register(editor: created.editor, store: store)
-            },
-            onFailed: { failed in
-                flushEditorError(for: failed)
-            }
-        )
-        if ok {
-            flushEditorError()
-        } else {
-            // Restored previous tab after rollback — align sidebar to it.
-            store.selection = tabs.selectedTab?.editor.fileURL?.path
-        }
-    }
 
     /// File → Open in New Tab: always new tab if not already open; if already open, just select.
     private func openSelectionInNewTab() {
@@ -597,21 +583,20 @@ struct ContentView: View {
                 AppSession.shared.register(editor: created.editor, store: store)
             },
             onFailed: { failed in
-                flushEditorError(for: failed)
+                Self.flushEditorError(failed, presentingOn: store)
             }
         )
         if ok {
-            flushEditorError()
+            Self.flushEditorError(tabs.selectedEditor, presentingOn: store)
         }
         // On failure, selection stays on the chosen file; failed editor error already flushed via onFailed.
     }
 
-    private func flushEditorError() {
-        flushEditorError(for: editor)
-    }
 
-    private func flushEditorError(for ed: EditorViewModel) {
-        // External conflicts / missing file use their own dialogs.
+    /// Canonical transient-error surfacing shared by the window shell and its
+    /// flows: conflict / missing-file cases belong to their own dialogs;
+    /// anything else presents once and clears.
+    static func flushEditorError(_ ed: EditorViewModel, presentingOn store: VaultStore) {
         guard !ed.hasExternalConflict, !ed.hasMissingFile else { return }
         guard let last = ed.lastError else { return }
         store.present(error: last.error, context: last.context)
@@ -625,7 +610,7 @@ struct ContentView: View {
             tabs.tabs.contains { $0.editor === editor }
         }) else { return }
         selectTab(containing: failed)
-        flushEditorError(for: failed)
+        Self.flushEditorError(failed, presentingOn: store)
     }
 
     private func selectTab(containing editor: EditorViewModel) {
@@ -634,47 +619,6 @@ struct ContentView: View {
         store.selection = tab.editor.fileURL?.path
     }
 
-    private func openWikiLink(_ text: String) {
-        switch store.resolveWikiLink(text) {
-        case .unique(let url):
-            openResolvedNote(url)
-        case .ambiguous(let candidates):
-            wikiPrompt = .pick(query: text, candidates: candidates)
-        case .unresolved:
-            guard let root = store.rootURL,
-                  let dest = WikiLinkSyntax.destinationURL(
-                    target: WikiLinkSyntax.parseInner(text).target,
-                    vaultRoot: root,
-                    linkingNoteURL: editor.fileURL
-                  ) else {
-                return
-            }
-            wikiPrompt = .create(query: text, destination: dest)
-        }
-    }
-
-    private func openResolvedNote(_ url: URL) {
-        if tabs.selectOpenNote(path: url.path) {
-            store.selection = url.path
-            return
-        }
-        guard editor.saveIfNeeded() else {
-            flushEditorError()
-            return
-        }
-        store.selection = url.path
-        activateNote(url: url)
-    }
-
-    private func createWikiNote(at dest: URL) {
-        guard editor.saveIfNeeded() else {
-            flushEditorError()
-            return
-        }
-        guard store.createNote(at: dest) else { return }
-        store.selection = dest.path
-        activateNote(url: dest)
-    }
 
     private func findInNote() {
         guard noteViewMode == .source, editor.fileURL != nil else { return }
@@ -688,74 +632,6 @@ struct ContentView: View {
             bodies[path] = tab.editor.text
         }
         return bodies
-    }
-
-    private func exportPDF() {
-        guard let noteURL = editor.fileURL else { return }
-        _ = editor.saveIfNeeded()
-        flushEditorError()
-        exportMarkdown(
-            editor.text,
-            noteDirectory: noteURL.deletingLastPathComponent(),
-            suggestedName: noteURL.deletingPathExtension().lastPathComponent + ".pdf",
-            directoryURL: noteURL.deletingLastPathComponent()
-        )
-    }
-
-    private func exportNotePDF(_ node: VaultNode) {
-        guard !node.isDirectory, store.rootURL != nil else { return }
-        let markdown: String
-        if let openTab = tabs.tabs.first(where: { $0.editor.fileURL?.path == node.url.path }) {
-            _ = openTab.editor.saveIfNeeded()
-            markdown = openTab.editor.text
-        } else {
-            do {
-                markdown = try String(contentsOf: node.url, encoding: .utf8)
-            } catch {
-                store.present(error: error, context: .exportPDF)
-                return
-            }
-        }
-        exportMarkdown(
-            markdown,
-            noteDirectory: node.url.deletingLastPathComponent(),
-            suggestedName: node.url.deletingPathExtension().lastPathComponent + ".pdf",
-            directoryURL: node.url.deletingLastPathComponent()
-        )
-    }
-
-    private func exportMarkdown(
-        _ markdown: String,
-        noteDirectory: URL,
-        suggestedName: String,
-        directoryURL: URL?
-    ) {
-        guard let vault = store.rootURL else { return }
-        Task { @MainActor in
-            do {
-                let data = try await Task.detached(priority: .userInitiated) {
-                    try NotePDFExporter.pdfData(
-                        markdown: markdown,
-                        noteDirectory: noteDirectory,
-                        vaultRoot: vault
-                    )
-                }.value
-                let panel = NSSavePanel()
-                panel.allowedContentTypes = [.pdf]
-                panel.nameFieldStringValue = suggestedName
-                panel.directoryURL = directoryURL
-                panel.begin { resp in
-                    guard resp == .OK, let url = panel.url else { return }
-                    do {
-                        try data.write(to: url, options: .atomic)
-                    } catch {
-                        store.present(error: error, context: .exportPDF)
-                    }
-                }
-            } catch {
-                store.present(error: error, context: .exportPDF)
-            }
-        }
     }
 
 }
