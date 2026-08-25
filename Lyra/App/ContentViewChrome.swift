@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Window chrome (dialogs + command routing) — kept out of `ContentView.body` so the type-checker stays happy.
+/// Window chrome (dialogs + quit-save-failure routing) — kept out of `ContentView.body` so the type-checker stays happy.
 struct ContentViewChrome: ViewModifier {
     @Bindable var store: VaultStore
     @Bindable var editor: EditorViewModel
@@ -9,22 +9,9 @@ struct ContentViewChrome: ViewModifier {
     var onSelectionChange: (VaultNode.ID?) -> Void
     var onHasErrorChange: (Bool) -> Void
     var flushEditorError: () -> Void
-    var exportPDF: () -> Void
     var quitSaveFailed: ([EditorViewModel]) -> Void
-    var openVault: () -> Void
-    var goToFile: () -> Void
-    var beginNewNote: () -> Void
-    var requestDelete: () -> Void
-    var toggleViewMode: () -> Void
-    var findInNote: () -> Void
-    var findInVault: () -> Void
-    var toggleBacklinks: () -> Void
-    var newTab: () -> Void
-    var openInNewTab: () -> Void
-    var closeTab: () -> Void
     var newNoteSheet: () -> AnyView
     var deleteConfirmSheet: () -> AnyView
-    var shouldHandleCommands: () -> Bool
 
     init(
         store: VaultStore,
@@ -34,22 +21,9 @@ struct ContentViewChrome: ViewModifier {
         onSelectionChange: @escaping (VaultNode.ID?) -> Void,
         onHasErrorChange: @escaping (Bool) -> Void,
         flushEditorError: @escaping () -> Void,
-        exportPDF: @escaping () -> Void,
         quitSaveFailed: @escaping ([EditorViewModel]) -> Void,
-        openVault: @escaping () -> Void,
-        goToFile: @escaping () -> Void,
-        beginNewNote: @escaping () -> Void,
-        requestDelete: @escaping () -> Void,
-        toggleViewMode: @escaping () -> Void,
-        findInNote: @escaping () -> Void,
-        findInVault: @escaping () -> Void,
-        toggleBacklinks: @escaping () -> Void,
-        newTab: @escaping () -> Void,
-        openInNewTab: @escaping () -> Void,
-        closeTab: @escaping () -> Void,
         newNoteSheet: @escaping () -> some View,
-        deleteConfirmSheet: @escaping () -> some View,
-        shouldHandleCommands: @escaping () -> Bool
+        deleteConfirmSheet: @escaping () -> some View
     ) {
         self.store = store
         self.editor = editor
@@ -58,22 +32,9 @@ struct ContentViewChrome: ViewModifier {
         self.onSelectionChange = onSelectionChange
         self.onHasErrorChange = onHasErrorChange
         self.flushEditorError = flushEditorError
-        self.exportPDF = exportPDF
         self.quitSaveFailed = quitSaveFailed
-        self.openVault = openVault
-        self.goToFile = goToFile
-        self.beginNewNote = beginNewNote
-        self.requestDelete = requestDelete
-        self.toggleViewMode = toggleViewMode
-        self.findInNote = findInNote
-        self.findInVault = findInVault
-        self.toggleBacklinks = toggleBacklinks
-        self.newTab = newTab
-        self.openInNewTab = openInNewTab
-        self.closeTab = closeTab
         self.newNoteSheet = { AnyView(newNoteSheet()) }
         self.deleteConfirmSheet = { AnyView(deleteConfirmSheet()) }
-        self.shouldHandleCommands = shouldHandleCommands
     }
 
     func body(content: Content) -> some View {
@@ -93,28 +54,13 @@ struct ContentViewChrome: ViewModifier {
             .onChange(of: editor.hasError) { _, has in
                 onHasErrorChange(has)
             }
-            .modifier(ContentViewCommands(
-                shouldHandle: shouldHandleCommands,
-                exportPDF: exportPDF,
-                openVault: openVault,
-                goToFile: goToFile,
-                toggleViewMode: toggleViewMode,
-                createNote: beginNewNote,
-                createFolder: { store.createFolder() },
-                requestDelete: requestDelete,
-                refresh: { store.refresh() },
-                save: {
-                    _ = editor.saveIfNeeded()
-                    flushEditorError()
-                },
-                quitSaveFailed: quitSaveFailed,
-                findInNote: findInNote,
-                findInVault: findInVault,
-                toggleBacklinks: toggleBacklinks,
-                newTab: newTab,
-                openInNewTab: openInNewTab,
-                closeTab: closeTab
-            ))
+            // App-global by design — the failing editor may belong to a
+            // background window, so every vault window observes and claims
+            // its own editors from the payload.
+            .onReceive(NotificationCenter.default.publisher(for: .lyraQuitSaveFailed)) { notification in
+                let failures = notification.object as? [EditorViewModel] ?? []
+                quitSaveFailed(failures)
+            }
     }
 }
 

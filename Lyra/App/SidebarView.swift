@@ -136,6 +136,7 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
+                    .accessibilityLabel("Rename \(node.name)")
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename(node) }
                     .onExitCommand { cancelRename() }
@@ -153,6 +154,7 @@ struct SidebarView: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
             }
+            .accessibilityLabel(node.isDirectory ? "Folder \(node.name)" : "Note \(node.name)")
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
             .contentShape(Rectangle())
             // Register double-tap before single-tap so rename wins on double-click.

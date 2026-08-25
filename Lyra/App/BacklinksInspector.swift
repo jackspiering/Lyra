@@ -18,6 +18,7 @@ struct BacklinksInspector: View {
                 }
                 .buttonStyle(.plain)
                 .help("Hide Backlinks")
+                .accessibilityLabel("Hide Backlinks")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
