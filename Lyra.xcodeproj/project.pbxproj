@@ -84,6 +84,7 @@
 		A10000000000000000000053 /* VaultBookmarkRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */; };
 		A10000000000000000000054 /* ParserFuzzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000054 /* ParserFuzzTests.swift */; };
 		A10000000000000000000055 /* PreviewImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000055 /* PreviewImageTests.swift */; };
+		A10000000000000000000056 /* NoteTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000056 /* NoteTabModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -178,6 +179,7 @@
 		B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkRestoreTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000054 /* ParserFuzzTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserFuzzTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000055 /* PreviewImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewImageTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000056 /* NoteTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -248,6 +250,7 @@
 				B10000000000000000000053 /* VaultBookmarkRestoreTests.swift */,
 				B10000000000000000000054 /* ParserFuzzTests.swift */,
 				B10000000000000000000055 /* PreviewImageTests.swift */,
+				B10000000000000000000056 /* NoteTabModelTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -537,6 +540,7 @@
 				A10000000000000000000053 /* VaultBookmarkRestoreTests.swift in Sources */,
 				A10000000000000000000054 /* ParserFuzzTests.swift in Sources */,
 				A10000000000000000000055 /* PreviewImageTests.swift in Sources */,
+				A10000000000000000000056 /* NoteTabModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
