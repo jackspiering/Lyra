@@ -70,6 +70,8 @@ private struct NoteTabChip: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isDirty ? "\(title), edited" : title)
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -80,6 +82,7 @@ private struct NoteTabChip: View {
             }
             .buttonStyle(.plain)
             .help("Close Tab")
+            .accessibilityLabel("Close \(title)")
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
