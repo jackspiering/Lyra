@@ -9,8 +9,9 @@ import Observation
 @MainActor
 @Observable
 final class WikiFlow {
-    /// Active pick-or-create confirmation sheet; nil when idle.
-    private(set) var prompt: WikiFollowPrompt?
+    /// Active pick-or-create confirmation sheet; nil when idle. Settable so
+    /// the window shell can bind it to a sheet via `@Bindable`.
+    var prompt: WikiFollowPrompt?
 
     private let store: VaultStore
     private let tabs: NoteTabController

@@ -15,7 +15,7 @@
   </a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version 0.10.1" src="https://img.shields.io/badge/version-0.10.1-informational?style=flat-square">
+  <img alt="Version 0.10.2" src="https://img.shields.io/badge/version-0.10.2-informational?style=flat-square">
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   </a>

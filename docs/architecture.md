@@ -94,6 +94,12 @@ One primary type per file when practical.
 
 **Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window (`ContentViewCommands`); from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
 
+From 0.10.2 the decomposition continued along the same seams: wiki-link
+resolution, the pick-or-create sheet, and shared tab activation live in
+`WikiFlow`; PDF export orchestration lives in `PDFExportFlow`. `ContentView`
+is shell + wiring, and both flows share one canonical editor-error surfacing
+helper so presentation policy cannot fork.
+
 ### Inter typeface (v0.5)
 
 **Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced. Appearance is System / Light / Dark only. No theme marketplace.
