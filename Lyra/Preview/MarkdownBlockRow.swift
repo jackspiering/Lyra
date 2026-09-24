@@ -154,20 +154,24 @@ private struct MarkdownPreviewImage: View {
             image = nil
             failure = nil
             finishedLoading = false
-            // Bytes and decoding both run off the main actor. `NSImage` crosses
-            // back only as the finished result for state assignment.
-            let result = await Task.detached(priority: .utility) { () -> (NSImage?, String?) in
-                guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes) else {
-                    return (nil, "Couldn't read image: \(url.lastPathComponent)")
-                }
-                guard let decoded = PreviewImage.decode(data) else {
-                    return (nil, "Image is too large or couldn't be decoded: \(url.lastPathComponent)")
-                }
-                return (decoded, nil)
+            // Bytes load off the main actor with a no-follow, bounded read.
+            // Decoding stays on this actor: `NSImage` is not Sendable, so it
+            // cannot cross back from a detached task.
+            let data = await Task.detached(priority: .utility) {
+                FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes)
             }.value
             guard !Task.isCancelled else { return }
-            image = result.0
-            failure = result.1
+            guard let data else {
+                failure = "Couldn't read image: \(url.lastPathComponent)"
+                finishedLoading = true
+                return
+            }
+            guard let decoded = PreviewImage.decode(data) else {
+                failure = "Image is too large or couldn't be decoded: \(url.lastPathComponent)"
+                finishedLoading = true
+                return
+            }
+            image = decoded
             finishedLoading = true
         }
     }
