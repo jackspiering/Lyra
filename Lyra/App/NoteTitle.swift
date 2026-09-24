@@ -18,8 +18,14 @@ enum NoteTitle {
     }
 
     /// Title-field commit always requests a rename. Markdown is unchanged.
-    static func applyingTitle(_ newTitle: String, to markdown: String) -> (markdown: String, renamedStem: String?) {
-        let stem = FilenameValidation.sanitizeNoteStem(newTitle)
-        return (markdown, stem)
+    /// Invalid titles return an error instead of silently falling back.
+    static func applyingTitle(_ newTitle: String, to markdown: String) -> (markdown: String, renamedStem: String?, error: String?) {
+        switch FilenameValidation.validate(newTitle, isDirectory: false) {
+        case .invalid(let detail):
+            return (markdown, nil, detail)
+        case .ok(let name):
+            let stem = (name as NSString).deletingPathExtension
+            return (markdown, stem, nil)
+        }
     }
 }

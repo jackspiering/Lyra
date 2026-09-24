@@ -7,9 +7,10 @@ struct VaultSearchPalette: View {
     var onOpen: (URL) -> Void
     var onClose: () -> Void
     @FocusState private var queryFocused: Bool
+    @State private var debouncedQuery = ""
 
     private var hits: [VaultFullTextSearch.Hit] {
-        search(query)
+        search(debouncedQuery)
     }
 
     var body: some View {
@@ -24,6 +25,16 @@ struct VaultSearchPalette: View {
                     .font(LyraFonts.headline)
                     .focused($queryFocused)
                     .onAppear { queryFocused = true }
+                    .onSubmit {
+                        if let first = search(query).first {
+                            onOpen(first.url)
+                        }
+                    }
+                    .task(id: query) {
+                        try? await Task.sleep(nanoseconds: 120_000_000)
+                        guard !Task.isCancelled else { return }
+                        debouncedQuery = query
+                    }
             }
             .padding(.horizontal, 12)
             .frame(height: 38)

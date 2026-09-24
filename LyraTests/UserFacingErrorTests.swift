@@ -74,4 +74,14 @@ final class UserFacingErrorTests: XCTestCase {
         XCTAssertEqual(redacted, "Couldn't save Roadmap.md today")
         XCTAssertFalse(redacted.contains("/tmp"))
     }
+
+    func testRedactAbsolutePathsAfterPunctuation() {
+        let redacted = UserFacingError.redactAbsolutePaths(
+            "path:/tmp/lyra-vault/note.md, [key=/tmp/lyra-vault/other.md]; (/tmp/lyra-vault/third.md)."
+        )
+        XCTAssertFalse(redacted.contains("/tmp"))
+        XCTAssertTrue(redacted.contains("note.md"))
+        XCTAssertTrue(redacted.contains("other.md"))
+        XCTAssertTrue(redacted.contains("third.md"))
+    }
 }

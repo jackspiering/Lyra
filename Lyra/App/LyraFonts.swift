@@ -6,15 +6,24 @@ import SwiftUI
 enum LyraFonts {
     private static var didRegister = false
 
-    static func registerBundledFonts() {
-        guard !didRegister else { return }
-        didRegister = true
+    @discardableResult
+    static func registerBundledFonts() -> [String] {
+        guard !didRegister else { return [] }
+        var failed: [String] = []
         for name in ["Inter-Regular", "Inter-SemiBold", "Inter-Bold"] {
             let url = Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts")
                 ?? Bundle.main.url(forResource: name, withExtension: "ttf")
-            guard let url else { continue }
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            guard let url else {
+                failed.append(name)
+                continue
+            }
+            var error: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+                failed.append(name)
+            }
         }
+        didRegister = failed.isEmpty
+        return failed
     }
 
     static func ui(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {

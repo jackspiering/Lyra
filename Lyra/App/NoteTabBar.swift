@@ -59,8 +59,9 @@ private struct NoteTabChip: View {
     var onClose: () -> Void
 
     @State private var isHovering = false
+    @FocusState private var closeFocused: Bool
 
-    private var showsClose: Bool { isHovering || (isSelected && !isDirty) }
+    private var showsClose: Bool { isHovering || (isSelected && !isDirty) || closeFocused }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -91,6 +92,7 @@ private struct NoteTabChip: View {
                 }
                 .buttonStyle(.plain)
                 .opacity(showsClose ? 1 : 0)
+                .focused($closeFocused)
                 .help("Close Tab")
                 .accessibilityLabel("Close \(title)")
             }
