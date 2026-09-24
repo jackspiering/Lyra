@@ -13,7 +13,7 @@
 | Job | Runner | What |
 |-----|--------|------|
 | `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` (structure + `Scripts/lint.sh` whitespace and shell syntax checks) |
-| `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug build + unit tests), after smoke |
+| `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug build + unit tests), in parallel with smoke |
 
 | Setting | Value |
 |---------|--------|
@@ -26,7 +26,7 @@
 
 | Trigger | What |
 |---------|------|
-| Push tag `v*` (e.g. `v0.9.0`) | Release build → DMG → GitHub Release asset |
+| Push tag `v*` (e.g. `v0.11.0`) | Release build → DMG → GitHub Release asset |
 | Manual **workflow_dispatch** | Same DMG build; artifact only (no Release unless tagged) |
 
 Version guard: the tag (or dispatch input) must be three-part semver and match `MARKETING_VERSION` in the Xcode project. The packaging script also validates its output paths, checks `CFBundleShortVersionString` inside the built app, and refuses to package unless the finished app has a valid signature with the expected sandbox entitlements.
@@ -46,21 +46,21 @@ Dependabot (`.github/dependabot.yml`) opens monthly PRs for GitHub Actions updat
 ```bash
 bash Scripts/smoke.sh
 bash Scripts/xcode-test.sh                              # Mac + Xcode
-VERSION=0.9.0 bash Scripts/package-dmg.sh               # → build/dist/Lyra-0.9.0.dmg
+VERSION=0.11.0 bash Scripts/package-dmg.sh              # → build/dist/Lyra-0.11.0.dmg
 ```
 
 ## Ship a DMG
 
-1. Merge to `main` with marketing version matching the intended tag (`0.9.0`).
+1. Merge to `main` with marketing version matching the intended tag (`0.11.0`).
 2. Tag and push:
 
 ```bash
 git checkout main && git pull
-git tag v0.9.0
-git push origin v0.9.0
+git tag v0.11.0
+git push origin v0.11.0
 ```
 
-3. When **Actions → Release** is green, download `Lyra-0.9.0.dmg` from [Releases](https://github.com/jackspiering/Lyra/releases).
+3. When **Actions → Release** is green, download `Lyra-0.11.0.dmg` from [Releases](https://github.com/jackspiering/Lyra/releases).
 
 ### Gatekeeper / signing
 

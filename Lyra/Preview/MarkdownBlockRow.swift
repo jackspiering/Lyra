@@ -110,6 +110,19 @@ struct MarkdownBlockRow: View {
     }
 }
 
+private struct ImageVersion: Hashable {
+    let path: String
+    let modificationDate: Date?
+    let fileSize: Int?
+
+    init(url: URL) {
+        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+        path = url.path
+        modificationDate = values?.contentModificationDate
+        fileSize = values?.fileSize
+    }
+}
+
 private struct MarkdownPreviewImage: View {
     let url: URL
     let alt: String
@@ -117,6 +130,7 @@ private struct MarkdownPreviewImage: View {
 
     @State private var image: NSImage?
     @State private var finishedLoading = false
+    @State private var failure: String?
 
     var body: some View {
         Group {
@@ -127,7 +141,7 @@ private struct MarkdownPreviewImage: View {
                     .frame(maxWidth: 480, alignment: .leading)
                     .accessibilityLabel(alt.isEmpty ? "Image" : alt)
             } else if finishedLoading {
-                Text("Missing image: \(path)")
+                Text(failure ?? "Missing image: \(path)")
                     .font(LyraFonts.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -136,18 +150,28 @@ private struct MarkdownPreviewImage: View {
                     .accessibilityLabel("Loading image")
             }
         }
-        .task(id: url) {
+        .task(id: ImageVersion(url: url)) {
             image = nil
+            failure = nil
             finishedLoading = false
-            // Load bytes off the main actor. `NSImage` is not Sendable, so
-            // decode on this actor after the Data hop (same pattern as before).
+            // Bytes load off the main actor with a no-follow, bounded read.
+            // Decoding stays on this actor: `NSImage` is not Sendable, so it
+            // cannot cross back from a detached task.
             let data = await Task.detached(priority: .utility) {
-                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                if size > PreviewImage.maxEncodedBytes { return Data?.none }
-                return try? Data(contentsOf: url)
+                FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes)
             }.value
             guard !Task.isCancelled else { return }
-            image = data.flatMap { PreviewImage.decode($0) }
+            guard let data else {
+                failure = "Couldn't read image: \(url.lastPathComponent)"
+                finishedLoading = true
+                return
+            }
+            guard let decoded = PreviewImage.decode(data) else {
+                failure = "Image is too large or couldn't be decoded: \(url.lastPathComponent)"
+                finishedLoading = true
+                return
+            }
+            image = decoded
             finishedLoading = true
         }
     }

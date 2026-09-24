@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if failed.isEmpty {
             return .terminateNow
         }
+        NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
         return .terminateCancel
     }
@@ -65,17 +66,22 @@ struct VaultWindowRoot: View {
             AppearanceController.apply(rawValue: new)
         }
         .onDisappear {
+            var hasFailedEditor = false
             for editor in tabs.allEditors() {
                 if editor.saveIfNeeded() {
                     AppSession.shared.unregister(editor: editor)
                 } else {
                     // Keep failed editor registered so AppSession can retry on quit;
-                    // do not unregister — prune keeps weak entry alive.
+                    // do not unregister — the retained entry keeps its store alive.
+                    hasFailedEditor = true
                 }
             }
-            // Always balance startAccessingSecurityScopedResource, even when a save
-            // failed. Per-window scope must not leak across window close + reopen.
-            store.releaseAccess()
+            // Balance security-scoped access only when every editor saved.
+            // A retained failed editor keeps its store/scope until a later save
+            // or application termination.
+            if !hasFailedEditor {
+                store.releaseAccess()
+            }
         }
     }
 }
@@ -106,19 +112,23 @@ struct LyraApp: App {
                     vaultCommands?.createNote()
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("New Folder") {
                     vaultCommands?.createFolder()
                 }
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("New Tab") {
                     vaultCommands?.newTab()
                 }
                 .keyboardShortcut("t", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("Open in New Tab") {
                     vaultCommands?.openInNewTab()
                 }
+                .disabled(!(vaultCommands?.canOpenInNewTab ?? false))
 
                 Button("Close Tab") {
                     vaultCommands?.closeTab()
@@ -130,11 +140,13 @@ struct LyraApp: App {
                     vaultCommands?.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .importExport) {
                 Button("Export PDF…") {
                     vaultCommands?.exportPDF()
                 }
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .newItem) {
                 Button("Go to File…") {
@@ -150,6 +162,7 @@ struct LyraApp: App {
                     vaultCommands?.refresh()
                 }
                 .keyboardShortcut("r", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Divider()
 
@@ -157,27 +170,32 @@ struct LyraApp: App {
                     vaultCommands?.requestDelete()
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!(vaultCommands?.canDeleteSelection ?? false))
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {
                     vaultCommands?.toggleViewMode()
                 }
                 .keyboardShortcut("e", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
 
                 Button("Backlinks") {
                     vaultCommands?.toggleBacklinks()
                 }
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") {
                     vaultCommands?.findInNote()
                 }
                 .keyboardShortcut("f", modifiers: .command)
+                .disabled(!(vaultCommands?.canFindInNote ?? false))
 
                 Button("Search Vault…") {
                     vaultCommands?.findInVault()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
             }
         }
 

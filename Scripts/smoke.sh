@@ -78,6 +78,14 @@ else
   fail=1
 fi
 
+echo "-- release documentation version"
+if grep -q "releases/tag/v${versions}" README.md; then
+  echo "  ok: README release link matches MARKETING_VERSION ($versions)"
+else
+  echo "  FAIL: README release link does not match MARKETING_VERSION ($versions)"
+  fail=1
+fi
+
 # Optional: if a built app is sitting in the usual place, assert real sandbox entitlements.
 APP_CANDIDATES=(
   "build/DerivedData/Build/Products/Release/Lyra.app"

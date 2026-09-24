@@ -35,7 +35,7 @@ Writing is the first job. Wiki links and the vault tree support that job. They a
 
 ## Download
 
-Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.10.1), then drag Lyra to Applications.
+Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.11.0), then drag Lyra to Applications.
 
 The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
@@ -50,7 +50,7 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 - **Multiple vaults:** Open separate vault folders in separate windows.
 - **Filename identity:** The title at the top of the note and the tab show the file stem, with the vault and folder path above it. Editing the title renames the file. The first heading is content only.
 - **Sidebar:** Shows the vault name and note count, a note count for each folder, and a filter for note names and paths. The filter is not Find.
-- **Find:** Command-F finds text in the open note. Shift-Command-F searches note bodies in memory and shows a path plus one snippet.
+- **Find:** Command-F finds text in the open note in Source mode. Shift-Command-F searches note bodies in memory and shows a path plus one snippet.
 - **Wiki links:** Path-aware `[[Note]]`, `[[Folder/Note]]`, and `[[path|alias]]`. A leading YAML `aliases:` list adds extra names. If more than one note matches, pick from a list. Lyra does not guess. An unresolved link can create a file after you confirm.
 - **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. Each card shows the linking note, its folder, and the line around the link. There is no graph view.
 - **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link.
@@ -80,7 +80,7 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 | Command-E | Toggle Source and Reading modes |
 | Command-S | Save the current note |
 | Command-R | Refresh the vault from disk |
-| Command-F | Find in the open note |
+| Command-F | Find in the open note in Source mode |
 | Shift-Command-F | Search note bodies in the vault |
 | Command-Delete | Move the selected item to Trash |
 
@@ -101,7 +101,7 @@ My Vault/
 
 Lyra does not create a sidecar database or proprietary note format. Hidden files, package directories, and symlinked entries are ignored by the vault tree. Clipboard images are stored in `_attachments/` and referenced with relative paths.
 
-Search, aliases, and backlinks skip note bodies larger than 2 MB (the editor can still open those files). Folders nested deeper than 64 levels are listed empty. PDF export of a single note stops at 2,000 pages.
+Search, aliases, and backlinks skip note bodies larger than 2 MB and notes that cannot be read or decoded as UTF-8 (the editor can still open readable files). Folders nested deeper than 64 levels are listed empty. PDF export of a single note stops at 2,000 pages.
 
 ## Build From Source
 
@@ -109,7 +109,7 @@ Requirements:
 
 - macOS 15 or later
 - Xcode 16 or later
-- Swift 5.10 or later
+- Swift 5.10 toolchain or later (the project uses Swift 5 language mode)
 
 Clone the repository and open the Xcode project:
 

@@ -19,6 +19,11 @@ enum MarkdownHighlighter {
         .paragraphStyle: paragraphStyle,
     ]
 
+    private static let fencedCodeAttributes: [NSAttributedString.Key: Any] = [
+        .foregroundColor: LyraTheme.code,
+        .font: codeFont,
+    ]
+
     private struct Rule {
         let regex: NSRegularExpression
         /// Applied to the whole match.
@@ -27,6 +32,8 @@ enum MarkdownHighlighter {
         var groups: [Int: [NSAttributedString.Key: Any]] = [:]
         /// Swap every font in the match for the bold face at the same size.
         var embolden = false
+        /// Fence delimiters style even inside fenced code; other Markdown rules do not.
+        var skipInFencedCode = true
     }
 
     private static let headingRegex = try? NSRegularExpression(pattern: #"(?m)^(#{1,6})[ \t]+.*$"#)
@@ -51,10 +58,6 @@ enum MarkdownHighlighter {
     private static let rules: [Rule] = {
         let marker: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.markup]
         let accent: [NSAttributedString.Key: Any] = [.foregroundColor: LyraTheme.accent]
-        let code: [NSAttributedString.Key: Any] = [
-            .foregroundColor: LyraTheme.code,
-            .font: codeFont,
-        ]
         let inlineCode: [NSAttributedString.Key: Any] = [
             .foregroundColor: LyraTheme.code,
             .font: codeFont,
@@ -73,7 +76,7 @@ enum MarkdownHighlighter {
 
         let list: [Rule?] = [
             // Fence lines (```lang / ~~~).
-            rule(#"(?m)^[ \t]{0,3}(```|~~~).*$"#, attributes: code, groups: [1: marker]),
+            rule(#"(?m)^[ \t]{0,3}(```|~~~).*$"#, attributes: fencedCodeAttributes, groups: [1: marker], skipInFencedCode: false),
             // **bold**
             rule(#"(\*\*)([^*\n]+)(\*\*)"#, groups: [1: marker, 3: marker], embolden: true),
             // *emphasis* and _emphasis_
@@ -99,10 +102,11 @@ enum MarkdownHighlighter {
         _ pattern: String,
         attributes: [NSAttributedString.Key: Any] = [:],
         groups: [Int: [NSAttributedString.Key: Any]] = [:],
-        embolden: Bool = false
+        embolden: Bool = false,
+        skipInFencedCode: Bool = true
     ) -> Rule? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        return Rule(regex: regex, attributes: attributes, groups: groups, embolden: embolden)
+        return Rule(regex: regex, attributes: attributes, groups: groups, embolden: embolden, skipInFencedCode: skipInFencedCode)
     }
 
     /// Apply syntax attributes over `range` (or the whole storage) without replacing characters.
@@ -111,7 +115,7 @@ enum MarkdownHighlighter {
         guard length > 0 else { return }
 
         let full = NSRange(location: 0, length: length)
-        let target: NSRange
+        var target: NSRange
         if let range {
             // NSIntersectionRange collapses a zero-length caret at `length` to {0,0},
             // which restyles the first paragraph instead of the one being typed.
@@ -124,12 +128,33 @@ enum MarkdownHighlighter {
             target = full
         }
 
+        let source = storage.string
+        let fencedRanges = WikiLinkSyntax.fencedCodeRanges(in: source)
+        // Toggling a fence can restyle the rest of the document. Fall back to a
+        // full pass only for edits containing a fence marker.
+        if range != nil {
+            let paragraphText = (source as NSString).substring(with: target)
+            if paragraphText.contains("```") || paragraphText.contains("~~~") {
+                target = full
+            }
+        }
+        let fencedTargetRanges = fencedRanges.compactMap { fence -> NSRange? in
+            let intersection = NSIntersectionRange(fence, target)
+            return intersection.length > 0 ? intersection : nil
+        }
+        func intersectsFencedCode(_ candidate: NSRange) -> Bool {
+            fencedTargetRanges.contains { NSIntersectionRange($0, candidate).length > 0 }
+        }
+
         storage.beginEditing()
         storage.setAttributes(baseAttributes, range: target)
-        let source = storage.string
+        for fenced in fencedTargetRanges {
+            storage.addAttributes(fencedCodeAttributes, range: fenced)
+        }
 
         headingRegex?.enumerateMatches(in: source, range: target) { match, _, _ in
             guard let match else { return }
+            if intersectsFencedCode(match.range) { return }
             let hashes = match.range(at: 1)
             let level = min(max(hashes.length, 1), 6)
             storage.addAttributes(headingAttributes[level - 1], range: match.range)
@@ -139,6 +164,7 @@ enum MarkdownHighlighter {
         for rule in rules {
             rule.regex.enumerateMatches(in: source, range: target) { match, _, _ in
                 guard let match else { return }
+                if rule.skipInFencedCode, intersectsFencedCode(match.range) { return }
                 if !rule.attributes.isEmpty {
                     storage.addAttributes(rule.attributes, range: match.range)
                 }

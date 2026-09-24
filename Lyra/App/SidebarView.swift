@@ -60,13 +60,16 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var scanLimitsBanner: some View {
-        if store.scanDidTruncate || store.scanSkippedLargeNotes {
+        if store.scanDidTruncate || store.scanSkippedLargeNotes || store.scanSkippedUnreadableNotes {
             VStack(alignment: .leading, spacing: 2) {
                 if store.scanDidTruncate {
                     Text("Nested folders deeper than 64 levels were skipped.")
                 }
                 if store.scanSkippedLargeNotes {
                     Text("Notes larger than 2 MB were left out of search and backlinks.")
+                }
+                if store.scanSkippedUnreadableNotes {
+                    Text("Unreadable notes were left out of search and backlinks.")
                 }
             }
             .font(LyraFonts.caption)

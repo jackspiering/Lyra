@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 enum FileSystemVault {
     /// Directories nested deeper than this are listed empty and not walked.
@@ -32,17 +37,63 @@ enum FileSystemVault {
         try scanNode(root: root, shouldCancel: shouldCancel, depth: 0, maxDepth: maxDepth)
     }
 
-    /// Reads at most `maxBytes` of UTF-8. Returns `nil` when the file is larger
-    /// so callers can skip it from in-memory indexes without loading it fully.
+    enum IndexedBody: Equatable {
+        case body(String)
+        case oversized
+        case unreadable
+    }
+
+    /// Reads at most `maxBytes` of UTF-8 without following a final-path symlink.
+    /// Returns `.oversized` for large files and `.unreadable` for missing,
+    /// unreadable, non-regular, or invalid UTF-8 files.
     static func indexedUTF8Body(
         at url: URL,
         maxBytes: Int = maxIndexedBodyBytes
-    ) -> String? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
-        defer { try? handle.close() }
-        guard let data = try? handle.read(upToCount: maxBytes + 1) else { return "" }
-        if data.count > maxBytes { return nil }
-        return String(data: data, encoding: .utf8) ?? ""
+    ) -> IndexedBody {
+        guard let data = safeBoundedData(at: url, maxBytes: maxBytes) else {
+            return .unreadable
+        }
+        if data.count > maxBytes { return .oversized }
+        guard let text = String(data: data, encoding: .utf8) else {
+            return .unreadable
+        }
+        return .body(text)
+    }
+
+    /// Bounded read that refuses symlinks and non-regular files. Uses a file
+    /// descriptor so validation and reading cannot be separated by a path swap.
+    static func safeBoundedData(at url: URL, maxBytes: Int) -> Data? {
+        let fd = url.path.withCString { path in
+            open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        }
+        guard fd >= 0 else { return nil }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        do {
+            var status = stat()
+            guard fstat(fd, &status) == 0,
+                  (Int(status.st_mode) & Int(S_IFMT)) == Int(S_IFREG) else {
+                try? handle.close()
+                return nil
+            }
+            return try handle.read(upToCount: maxBytes + 1)
+        } catch {
+            try? handle.close()
+            return nil
+        }
+    }
+
+    /// Creates an empty file only when no object already exists at `url`.
+    /// Returns false for collisions and I/O errors.
+    static func exclusivelyCreateEmptyFile(at url: URL) -> Bool {
+        let fd = url.path.withCString { path in
+            open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode_t(0o666))
+        }
+        guard fd >= 0 else { return false }
+        return close(fd) == 0
+    }
+
+    static func isRegularFile(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
     }
 
     private static func scanNode(
@@ -72,7 +123,7 @@ enum FileSystemVault {
         // contentsOfDirectory — packages are skipped via `.isPackageKey` below.
         let contents = try FileManager.default.contentsOfDirectory(
             at: root,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey],
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey, .isRegularFileKey],
             options: []
         )
 
@@ -85,7 +136,7 @@ enum FileSystemVault {
                 guard shouldInclude(name: childName) else { continue }
 
                 let values = try childURL.resourceValues(
-                    forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]
+                    forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey, .isRegularFileKey]
                 )
                 // Skip bundles / packages so a stray .app or .rtfd is not expanded.
                 if values.isPackage == true { continue }
@@ -116,7 +167,7 @@ enum FileSystemVault {
                     )
                     didTruncate = didTruncate || nested.didTruncate
                     children.append(nested.node)
-                } else if childURL.pathExtension.lowercased() == "md" {
+                } else if childURL.pathExtension.lowercased() == "md", values.isRegularFile == true {
                     children.append(VaultNode(name: childName, url: childURL, isDirectory: false, children: nil))
                 }
             } catch is CancellationError {
@@ -144,6 +195,28 @@ enum FileSystemVault {
         let candidateComponents = candidate.resolvingSymlinksInPath().standardizedFileURL.pathComponents
         guard candidateComponents.count >= rootComponents.count else { return false }
         return zip(rootComponents, candidateComponents).allSatisfy { $0 == $1 }
+    }
+
+    /// True only for an object strictly below `root`. The vault root itself is
+    /// within the vault but must never be renamed or deleted as a note.
+    static func isStrictDescendant(_ candidate: URL, root: URL) -> Bool {
+        let rootComponents = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        let candidateComponents = candidate.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        guard candidateComponents.count > rootComponents.count else { return false }
+        return zip(rootComponents, candidateComponents).allSatisfy { $0 == $1 }
+    }
+
+    /// Vault-relative path using path components, so `/vault/Notes2/x.md` is
+    /// never shortened relative to `/vault/Notes`. Falls back to the filename
+    /// for the root itself and for paths outside the vault.
+    static func relativePath(for url: URL, under root: URL) -> String {
+        let rootComponents = root.standardizedFileURL.pathComponents
+        let fileComponents = url.standardizedFileURL.pathComponents
+        guard fileComponents.count > rootComponents.count,
+              Array(fileComponents.prefix(rootComponents.count)) == rootComponents else {
+            return url.lastPathComponent
+        }
+        return Array(fileComponents.dropFirst(rootComponents.count)).joined(separator: "/")
     }
 
     /// Returns whether the URL itself is a symlink. This deliberately does not

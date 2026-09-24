@@ -52,13 +52,6 @@ enum VaultSearch {
     }
 
     private static func relativePath(for node: VaultNode, vaultRoot: URL) -> String {
-        let rootPath = vaultRoot.standardizedFileURL.path
-        let nodePath = node.url.standardizedFileURL.path
-        guard nodePath.hasPrefix(rootPath) else { return node.name }
-        var rest = String(nodePath.dropFirst(rootPath.count))
-        if rest.hasPrefix("/") {
-            rest = String(rest.dropFirst())
-        }
-        return rest.isEmpty ? node.name : rest
+        FileSystemVault.relativePath(for: node.url, under: vaultRoot)
     }
 }

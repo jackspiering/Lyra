@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showNewNoteSheet = false
     @State private var newNoteName = ""
     @State private var didAlertSaveFailure = false
+    @State private var didAlertBackgroundSaveFailure = false
     /// Bumped when ⌘F should show the Source find bar.
     @State private var findBarToken = 0
     @State private var wikiFlow: WikiFlow
@@ -65,6 +66,9 @@ struct ContentView: View {
                     onSaveFailure: handleEditorSaveFailures
                 )
             )
+            .onChange(of: tabs.tabs.map { $0.editor.hasError }) { _, _ in
+                handleBackgroundSaveFailure()
+            }
             .onChange(of: scenePhase) { _, phase in
                 handleScenePhase(phase)
             }
@@ -96,11 +100,19 @@ struct ContentView: View {
                 requestDelete: requestDelete,
                 refresh: { store.refresh() },
                 findInNote: findInNote,
-                findInVault: { showVaultSearch = true },
+                findInVault: {
+                    vaultSearchQuery = ""
+                    showVaultSearch = true
+                },
                 toggleBacklinks: { showBacklinks.toggle() },
                 newTab: newTab,
                 openInNewTab: openSelectionInNewTab,
-                closeTab: { closeTab(id: tabs.selectedTabID) }
+                closeTab: { closeTab(id: tabs.selectedTabID) },
+                isVaultOpen: store.rootURL != nil,
+                hasOpenNote: editor.fileURL != nil,
+                canDeleteSelection: store.selectedNode() != nil,
+                canOpenInNewTab: store.selectedFileURL() != nil,
+                canFindInNote: noteViewMode == .source && editor.fileURL != nil
             ))
     }
 
@@ -235,12 +247,20 @@ struct ContentView: View {
             Label("Save failed", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .help("Last save failed — press ⌘S to retry")
+        } else if backgroundSaveFailed {
+            Label("Background tab save failed", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .help("A background tab failed to save — select it to retry")
         } else if editor.conflictDeferred {
             Label("Autosave paused", systemImage: "pause.circle")
                 .foregroundStyle(.orange)
                 .help("Conflict deferred — press ⌘S to resolve")
         }
         // Dirty state: traffic-light close button via DocumentEditedReader (no grey Unsaved label).
+    }
+
+    private var backgroundSaveFailed: Bool {
+        tabs.tabs.contains { $0.editor !== editor && $0.editor.lastSaveFailed }
     }
 
     @ViewBuilder
@@ -277,8 +297,7 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .overlay(alignment: .bottomTrailing) {
                             EditorStatusBar(
-                                wordCount: NoteStats.wordCount(editor.text),
-                                characterCount: NoteStats.characterCount(editor.text),
+                                text: editor.text,
                                 created: editor.createdAt,
                                 lastSaved: editor.lastSavedAt
                             )
@@ -315,7 +334,8 @@ struct ContentView: View {
                 onEdit: { editor.noteEdited() },
                 onPasteError: { store.present(context: .pasteImage, message: $0) },
                 onWikiLink: { wikiFlow.followLink($0, from: editor.fileURL) },
-                findBarToken: findBarToken
+                findBarToken: findBarToken,
+                onFindBarShown: { findBarToken = 0 }
             )
             // Per-file identity: reset selection, scroll, and undo when switching notes/tabs.
             .id(editor.fileURL?.path)
@@ -383,6 +403,25 @@ struct ContentView: View {
                 tab.editor.saveIfNeeded() ? nil : tab.editor
             }
             handleEditorSaveFailures(failures)
+        }
+    }
+
+    private func handleBackgroundSaveFailure() {
+        guard let failed = tabs.tabs.first(where: { $0.editor !== editor && $0.editor.hasError })?.editor else {
+            didAlertBackgroundSaveFailure = false
+            return
+        }
+        guard !didAlertBackgroundSaveFailure else { return }
+        didAlertBackgroundSaveFailure = true
+        // Do not steal the selected tab. Ordinary errors can be flushed here;
+        // conflicts/missing files need their tab-specific dialogs.
+        if failed.hasExternalConflict || failed.hasMissingFile {
+            store.present(
+                context: .saveNote,
+                message: "A background tab needs review before it can save. Select that tab to resolve it."
+            )
+        } else {
+            Self.flushEditorError(failed, presentingOn: store)
         }
     }
 
@@ -454,19 +493,26 @@ struct ContentView: View {
 
     private func performDelete() {
         guard let node = store.selectedNode() else { return }
-        // Flush + empty any tab that has this note (or a note under a deleted folder) open.
-        // Do not rely on selection=nil to close editors — that would close the wrong tab.
+        // Flush affected tabs before touching the filesystem, then close them
+        // only after the trash operation succeeds.
         let path = node.url.path
-        for tab in tabs.tabs {
-            guard let openPath = tab.editor.fileURL?.path else { continue }
-            let affected = openPath == path || (node.isDirectory && openPath.hasPrefix(path + "/"))
-            guard affected else { continue }
+        let affected = tabs.tabs.filter { tab in
+            guard let openPath = tab.editor.fileURL?.path else { return false }
+            return openPath == path || (node.isDirectory && openPath.hasPrefix(path + "/"))
+        }
+        for tab in affected {
+            if !tab.editor.saveIfNeeded() {
+                Self.flushEditorError(tab.editor, presentingOn: store)
+                return
+            }
+        }
+        guard store.deleteSelected() else { return }
+        for tab in affected {
             if !tab.editor.close() {
                 Self.flushEditorError(tab.editor, presentingOn: store)
                 return
             }
         }
-        store.deleteSelected()
         // deleteSelected nils selection; re-sync sidebar to whatever note (if any) is still active.
         // handleSelectionChange ignores nil and selectOpenNote avoids re-open/dual-open.
         if let path = tabs.selectedTab?.editor.fileURL?.path {
@@ -553,6 +599,10 @@ struct ContentView: View {
     private func commitNoteTitle(_ newTitle: String) {
         guard editor.fileURL != nil else { return }
         let result = NoteTitle.applyingTitle(newTitle, to: editor.text)
+        if let error = result.error {
+            store.present(context: .rename, message: error)
+            return
+        }
         if result.markdown != editor.text {
             editor.text = result.markdown
             editor.noteEdited()
@@ -628,11 +678,22 @@ struct ContentView: View {
     /// Select the tab that owns a failed editor so conflict/missing-file
     /// dialogs and ordinary save alerts are attached to the right note.
     private func handleEditorSaveFailures(_ failures: [EditorViewModel]) {
-        guard let failed = failures.first(where: { editor in
+        if let failed = failures.first(where: { editor in
             tabs.tabs.contains { $0.editor === editor }
-        }) else { return }
-        selectTab(containing: failed)
-        Self.flushEditorError(failed, presentingOn: store)
+        }) {
+            selectTab(containing: failed)
+            Self.flushEditorError(failed, presentingOn: store)
+            return
+        }
+        // No live tab owns the failure. In a single visible window this must be
+        // a retained editor from a closed window; surface quit cancellation.
+        // With multiple windows, the owning window handles its own failure.
+        if !failures.isEmpty, NSApp.windows.filter(\.isVisible).count <= 1 {
+            store.present(
+                context: .saveNote,
+                message: "Lyra couldn't save changes from a closed note. Quit was cancelled; reopen the vault to retry."
+            )
+        }
     }
 
     private func selectTab(containing editor: EditorViewModel) {

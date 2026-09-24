@@ -3,10 +3,11 @@ import SwiftUI
 /// Quiet floating pill in the corner of the note: word/character counts and last save.
 /// The created date lives in the tooltip so the pill stays one short line.
 struct EditorStatusBar: View {
-    let wordCount: Int
-    let characterCount: Int
+    let text: String
     let created: Date?
     let lastSaved: Date?
+    @State private var wordCount = 0
+    @State private var characterCount = 0
 
     var body: some View {
         HStack(spacing: 0) {
@@ -28,6 +29,16 @@ struct EditorStatusBar: View {
         .overlay(Capsule().strokeBorder(LyraTheme.hairlineColor, lineWidth: 1))
         .help(created.map { "Created \($0.formatted(date: .abbreviated, time: .shortened))" } ?? "")
         .accessibilityElement(children: .combine)
+        .task(id: text) {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            guard !Task.isCancelled else { return }
+            let counts = await Task.detached(priority: .utility) {
+                (NoteStats.wordCount(text), NoteStats.characterCount(text))
+            }.value
+            guard !Task.isCancelled else { return }
+            wordCount = counts.0
+            characterCount = counts.1
+        }
     }
 
     private var sep: some View {

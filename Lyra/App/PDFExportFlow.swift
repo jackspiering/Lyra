@@ -12,6 +12,7 @@ final class PDFExportFlow {
     private let tabs: NoteTabController
     /// Surfaces a failed pre-export save on the active note.
     private let flushError: (EditorViewModel) -> Void
+    private var exportTask: Task<Void, Never>?
 
     init(
         store: VaultStore,
@@ -35,26 +36,30 @@ final class PDFExportFlow {
     /// Sidebar context menu: export any note; its open tab's buffer wins.
     func exportNote(_ node: VaultNode) {
         guard !node.isDirectory, store.rootURL != nil else { return }
-        let markdown: String
         if let openTab = tabs.tabs.first(where: { $0.editor.fileURL?.path == node.url.path }) {
             _ = openTab.editor.saveIfNeeded()
-            markdown = openTab.editor.text
-        } else {
+            export(markdown: openTab.editor.text, noteURL: node.url)
+            return
+        }
+        let nodeURL = node.url
+        Task { @MainActor in
             do {
-                markdown = try String(contentsOf: node.url, encoding: .utf8)
+                let markdown = try await Task.detached(priority: .userInitiated) {
+                    try String(contentsOf: nodeURL, encoding: .utf8)
+                }.value
+                export(markdown: markdown, noteURL: nodeURL)
             } catch {
                 store.present(error: error, context: .exportPDF)
-                return
             }
         }
-        export(markdown: markdown, noteURL: node.url)
     }
 
     private func export(markdown: String, noteURL: URL) {
         guard let vault = store.rootURL else { return }
         let noteDirectory = noteURL.deletingLastPathComponent()
         let suggestedName = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
-        Task { @MainActor in
+        exportTask?.cancel()
+        exportTask = Task { @MainActor in
             do {
                 let data = try await Task.detached(priority: .userInitiated) {
                     try NotePDFExporter.pdfData(
@@ -63,6 +68,7 @@ final class PDFExportFlow {
                         vaultRoot: vault
                     )
                 }.value
+                guard !Task.isCancelled else { return }
                 let panel = NSSavePanel()
                 panel.allowedContentTypes = [.pdf]
                 panel.nameFieldStringValue = suggestedName

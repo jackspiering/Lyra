@@ -38,14 +38,7 @@ enum WikiLinkSyntax {
 
     /// Vault-relative path including `.md` (`Projects/Roadmap.md`).
     static func relativePath(for url: URL, vaultRoot: URL) -> String {
-        let rootPath = vaultRoot.standardizedFileURL.path
-        let filePath = url.standardizedFileURL.path
-        guard filePath.hasPrefix(rootPath) else { return url.lastPathComponent }
-        var rest = String(filePath.dropFirst(rootPath.count))
-        if rest.hasPrefix("/") {
-            rest.removeFirst()
-        }
-        return rest.isEmpty ? url.lastPathComponent : rest
+        FileSystemVault.relativePath(for: url, under: vaultRoot)
     }
 
     /// Lowercased relative path without `.md`.
@@ -105,9 +98,15 @@ enum WikiLinkSyntax {
             if skipped.contains(where: { NSIntersectionRange($0, outer).length > 0 }) {
                 return nil
             }
+            // `![[...]]` embeds are explicitly unsupported: do not treat the
+            // inner brackets as a normal wiki link.
+            if outer.location > 0, ns.character(at: outer.location - 1) == 0x21 {
+                return nil
+            }
             let inner = ns.substring(with: match.range(at: 1))
             let target = parseInner(inner).target
-            guard !target.isEmpty else { return nil }
+            // `[[Note#heading]]` fragments are explicitly unsupported.
+            guard !target.isEmpty, !target.contains("#") else { return nil }
             return Match(range: outer, inner: inner, target: target)
         }
     }
@@ -125,7 +124,13 @@ enum WikiLinkSyntax {
         return ranges
     }
 
-    private static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
+    /// Fenced code ranges for callers such as Source highlighting. Heading
+    /// fragments are not supported, so links containing `#` are left alone.
+    static func fencedCodeRanges(in markdown: String) -> [NSRange] {
+        fencedCodeRanges(in: markdown as NSString)
+    }
+
+    static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
         var ranges: [NSRange] = []
         var i = 0
         let length = ns.length

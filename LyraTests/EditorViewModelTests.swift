@@ -432,4 +432,41 @@ final class EditorViewModelTests: XCTestCase {
         XCTAssertFalse(editor.isDirty)
         XCTAssertNil(editor.lastError)
     }
+
+    func testCoherentReadReturnsMatchingTextAndSnapshot() throws {
+        let a = tempRoot.appendingPathComponent("coherent.md")
+        try "coherent body".write(to: a, atomically: true, encoding: .utf8)
+
+        let read = try XCTUnwrap(EditorViewModel.readTextAndSnapshot(of: a))
+        XCTAssertEqual(read.0, "coherent body")
+        XCTAssertEqual(read.1?.content, "coherent body".data(using: .utf8))
+
+        let invalid = tempRoot.appendingPathComponent("invalid.md")
+        try Data([0xFF, 0xFE]).write(to: invalid)
+        XCTAssertNil(EditorViewModel.readTextAndSnapshot(of: invalid))
+    }
+
+    func testRelocateClearsPreviousSaveError() throws {
+        let roDir = tempRoot.appendingPathComponent("ro-relocate", isDirectory: true)
+        try FileManager.default.createDirectory(at: roDir, withIntermediateDirectories: true)
+        let a = roDir.appendingPathComponent("relocate-old.md")
+        let b = tempRoot.appendingPathComponent("relocate-new.md")
+        try "body".write(to: a, atomically: true, encoding: .utf8)
+        try "body".write(to: b, atomically: true, encoding: .utf8)
+
+        let editor = EditorViewModel()
+        XCTAssertTrue(editor.open(url: a))
+        editor.text = "edited"
+        editor.isDirty = true
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: roDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: roDir.path)
+        }
+        XCTAssertFalse(editor.saveIfNeeded())
+        XCTAssertNotNil(editor.lastError)
+
+        editor.relocate(to: b)
+        XCTAssertNil(editor.lastError)
+        XCTAssertFalse(editor.lastSaveFailed)
+    }
 }

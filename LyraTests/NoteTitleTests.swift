@@ -23,12 +23,14 @@ final class NoteTitleTests: XCTestCase {
         let result = NoteTitle.applyingTitle("New Title", to: md)
         XCTAssertEqual(result.markdown, md)
         XCTAssertEqual(result.renamedStem, "New Title")
+        XCTAssertNil(result.error)
     }
 
-    func testApplyingTitleSanitizesRenameStem() {
+    func testApplyingTitleRejectsInvalidStem() {
         let md = "body"
         let result = NoteTitle.applyingTitle("  Bad/Name  ", to: md)
-        XCTAssertEqual(result.renamedStem, "Untitled")
+        XCTAssertNil(result.renamedStem)
+        XCTAssertNotNil(result.error)
         XCTAssertEqual(result.markdown, md)
     }
 

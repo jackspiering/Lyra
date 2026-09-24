@@ -16,8 +16,10 @@ final class AppSession {
     private struct Entry {
         // Keep a failed editor alive across an unexpected scene teardown so a
         // cancelled quit can retry the save instead of losing its buffer.
+        // The store is also retained for a failed editor so its security scope
+        // is not released before a retry.
         var editor: EditorViewModel?
-        weak var store: VaultStore?
+        var store: VaultStore?
     }
 
     private var entries: [ObjectIdentifier: Entry] = [:]

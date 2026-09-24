@@ -95,7 +95,9 @@ enum UserFacingError {
                     j += 1
                 }
                 var path = String(chars[i..<j])
-                while let last = path.last, last == "." || last == "," || last == ";" || last == ":" {
+                while let last = path.last,
+                      last == "." || last == "," || last == ";" || last == ":" ||
+                        last == ")" || last == "]" || last == "}" || last == "!" || last == "?" {
                     path.removeLast()
                 }
                 result += URL(fileURLWithPath: path).lastPathComponent
@@ -115,6 +117,13 @@ enum UserFacingError {
             || character == "“"
             || character == "‘"
             || character == "("
+            || character == "["
+            || character == "{"
+            || character == "<"
+            || character == "="
+            || character == ":"
+            || character == ","
+            || character == ";"
     }
 
     private static func isPathChar(_ character: Character) -> Bool {

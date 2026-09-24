@@ -44,7 +44,11 @@ final class WikiFlow {
                   ) else {
                 return
             }
-            prompt = .create(query: text, destination: dest)
+            prompt = .create(
+                query: text,
+                destination: dest,
+                relativePath: FileSystemVault.relativePath(for: dest, under: root)
+            )
         }
     }
 

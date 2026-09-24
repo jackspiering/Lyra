@@ -65,4 +65,11 @@ final class WikiLinkSyntaxTests: XCTestCase {
             )
         )
     }
+
+    func testExtractSkipsEmbedsAndHeadingFragments() {
+        let targets = WikiLinkSyntax.extractLinks(
+            in: "Embed ![[Note]] and fragment [[Note#heading]] plus [[Real]]"
+        ).map(\.target)
+        XCTAssertEqual(targets, ["Real"])
+    }
 }
