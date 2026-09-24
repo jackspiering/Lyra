@@ -72,4 +72,24 @@ final class WikiLinkSyntaxTests: XCTestCase {
         ).map(\.target)
         XCTAssertEqual(targets, ["Real"])
     }
+
+    func testUnmatchedBacktickDoesNotSpanParagraphs() {
+        let md = "I pressed ` by mistake.\n\n[[Target]]\n\nlater ` here"
+        XCTAssertEqual(WikiLinkSyntax.extractLinks(in: md).map(\.target), ["Target"])
+    }
+
+    func testCodeSpanStillCoversSoftLineBreak() {
+        let md = "`code [[Hidden]]\nstill code` and [[Shown]]"
+        XCTAssertEqual(WikiLinkSyntax.extractLinks(in: md).map(\.target), ["Shown"])
+    }
+
+    func testCanCreateRejectsHeadingLinksAndEmbeds() {
+        XCTAssertTrue(WikiLinkSyntax.canCreate(target: "New Idea"))
+        XCTAssertTrue(WikiLinkSyntax.canCreate(target: "Node.js"))
+        XCTAssertTrue(WikiLinkSyntax.canCreate(target: "Folder/Note.md"))
+        XCTAssertFalse(WikiLinkSyntax.canCreate(target: "Roadmap#Q3"))
+        XCTAssertFalse(WikiLinkSyntax.canCreate(target: "Roadmap#^block"))
+        XCTAssertFalse(WikiLinkSyntax.canCreate(target: "diagram.png"))
+        XCTAssertFalse(WikiLinkSyntax.canCreate(target: "Files/Spec.PDF"))
+    }
 }

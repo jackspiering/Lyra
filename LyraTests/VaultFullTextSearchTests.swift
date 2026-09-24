@@ -43,4 +43,20 @@ final class VaultFullTextSearchTests: XCTestCase {
         let hits = VaultFullTextSearch.search(documents: docs, query: "ZEBRA")
         XCTAssertEqual(hits.map(\.relativePath), ["Projects/Roadmap.md", "Welcome.md"])
     }
+
+    func testResultsAreCapped() {
+        let docs = (0..<5).map { index in
+            VaultFullTextSearch.Document(
+                url: URL(fileURLWithPath: "/vault/\(index).md"),
+                relativePath: "\(index).md",
+                body: "match"
+            )
+        }
+        XCTAssertEqual(VaultFullTextSearch.search(documents: docs, query: "match", limit: 3).count, 3)
+    }
+
+    func testSnippetFlattensCRLF() {
+        let snippet = VaultFullTextSearch.snippet(in: "line one\r\nfind me\r\nline three", query: "find")
+        XCTAssertEqual(snippet, "line one find me line three")
+    }
 }

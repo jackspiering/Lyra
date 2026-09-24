@@ -28,16 +28,16 @@ final class VaultStore {
     private(set) var scanSkippedUnreadableNotes = false
     /// Resolved bookmark that macOS marked stale. Open only after the user confirms.
     private(set) var staleRestoreURL: URL?
+    /// Bumped each time a scan lands, so views can recompute derived data
+    /// (backlinks) when the index changes without comparing trees.
+    private(set) var indexVersion = 0
+    /// Bookmark for the open vault, so the window can remember its own folder.
+    private(set) var rootBookmark: Data?
     /// Drops stale async scan results when a newer refresh was requested.
     private var refreshGeneration = 0
     private var refreshTask: Task<Void, Never>?
 
-    init() {
-        // Multi-window: only the first store restores the last vault bookmark.
-        if AppSession.shared.claimLaunchVaultRestore() {
-            restoreLastVaultIfPossible()
-        }
-    }
+    init() {}
 
     func present(error: Error, context: UserFacingError.Context) {
         let pair = UserFacingError.presentable(for: error, context: context)
@@ -182,6 +182,7 @@ final class VaultStore {
                 self.scanDidTruncate = didTruncate
                 self.scanSkippedLargeNotes = skippedLarge
                 self.scanSkippedUnreadableNotes = skippedUnreadable
+                self.indexVersion += 1
                 // Apply pending selection only after the tree contains the new path.
                 if let pending = self.pendingSelection {
                     if FileSystemVault.findNode(id: pending, in: node) != nil {
@@ -223,6 +224,10 @@ final class VaultStore {
     func resolveWikiLink(_ text: String) -> WikiResolveResult {
         wikiResolver.resolve(text)
     }
+
+    /// The resolver from the last scan. Captured before a rename so links
+    /// to the old name can still be found afterwards.
+    var linkResolver: WikiLinkResolver { wikiResolver }
 
     func backlinks(to url: URL, liveBodies: [String: String]) -> [Backlink] {
         var live: [URL: String] = [:]
@@ -560,7 +565,7 @@ final class VaultStore {
                 return nil
             }
             do {
-                try FileManager.default.moveItem(at: node.url, to: dest)
+                try FileSystemVault.move(node.url, to: dest)
                 // Keep create-parent coherent if we renamed the folder we last created into.
                 if let last = lastCreateParentPath {
                     if last == node.url.path {
@@ -616,8 +621,16 @@ final class VaultStore {
         stopAccessingIfNeeded()
     }
 
-    private func restoreLastVaultIfPossible() {
+    /// Launch restore for a window with no remembered folder of its own:
+    /// reopen the most recently opened vault.
+    func restoreLastVault() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
+        restoreVault(fromBookmark: data)
+    }
+
+    /// Reopen a vault from a security-scoped bookmark (the window's own, or
+    /// the last-opened one). A stale bookmark asks the user first.
+    func restoreVault(fromBookmark data: Data) {
         var isStale = false
         let url = try? URL(
             resolvingBookmarkData: data,
@@ -646,6 +659,7 @@ final class VaultStore {
                 relativeTo: nil
             )
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+            rootBookmark = bookmark
         } catch {
             present(error: error, context: .rememberVault)
         }

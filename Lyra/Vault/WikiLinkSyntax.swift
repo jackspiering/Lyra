@@ -2,6 +2,8 @@ import Foundation
 
 /// Parse, extract, and locate `[[wiki]]` destinations. Shared by resolve, backlinks, and Source click.
 enum WikiLinkSyntax {
+    private static let linkPattern = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#)
+
     struct Match: Equatable {
         var range: NSRange
         var inner: String
@@ -52,6 +54,35 @@ enum WikiLinkSyntax {
         return normalizeTarget(name).lowercased()
     }
 
+    /// Whether an unresolved link may offer Create. Obsidian heading links
+    /// (`[[Note#Heading]]`) and embeds of non-note files (`[[diagram.png]]`)
+    /// are not supported, so they must not create `Note#Heading.md` or
+    /// `diagram.png.md` in a migrated vault.
+    static func canCreate(target: String) -> Bool {
+        let normalized = normalizeTarget(target)
+        guard !normalized.isEmpty, !normalized.contains("#"), !normalized.contains("^") else {
+            return false
+        }
+        let ext = (normalized as NSString).pathExtension.lowercased()
+        return !attachmentExtensions.contains(ext)
+    }
+
+    /// File types Obsidian embeds. `[[Node.js]]` is still a note name.
+    private static let attachmentExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif", "heic", "tif", "tiff",
+        "mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm", "ogv", "mov", "mkv",
+        "pdf", "canvas",
+    ]
+
+    /// Link target text after its note was renamed to `newStem`: keeps any
+    /// folder prefix and a trailing `.md` (`Projects/Old.md` → `Projects/New.md`).
+    static func retarget(_ rawTarget: String, toStem newStem: String) -> String {
+        let trimmed = rawTarget.trimmingCharacters(in: .whitespaces)
+        let name = trimmed.lowercased().hasSuffix(".md") ? newStem + ".md" : newStem
+        guard let slash = trimmed.lastIndex(where: { $0 == "/" || $0 == "\\" }) else { return name }
+        return String(trimmed[...slash]) + name
+    }
+
     /// Where Create should write the file. `nil` if the target is empty or unsafe.
     static func destinationURL(target: String, vaultRoot: URL, linkingNoteURL: URL?) -> URL? {
         let normalized = normalizeTarget(target)
@@ -91,7 +122,7 @@ enum WikiLinkSyntax {
         let ns = markdown as NSString
         let full = NSRange(location: 0, length: ns.length)
         let skipped = skippedRanges(in: ns)
-        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return [] }
+        guard let regex = linkPattern else { return [] }
         return regex.matches(in: markdown, range: full).compactMap { match in
             guard match.numberOfRanges > 1 else { return nil }
             let outer = match.range
@@ -130,6 +161,7 @@ enum WikiLinkSyntax {
         fencedCodeRanges(in: markdown as NSString)
     }
 
+    /// Fenced code blocks (``` or ~~~), including an unclosed trailing fence.
     static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
         var ranges: [NSRange] = []
         var i = 0
@@ -260,6 +292,9 @@ enum WikiLinkSyntax {
         var index = start
         while index < source.endIndex {
             guard source[index] == "`" else {
+                if source[index].isNewline, startsBlankLine(in: source, after: index) {
+                    return nil
+                }
                 index = source.index(after: index)
                 continue
             }
@@ -274,5 +309,16 @@ enum WikiLinkSyntax {
             index = runEnd
         }
         return nil
+    }
+
+    /// True when the line after the newline at `index` is blank. Code spans
+    /// end at a paragraph break, so a stray backtick cannot pair across one
+    /// and hide every link in between.
+    private static func startsBlankLine(in source: String, after index: String.Index) -> Bool {
+        var cursor = source.index(after: index)
+        while cursor < source.endIndex, source[cursor] == " " || source[cursor] == "\t" {
+            cursor = source.index(after: cursor)
+        }
+        return cursor < source.endIndex && source[cursor].isNewline
     }
 }
