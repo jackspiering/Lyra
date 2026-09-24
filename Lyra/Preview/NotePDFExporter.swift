@@ -452,6 +452,7 @@ enum NotePDFExporter {
         private func drawThematicBreak() {
             let lineHeight: CGFloat = 12
             ensureSpace(lineHeight)
+            guard !stopped else { return }
             let midY = y + lineHeight / 2
             let path = NSBezierPath()
             path.move(to: NSPoint(x: NotePDFExporter.margin, y: midY))
@@ -463,31 +464,43 @@ enum NotePDFExporter {
         }
 
         private func drawImage(alt: String, path: String) {
-            if let url = MarkdownImagePath.resolve(
+            guard let url = MarkdownImagePath.resolve(
                 path: path,
                 noteDirectory: noteDirectory,
                 vaultRoot: vaultRoot
-            ), let image = PreviewImage.decode(contentsOf: url), image.size.width > 0, image.size.height > 0 {
-                let imgSize = image.size
-                let maxH = NotePDFExporter.contentHeight
-                let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)
-                let drawW = imgSize.width * scale
-                let drawH = imgSize.height * scale
-                ensureSpace(drawH)
-                let rect = CGRect(x: NotePDFExporter.margin, y: y, width: drawW, height: drawH)
-                image.draw(
-                    in: rect,
-                    from: .zero,
-                    operation: .sourceOver,
-                    fraction: 1.0,
-                    respectFlipped: true,
-                    hints: nil
-                )
-                y += drawH + NotePDFExporter.blockGap
-            } else {
-                let label = alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
-                drawTextSpanning(label, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+            ) else {
+                drawTextSpanning(missingImageLabel(alt: alt, path: path), font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
             }
+            guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes) else {
+                drawTextSpanning("Couldn't read image: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
+            }
+            guard let image = PreviewImage.decode(data), image.size.width > 0, image.size.height > 0 else {
+                drawTextSpanning("Image is too large or couldn't be decoded: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
+            }
+            let imgSize = image.size
+            let maxH = NotePDFExporter.contentHeight
+            let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)
+            let drawW = imgSize.width * scale
+            let drawH = imgSize.height * scale
+            ensureSpace(drawH)
+            guard !stopped else { return }
+            let rect = CGRect(x: NotePDFExporter.margin, y: y, width: drawW, height: drawH)
+            image.draw(
+                in: rect,
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: true,
+                hints: nil
+            )
+            y += drawH + NotePDFExporter.blockGap
+        }
+
+        private func missingImageLabel(alt: String, path: String) -> String {
+            alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
         }
 
         // MARK: Typography helpers

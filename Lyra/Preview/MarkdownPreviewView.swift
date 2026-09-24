@@ -15,12 +15,17 @@ struct MarkdownPreviewView: View {
                         .font(LyraFonts.prose)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(MarkdownPreviewBlocks.parse(text).enumerated()), id: \.offset) { _, block in
+                    let blocks = MarkdownPreviewBlocks.parse(text)
+                    ForEach(blocks.indices, id: \.self) { index in
+                        let block = blocks[index]
                         MarkdownBlockRow(
                             block: block,
                             noteDirectory: noteDirectory,
                             vaultRoot: vaultRoot
                         )
+                        // Stable per-block identity: inserting or deleting a block
+                        // above must not reuse image loading state for another block.
+                        .id("\(index)-\(String(describing: block))")
                     }
                 }
             }
@@ -38,7 +43,16 @@ struct MarkdownPreviewView: View {
                 onWikiLink?(name)
                 return .handled
             }
-            return .systemAction
+            guard let scheme = url.scheme?.lowercased() else { return .handled }
+            if ["http", "https", "mailto"].contains(scheme) {
+                return .systemAction
+            }
+            // Local files open only when they remain inside the vault.
+            if scheme == "file", let vaultRoot,
+               FileSystemVault.isSafePath(url, within: vaultRoot) {
+                return .systemAction
+            }
+            return .handled
         })
     }
 }

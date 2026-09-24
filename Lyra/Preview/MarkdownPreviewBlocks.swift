@@ -57,7 +57,20 @@ enum MarkdownPreviewBlocks {
                 continue
             }
 
-            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+            if !paragraphIndices.isEmpty, let setextLevel = parseSetextUnderline(trimmed) {
+                let headingText = paragraphIndices
+                    .map { lines[$0].text.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                paragraphIndices.removeAll()
+                if !headingText.isEmpty {
+                    blocks.append(.heading(level: setextLevel, text: headingText))
+                }
+                i += 1
+                continue
+            }
+
+            if isThematicBreak(trimmed) {
                 flushParagraph()
                 blocks.append(.thematicBreak)
                 i += 1
@@ -71,10 +84,16 @@ enum MarkdownPreviewBlocks {
                 continue
             }
 
-            if trimmed.hasPrefix("> ") || trimmed == ">" {
+            if trimmed.hasPrefix(">") {
                 flushParagraph()
-                let body = trimmed.hasPrefix("> ") ? String(trimmed.dropFirst(2)) : ""
-                blocks.append(.quote(body))
+                var body = trimmed
+                while body.hasPrefix(">") {
+                    body.removeFirst()
+                    if body.hasPrefix(" ") {
+                        body.removeFirst()
+                    }
+                }
+                blocks.append(.quote(body.trimmingCharacters(in: .whitespaces)))
                 i += 1
                 continue
             }
@@ -82,6 +101,19 @@ enum MarkdownPreviewBlocks {
             if let item = parseListItem(raw: raw, trimmed: trimmed) {
                 flushParagraph()
                 blocks.append(item)
+                i += 1
+                continue
+            }
+
+            if !trimmed.isEmpty, paragraphIndices.isEmpty,
+               case .listItem(let text, let ordinal, let depth, let taskChecked)? = blocks.last,
+               isIndentedContinuation(raw) {
+                blocks[blocks.count - 1] = .listItem(
+                    text: text + "\n" + trimmed,
+                    ordinal: ordinal,
+                    depth: depth,
+                    taskChecked: taskChecked
+                )
                 i += 1
                 continue
             }
@@ -143,7 +175,14 @@ enum MarkdownPreviewBlocks {
         let matches = regex.matches(in: source, range: NSRange(location: 0, length: ns.length)).reversed()
         for match in matches {
             guard match.numberOfRanges > 1 else { continue }
+            if match.range.location > 0, ns.character(at: match.range.location - 1) == 0x21 {
+                continue
+            }
             let body = ns.substring(with: match.range(at: 1))
+            let unsupportedTarget = WikiLinkSyntax.parseInner(body).target
+            if unsupportedTarget.isEmpty || unsupportedTarget.contains("#") {
+                continue
+            }
             let target: String
             let display: String
             if let pipe = body.firstIndex(of: "|") {
@@ -282,6 +321,27 @@ enum MarkdownPreviewBlocks {
         return nil
     }
 
+    private static func parseSetextUnderline(_ trimmed: String) -> Int? {
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.allSatisfy({ $0 == "=" }) { return 1 }
+        if trimmed.allSatisfy({ $0 == "-" }) { return 2 }
+        return nil
+    }
+
+    private static func isThematicBreak(_ trimmed: String) -> Bool {
+        let compact = trimmed.filter { !$0.isWhitespace }
+        guard compact.count >= 3,
+              let marker = compact.first,
+              marker == "*" || marker == "-" || marker == "_" else {
+            return false
+        }
+        return compact.allSatisfy { $0 == marker }
+    }
+
+    private static func isIndentedContinuation(_ raw: String) -> Bool {
+        raw.hasPrefix("    ") || raw.hasPrefix("\t") || raw.hasPrefix("  ")
+    }
+
     private static func parseHeading(_ trimmed: String) -> Block? {
         var level = 0
         for ch in trimmed {
@@ -324,7 +384,7 @@ enum MarkdownPreviewBlocks {
             }
             return .listItem(text: body, ordinal: nil, depth: depth, taskChecked: nil)
         }
-        guard let regex = try? NSRegularExpression(pattern: #"^(\d+)\.\s+(.*)$"#) else { return nil }
+        guard let regex = try? NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.*)$"#) else { return nil }
         let ns = trimmed as NSString
         guard let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: ns.length)),
               match.numberOfRanges > 2 else { return nil }

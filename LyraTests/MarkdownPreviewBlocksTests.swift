@@ -143,4 +143,40 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         let blocks = MarkdownPreviewBlocks.parse("![shot](images/photo(1).png \"preview\")\n")
         XCTAssertEqual(blocks, [.image(alt: "shot", path: "images/photo(1).png")])
     }
+
+    func testSetextHeadings() {
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse("Title\n===\n"),
+            [.heading(level: 1, text: "Title")]
+        )
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse("Title\n---\n"),
+            [.heading(level: 2, text: "Title")]
+        )
+    }
+
+    func testThematicBreakVariants() {
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse("Before\n\n- - -\n"),
+            [.paragraph("Before"), .thematicBreak]
+        )
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse("Before\n\n* * *\n"),
+            [.paragraph("Before"), .thematicBreak]
+        )
+    }
+
+    func testOrderedParenthesisAndListContinuation() {
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.parse("1) first\n   continued\n"),
+            [.listItem(text: "first\ncontinued", ordinal: 1, depth: 0, taskChecked: nil)]
+        )
+    }
+
+    func testPrepareInlineSkipsEmbedsAndFragments() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("Embed ![[Note]] plus [[Note#heading]]")
+        XCTAssertTrue(prepared.contains("![[Note]]"), "got: \(prepared)")
+        XCTAssertTrue(prepared.contains("[[Note#heading]]"), "got: \(prepared)")
+        XCTAssertFalse(prepared.contains("lyra-wiki:"))
+    }
 }

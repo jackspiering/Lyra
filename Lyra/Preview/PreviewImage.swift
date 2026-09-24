@@ -15,6 +15,29 @@ enum PreviewImage {
     }
 
     static func decode(_ data: Data) -> NSImage? {
+        guard let size = imageSizeIfWithinBudget(data) else { return nil }
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, options),
+              CGImageSourceGetCount(source) > 0 else {
+            return nil
+        }
+        // Apply EXIF orientation so phone/scanner photos are upright and the
+        // returned size matches the displayed pixels.
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height),
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCache: false,
+        ] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: NSSize(width: size.width, height: size.height))
+    }
+
+    /// Image dimensions when encoded bytes and decoded pixels are budgeted.
+    /// Orientation-aware: quarter-turn EXIF orientations swap width/height.
+    static func imageSizeIfWithinBudget(_ data: Data) -> (width: Int, height: Int)? {
         guard data.count <= maxEncodedBytes else { return nil }
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
@@ -25,15 +48,17 @@ enum PreviewImage {
         }
         let width = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
         let height = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
-        guard isWithinBudget(width: width, height: height) else { return nil }
-        guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-        return NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
+        let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let displayWidth = (orientation >= 5 && orientation <= 8) ? height : width
+        let displayHeight = (orientation >= 5 && orientation <= 8) ? width : height
+        guard isWithinBudget(width: displayWidth, height: displayHeight) else { return nil }
+        return (displayWidth, displayHeight)
     }
 
     static func decode(contentsOf url: URL) -> NSImage? {
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-        if size > maxEncodedBytes { return nil }
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: maxEncodedBytes) else {
+            return nil
+        }
         return decode(data)
     }
 }
