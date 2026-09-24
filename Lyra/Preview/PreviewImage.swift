@@ -22,6 +22,12 @@ enum PreviewImage {
     /// bitmap; the returned image keeps the original point size so layout
     /// does not change.
     static func decode(_ data: Data, maxPixelSize: Int? = nil) -> NSImage? {
+        guard let (cgImage, size) = decodeBitmap(data, maxPixelSize: maxPixelSize) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: size.width, height: size.height))
+    }
+
+    /// The decoded (possibly downsampled) bitmap plus the image's display size.
+    static func decodeBitmap(_ data: Data, maxPixelSize: Int? = nil) -> (CGImage, (width: Int, height: Int))? {
         guard let size = imageSizeIfWithinBudget(data) else { return nil }
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
@@ -40,7 +46,7 @@ enum PreviewImage {
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
             return nil
         }
-        return NSImage(cgImage: cgImage, size: NSSize(width: size.width, height: size.height))
+        return (cgImage, size)
     }
 
     /// Image dimensions when encoded bytes and decoded pixels are budgeted.

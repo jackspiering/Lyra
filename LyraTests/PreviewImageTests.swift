@@ -37,7 +37,8 @@ final class PreviewImageTests: XCTestCase {
 
         let image = try XCTUnwrap(PreviewImage.decode(png, maxPixelSize: 600))
         XCTAssertEqual(image.size, NSSize(width: 3000, height: 1500))
-        let backing = try XCTUnwrap(image.representations.first)
-        XCTAssertLessThanOrEqual(max(backing.pixelsWide, backing.pixelsHigh), 600)
+        let (bitmap, size) = try XCTUnwrap(PreviewImage.decodeBitmap(png, maxPixelSize: 600))
+        XCTAssertEqual(size.width, 3000)
+        XCTAssertLessThanOrEqual(max(bitmap.width, bitmap.height), 600)
     }
 }
