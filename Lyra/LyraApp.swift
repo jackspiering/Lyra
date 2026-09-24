@@ -219,6 +219,26 @@ struct LyraApp: App {
                     vaultCommands?.toggleBacklinks()
                 }
                 .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Divider()
+
+                Button("Bigger") {
+                    vaultCommands?.zoomIn()
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Button("Smaller") {
+                    vaultCommands?.zoomOut()
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Button("Actual Size") {
+                    vaultCommands?.resetZoom()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") {

@@ -104,7 +104,7 @@ helper so presentation policy cannot fork.
 
 ### Inter typeface (v0.5)
 
-**Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced. Appearance is System / Light / Dark only. No theme marketplace. Regular, Italic, SemiBold, and Bold are bundled.
+**Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced. Appearance is System / Light / Dark only. No theme marketplace. Regular, Italic, SemiBold, and Bold are bundled. View → Bigger / Smaller magnifies the Source scroll view (`NSScrollView.magnification`, 0.7×–2×) rather than changing font sizes, so the type scale and writing column keep their proportions.
 
 **Why:** Readable open-source screen font; registered at launch with `CTFontManagerRegisterFontsForURL`.
 

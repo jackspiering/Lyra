@@ -9,6 +9,9 @@ struct MarkdownTextView: NSViewRepresentable {
     /// Owner that keeps this note's text view alive across Reading toggles
     /// and tab switches, so undo, caret, and scroll survive.
     var viewOwner: EditorViewModel?
+    /// View ▸ Bigger / Smaller. Magnifies the whole Source view, so the
+    /// type scale and writing column keep their proportions.
+    var zoom: CGFloat = 1
     var onEdit: () -> Void
     var onPasteError: ((String) -> Void)?
     /// Command-click a `[[wiki]]` span.
@@ -27,6 +30,7 @@ struct MarkdownTextView: NSViewRepresentable {
         if let cached = viewOwner?.sourceView as? NSScrollView,
            let textView = cached.documentView as? LyraTextView {
             cached.removeFromSuperview()
+            cached.magnification = zoom
             context.coordinator.attach(textView)
             if textView.string != text {
                 context.coordinator.loadDocument(text)
@@ -78,6 +82,7 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 56, right: 0)
         scrollView.documentView = textView
+        scrollView.magnification = zoom
 
         context.coordinator.attach(textView)
         context.coordinator.loadDocument(text)
@@ -89,6 +94,9 @@ struct MarkdownTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? LyraTextView else { return }
+        if abs(scrollView.magnification - zoom) > 0.001 {
+            scrollView.magnification = zoom
+        }
         context.coordinator.attach(textView)
         if textView.string != text {
             context.coordinator.loadDocument(text)

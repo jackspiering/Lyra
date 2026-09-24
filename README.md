@@ -44,7 +44,7 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 ## Features
 
 - **Writing column:** Title, Source, and Reading share one centered column of about 680 points, so lines stay a comfortable length in any window size and Command-E does not shift the text.
-- **Source mode:** TextKit editing, undo, autosave, and standard text editing behavior. Markdown stays plain text. Syntax markers such as `#`, `**`, and `[[ ]]` are drawn quietly, headings are sized by level, and code uses a monospaced face. Command-click a wiki link to follow it. Undo, caret, and scroll survive switching tabs or modes.
+- **Source mode:** TextKit editing, undo, autosave, and standard text editing behavior. Markdown stays plain text. Syntax markers such as `#`, `**`, and `[[ ]]` are drawn quietly, headings are sized by level, and code uses a monospaced face. Command-click a wiki link to follow it. Undo, caret, and scroll survive switching tabs or modes. View > Bigger and Smaller zoom the editor.
 - **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links. Reading is not editable. Links to notes open in Lyra. Web and mail links open in your browser or mail app. A `file:` link opens only for a plain file inside the vault. Other link types do nothing. A leading YAML block shows as code.
 - **Note tabs:** Open multiple notes inside one vault window without losing the sidebar.
 - **Multiple vaults:** Open separate vault folders in separate windows. Each window reopens its own vault after you relaunch Lyra.
@@ -81,6 +81,8 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 | Command-S | Save the current note |
 | Command-R | Refresh the vault from disk |
 | Command-F | Find in the open note |
+| Command-Plus / Command-Minus | Zoom the editor in or out |
+| Command-0 | Reset editor zoom |
 | Shift-Command-F | Search note bodies in the vault |
 | Command-Delete | Move the selected item to Trash |
 

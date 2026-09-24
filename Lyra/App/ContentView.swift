@@ -25,6 +25,8 @@ struct ContentView: View {
     /// The UUID is the handoff token for the folder that window should open.
     var openNewVaultWindow: ((UUID) -> Void)?
     @AppStorage("lyra.noteViewMode") private var noteViewModeRaw = NoteViewMode.source.rawValue
+    /// Source magnification (View ▸ Bigger / Smaller / Actual Size).
+    @AppStorage("lyra.editorZoom") private var editorZoom = 1.0
     @State private var backlinkItems: [Backlink] = []
     @State private var backlinksPath: String?
     @State private var pendingLinkUpdate: PendingLinkUpdate?
@@ -128,6 +130,9 @@ struct ContentView: View {
                 newTab: newTab,
                 openInNewTab: openSelectionInNewTab,
                 closeTab: { closeTab(id: tabs.selectedTabID) },
+                zoomIn: { editorZoom = min((editorZoom + 0.1) * 10, 20).rounded() / 10 },
+                zoomOut: { editorZoom = max((editorZoom - 0.1) * 10, 7).rounded() / 10 },
+                resetZoom: { editorZoom = 1 },
                 isVaultOpen: store.rootURL != nil,
                 hasOpenNote: editor.fileURL != nil,
                 canDeleteSelection: store.selectedNode() != nil,
@@ -384,6 +389,7 @@ struct ContentView: View {
                 vaultRoot: store.rootURL,
                 noteURL: editor.fileURL,
                 viewOwner: editor,
+                zoom: CGFloat(editorZoom),
                 onEdit: { editor.noteEdited() },
                 onPasteError: { store.present(context: .pasteImage, message: $0) },
                 onWikiLink: { wikiFlow.followLink($0, from: editor.fileURL) },
