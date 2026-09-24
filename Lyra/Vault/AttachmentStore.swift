@@ -42,24 +42,39 @@ enum AttachmentStore {
         let existing = Set(
             (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         )
-        let name = uniquePNGFilename(now: now, existing: existing)
-        let fileURL = dir.appendingPathComponent(name)
-        // Final vault-boundary check: _attachments may have been swapped for a symlink
-        // between the directory validations and the write.
-        guard FileSystemVault.isSafePath(fileURL, within: vaultRoot) else {
+        var fileURL = dir.appendingPathComponent(uniquePNGFilename(now: now, existing: existing))
+        for _ in 0..<100 {
+            // Final vault-boundary check: _attachments may have been swapped for a symlink
+            // between the directory validations and the write.
+            guard FileSystemVault.isSafePath(fileURL, within: vaultRoot) else {
+                throw CocoaError(.fileWriteNoPermission)
+            }
+            if FileSystemVault.exclusivelyCreateEmptyFile(at: fileURL) {
+                break
+            }
+            let names = Set(
+                (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+            )
+            fileURL = dir.appendingPathComponent(uniquePNGFilename(now: now, existing: names))
+        }
+        guard FileSystemVault.isSafePath(fileURL, within: vaultRoot),
+              FileManager.default.fileExists(atPath: fileURL.path) else {
             throw CocoaError(.fileWriteNoPermission)
         }
         try data.write(to: fileURL, options: .atomic)
-        // Verify the write landed inside the vault (defense against TOCTOU on fileURL itself).
+        // Verify the write landed inside the vault. Only clean up when the
+        // resolved path is still inside the vault.
         guard FileSystemVault.isSafePath(fileURL, within: vaultRoot) else {
-            try? FileManager.default.removeItem(at: fileURL)
+            if FileSystemVault.isWithin(fileURL, root: vaultRoot) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
             throw CocoaError(.fileWriteNoPermission)
         }
         if let noteURL {
             let noteDir = noteURL.deletingLastPathComponent()
             return relativePath(from: noteDir, to: fileURL)
         }
-        return "\(folderName)/\(name)"
+        return "\(folderName)/\(fileURL.lastPathComponent)"
     }
 
     /// Path from `baseDirectory` to `target` using `../` segments as needed.

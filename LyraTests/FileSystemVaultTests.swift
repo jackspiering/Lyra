@@ -238,11 +238,47 @@ final class FileSystemVaultTests: XCTestCase {
 
         let small = root.appendingPathComponent("small.md")
         try "hello".write(to: small, atomically: true, encoding: .utf8)
-        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: small, maxBytes: 16), "hello")
+        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: small, maxBytes: 16), .body("hello"))
 
         let large = root.appendingPathComponent("large.md")
         try String(repeating: "x", count: 64).write(to: large, atomically: true, encoding: .utf8)
-        XCTAssertNil(FileSystemVault.indexedUTF8Body(at: large, maxBytes: 16))
+        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: large, maxBytes: 16), .oversized)
+
+        let invalid = root.appendingPathComponent("invalid.md")
+        try Data([0xFF, 0xFE]).write(to: invalid)
+        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: invalid, maxBytes: 16), .unreadable)
+
+        let missing = root.appendingPathComponent("missing.md")
+        XCTAssertEqual(FileSystemVault.indexedUTF8Body(at: missing, maxBytes: 16), .unreadable)
+    }
+
+    func testRelativePathUsesPathComponents() {
+        let root = URL(fileURLWithPath: "/vault/Notes")
+        XCTAssertEqual(
+            FileSystemVault.relativePath(
+                for: URL(fileURLWithPath: "/vault/Notes2/x.md"),
+                under: root
+            ),
+            "x.md"
+        )
+        XCTAssertEqual(
+            FileSystemVault.relativePath(
+                for: URL(fileURLWithPath: "/vault/Notes/Projects/x.md"),
+                under: root
+            ),
+            "Projects/x.md"
+        )
+    }
+
+    func testRootIsNotAStrictDescendant() {
+        let root = URL(fileURLWithPath: "/vault")
+        XCTAssertFalse(FileSystemVault.isStrictDescendant(root, root: root))
+        XCTAssertTrue(
+            FileSystemVault.isStrictDescendant(
+                URL(fileURLWithPath: "/vault/note.md"),
+                root: root
+            )
+        )
     }
 
     func testNoteCountCountsNestedNotesOnly() {

@@ -38,6 +38,33 @@ final class VaultStoreRenameTests: XCTestCase {
     }
 
     @MainActor
+    func testLargeNotesExcludedFromSearchAndBacklinks() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let small = root.appendingPathComponent("small.md")
+        try "small target".write(to: small, atomically: true, encoding: .utf8)
+        let large = root.appendingPathComponent("large.md")
+        let filler = String(repeating: "large-target ", count: 200_000)
+        try ("[[small]]\n" + filler).write(to: large, atomically: true, encoding: .utf8)
+
+        let store = VaultStore()
+        store.openVault(at: root)
+        let deadline = Date().addingTimeInterval(5)
+        while store.rootNode == nil, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        XCTAssertTrue(store.scanSkippedLargeNotes)
+        XCTAssertTrue(store.searchNoteBodies(query: "large-target", liveBodies: [:]).isEmpty)
+        XCTAssertTrue(store.backlinks(to: small, liveBodies: [:]).isEmpty)
+    }
+
+    @MainActor
     func testRenameSelectedReturnsDestinationImmediately() throws {
         let root = try FileManager.default.url(
             for: .itemReplacementDirectory,

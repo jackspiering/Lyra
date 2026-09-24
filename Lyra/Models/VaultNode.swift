@@ -11,7 +11,9 @@ struct VaultNode: Identifiable, Hashable {
 extension VaultNode {
     /// Markdown notes at or below this node (a note counts itself).
     var noteCount: Int {
-        guard isDirectory else { return 1 }
+        guard isDirectory else {
+            return url.pathExtension.lowercased() == "md" ? 1 : 0
+        }
         return (children ?? []).reduce(0) { $0 + $1.noteCount }
     }
 }

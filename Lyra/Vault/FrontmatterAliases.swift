@@ -29,10 +29,19 @@ enum FrontmatterAliases {
         var result: [String] = []
         var inList = false
         for line in lines {
+            let indentation = line.prefix(while: { $0 == " " || $0 == "\t" }).count
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("aliases:") {
-                let rest = String(trimmed.dropFirst("aliases:".count))
-                    .trimmingCharacters(in: .whitespaces)
+                // Only a top-level key participates. Nested `aliases:` keys and
+                // block scalars are ordinary YAML and must not become wiki names.
+                guard indentation == 0 else {
+                    inList = false
+                    continue
+                }
+                let rest = stripComment(
+                    String(trimmed.dropFirst("aliases:".count))
+                        .trimmingCharacters(in: .whitespaces)
+                )
                 if rest.isEmpty {
                     inList = true
                     continue
@@ -40,7 +49,7 @@ enum FrontmatterAliases {
                 inList = false
                 if rest.hasPrefix("["), rest.hasSuffix("]") {
                     let inner = rest.dropFirst().dropLast()
-                    result.append(contentsOf: inner.split(separator: ",").compactMap {
+                    result.append(contentsOf: splitFlowList(String(inner)).compactMap {
                         let name = unquote($0.trimmingCharacters(in: .whitespaces))
                         return name.isEmpty ? nil : name
                     })
@@ -51,11 +60,13 @@ enum FrontmatterAliases {
                 continue
             }
             if inList {
-                if trimmed.hasPrefix("-") {
-                    let value = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                if indentation > 0, trimmed.hasPrefix("-") {
+                    let value = stripComment(
+                        trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                    )
                     let name = unquote(value)
                     if !name.isEmpty { result.append(name) }
-                } else if !trimmed.isEmpty && !trimmed.hasPrefix("#") {
+                } else if !trimmed.isEmpty, !trimmed.hasPrefix("#") {
                     inList = false
                 }
             }
@@ -63,13 +74,79 @@ enum FrontmatterAliases {
         return result
     }
 
+    /// Removes a `#` comment that starts outside single/double quotes.
+    private static func stripComment(_ raw: String) -> String {
+        var result = ""
+        var quote: Character?
+        var escaped = false
+        var index = raw.startIndex
+        while index < raw.endIndex {
+            let character = raw[index]
+            if escaped {
+                result.append(character)
+                escaped = false
+            } else if character == "\\", quote == "\"" {
+                result.append(character)
+                escaped = true
+            } else if character == "\"", quote == nil {
+                quote = character
+                result.append(character)
+            } else if character == "'", quote == nil {
+                quote = character
+                result.append(character)
+            } else if let openQuote = quote, character == openQuote {
+                quote = nil
+                result.append(character)
+            } else if character == "#", quote == nil {
+                break
+            } else {
+                result.append(character)
+            }
+            index = raw.index(after: index)
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Splits a flow list on commas outside single/double quotes.
+    private static func splitFlowList(_ raw: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaped = false
+        for character in raw {
+            if escaped {
+                current.append(character)
+                escaped = false
+            } else if character == "\\", quote == "\"" {
+                current.append(character)
+                escaped = true
+            } else if (character == "\"" || character == "'"), quote == nil {
+                quote = character
+                current.append(character)
+            } else if let openQuote = quote, character == openQuote {
+                quote = nil
+                current.append(character)
+            } else if character == ",", quote == nil {
+                parts.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        parts.append(current)
+        return parts
+    }
+
     private static func unquote(_ raw: String) -> String {
         if raw.count >= 2 {
             if raw.hasPrefix("\""), raw.hasSuffix("\"") {
-                return String(raw.dropFirst().dropLast())
+                let inner = String(raw.dropFirst().dropLast())
+                return inner
+                    .replacingOccurrences(of: "\\\"", with: "\"")
+                    .replacingOccurrences(of: "\\\\", with: "\\")
             }
             if raw.hasPrefix("'"), raw.hasSuffix("'") {
-                return String(raw.dropFirst().dropLast())
+                return String(raw.dropFirst().dropLast()).replacingOccurrences(of: "''", with: "'")
             }
         }
         return raw
