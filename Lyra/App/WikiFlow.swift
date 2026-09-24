@@ -36,9 +36,22 @@ final class WikiFlow {
         case .ambiguous(let candidates):
             prompt = .pick(query: text, candidates: candidates)
         case .unresolved:
+            let target = WikiLinkSyntax.parseInner(text).target
+            guard WikiLinkSyntax.canCreate(target: target) else {
+                // Obsidian heading links and file embeds: say so rather than
+                // offering to create `Note#Heading.md` or `image.png.md`.
+                store.present(
+                    context: .openNote,
+                    message: UserFacingError.message(
+                        context: .openNote,
+                        detail: "Lyra doesn’t follow heading links or embedded files. Link to the note by name instead."
+                    )
+                )
+                return
+            }
             guard let root = store.rootURL,
                   let dest = WikiLinkSyntax.destinationURL(
-                    target: WikiLinkSyntax.parseInner(text).target,
+                    target: target,
                     vaultRoot: root,
                     linkingNoteURL: linkingNoteURL
                   ) else {

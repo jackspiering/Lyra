@@ -5,17 +5,17 @@ final class NoteTitleTests: XCTestCase {
     func testDisplayTitleUsesFilenameStemEvenWhenH1Exists() {
         let md = "# Hello World\n\nBody paragraph."
         let url = URL(fileURLWithPath: "/vault/Welcome.md")
-        XCTAssertEqual(NoteTitle.displayTitle(markdown: md, fileURL: url), "Welcome")
+        XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Welcome")
     }
 
     func testDisplayTitleEmptyMarkdownUsesStem() {
         let url = URL(fileURLWithPath: "/vault/Empty.md")
-        XCTAssertEqual(NoteTitle.displayTitle(markdown: "", fileURL: url), "Empty")
+        XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Empty")
     }
 
     func testDisplayTitleNilURLIsEmpty() {
-        XCTAssertEqual(NoteTitle.displayTitle(markdown: "# Solo\n", fileURL: nil), "")
-        XCTAssertEqual(NoteTitle.displayTitle(markdown: "no h1", fileURL: nil), "")
+        XCTAssertEqual(NoteTitle.displayTitle(fileURL: nil), "")
+        XCTAssertEqual(NoteTitle.displayTitle(fileURL: nil), "")
     }
 
     func testApplyingTitleAlwaysRequestsRenameAndLeavesMarkdown() {

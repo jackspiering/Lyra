@@ -23,8 +23,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .terminateNow
         }
         NSApp.activate(ignoringOtherApps: true)
-        NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
-        return .terminateCancel
+        let orphaned = AppSession.shared.orphaned(failed)
+        if orphaned.count < failed.count {
+            // An open window owns at least one failure and shows its recovery.
+            NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
+            return .terminateCancel
+        }
+        // Only notes from closed windows failed; nothing else would ever
+        // surface them, so ask here instead of cancelling quit silently.
+        guard confirmDiscarding(orphaned) else { return .terminateCancel }
+        AppSession.shared.discard(orphaned)
+        return .terminateNow
+    }
+
+    private func confirmDiscarding(_ editors: [EditorViewModel]) -> Bool {
+        let names = editors
+            .compactMap { $0.fileURL?.deletingPathExtension().lastPathComponent }
+            .joined(separator: ", ")
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Some notes couldn't be saved"
+        alert.informativeText = "Changes to \(names.isEmpty ? "a note" : names) from a closed window "
+            + "couldn't be written to disk. Quit anyway and lose those changes?"
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Discard and Quit")
+        return alert.runModal() == .alertSecondButtonReturn
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -39,6 +62,8 @@ struct VaultWindowRoot: View {
     var handoffID: UUID?
     @State private var store = VaultStore()
     @State private var tabs = NoteTabController()
+    /// This window's vault, so a relaunch reopens every vault window.
+    @SceneStorage("lyra.windowVaultBookmark") private var windowVaultBookmark: Data?
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
     @Environment(\.openWindow) private var openWindow
 
@@ -60,12 +85,23 @@ struct VaultWindowRoot: View {
             if let handoffID,
                let pending = AppSession.shared.takePendingVaultURL(for: handoffID) {
                 store.openVault(at: pending)
+            } else if let windowVaultBookmark {
+                AppSession.shared.markLaunchVaultRestored()
+                store.restoreVault(fromBookmark: windowVaultBookmark)
+            } else if AppSession.shared.claimLaunchVaultRestore() {
+                store.restoreLastVault()
             }
         }
         .onChange(of: appearanceRaw) { _, new in
             AppearanceController.apply(rawValue: new)
         }
+        .onChange(of: store.rootBookmark) { _, bookmark in
+            if let bookmark {
+                windowVaultBookmark = bookmark
+            }
+        }
         .onDisappear {
+            AppSession.shared.windowClosed(store: store)
             var hasFailedEditor = false
             for editor in tabs.allEditors() {
                 if editor.saveIfNeeded() {

@@ -12,11 +12,9 @@ final class NoteTab: Identifiable {
     var fileURL: URL? { editor.fileURL }
 
     /// Tab bar label: filename stem via `NoteTitle`, or “New Tab” when empty.
+    /// Reads only the URL, so typing does not redraw the tab bar.
     var title: String {
-        if editor.fileURL != nil {
-            return NoteTitle.displayTitle(markdown: editor.text, fileURL: editor.fileURL)
-        }
-        return "New Tab"
+        editor.fileURL == nil ? "New Tab" : NoteTitle.displayTitle(fileURL: editor.fileURL)
     }
 
     /// Create an empty tab. Editor is created in the init body so the default

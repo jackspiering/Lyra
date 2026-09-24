@@ -2,8 +2,9 @@ import Foundation
 
 /// Filename stem is the note’s identity (tab chip + title field).
 enum NoteTitle {
-    /// Tab chip and title-field value. Ignores markdown. Empty when no file is open.
-    static func displayTitle(markdown _: String, fileURL: URL?) -> String {
+    /// Tab chip and title-field value. Empty when no file is open. Reads only
+    /// the URL, so observers do not redraw on every keystroke.
+    static func displayTitle(fileURL: URL?) -> String {
         fileURL?.deletingPathExtension().lastPathComponent ?? ""
     }
 

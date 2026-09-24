@@ -7,7 +7,9 @@ struct NoteTitleBar: View {
     /// Vault name and folders above the note, shown quietly over the title.
     var breadcrumb: [String] = []
     /// Called with the committed title string (Return / focus loss).
-    var onCommit: (String) -> Void
+    /// Returns `false` when the rename failed; the field then shows the
+    /// real name again instead of the rejected one.
+    var onCommit: (String) -> Bool
 
     @State private var draft: String = ""
     @State private var suppressFocusCommit = false
@@ -66,7 +68,9 @@ struct NoteTitleBar: View {
         if trimmed == title {
             return
         }
-        onCommit(trimmed)
+        if !onCommit(trimmed) {
+            draft = title
+        }
     }
 
     private func revertAndBlur() {
