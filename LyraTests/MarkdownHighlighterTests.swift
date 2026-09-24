@@ -137,6 +137,18 @@ final class MarkdownHighlighterTests: XCTestCase {
         XCTAssertTrue(isMonospaced)
     }
 
+    func testFencedCodeDoesNotReceiveMarkdownStyling() {
+        let source = "```\n# Not a heading\n**Not bold**\n```"
+        let storage = NSTextStorage(string: source)
+        MarkdownHighlighter.applyHighlighting(to: storage)
+
+        let ns = source as NSString
+        var range = NSRange(location: 0, length: 0)
+        let headingAttrs = storage.attributes(at: ns.range(of: "Not a heading").location, effectiveRange: &range)
+        assertColorDoesNotMatch(headingAttrs[.foregroundColor], LyraTheme.heading)
+        assertColor(headingAttrs[.foregroundColor], matches: LyraTheme.code)
+    }
+
     func testBodyCarriesProseLineSpacing() {
         let storage = NSTextStorage(string: "plain")
         MarkdownHighlighter.applyHighlighting(to: storage)

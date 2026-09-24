@@ -34,7 +34,7 @@ final class EditorViewModel {
     /// same path, size, and coarse-grained modification date. Keep the bytes
     /// too so conflict detection remains conservative on filesystems with a
     /// low timestamp resolution.
-    private struct DiskSnapshot: Equatable {
+    struct DiskSnapshot: Equatable {
         let path: String
         let date: Date
         let size: Int
@@ -66,24 +66,23 @@ final class EditorViewModel {
     @discardableResult
     func open(url: URL) -> Bool {
         guard saveIfNeeded() else { return false }
-        do {
-            text = try String(contentsOf: url, encoding: .utf8)
-            fileURL = url
-            isDirty = false
-            lastError = nil
-            lastSaveFailed = false
-            hasExternalConflict = false
-            hasMissingFile = false
-            conflictDeferred = false
-            rememberDiskSnapshot(for: url)
-            refreshFileDates(for: url, markSavedNow: false)
-            return true
-        } catch {
+        guard let (readText, snapshot) = Self.readTextAndSnapshot(of: url) else {
             // Do not discard the active note when the requested target cannot
             // be read. The user must still be able to retry or keep editing it.
-            lastError = (.openNote, error)
+            lastError = (.openNote, CocoaError(.fileReadUnknown))
             return false
         }
+        text = readText
+        fileURL = url
+        isDirty = false
+        lastError = nil
+        lastSaveFailed = false
+        hasExternalConflict = false
+        hasMissingFile = false
+        conflictDeferred = false
+        diskSnapshot = snapshot
+        refreshFileDates(for: url, markSavedNow: false)
+        return true
     }
 
     /// Point the editor at a new path without saving (e.g. after rename).
@@ -94,6 +93,8 @@ final class EditorViewModel {
         hasMissingFile = false
         hasExternalConflict = false
         conflictDeferred = false
+        lastError = nil
+        lastSaveFailed = false
         rememberDiskSnapshot(for: newURL)
         refreshFileDates(for: newURL, markSavedNow: false)
     }
@@ -171,26 +172,25 @@ final class EditorViewModel {
         guard let url = fileURL else { return false }
         saveTask?.cancel()
         saveTask = nil
-        do {
-            text = try String(contentsOf: url, encoding: .utf8)
-            isDirty = false
-            lastError = nil
-            lastSaveFailed = false
-            hasExternalConflict = false
-            hasMissingFile = false
-            conflictDeferred = false
-            rememberDiskSnapshot(for: url)
-            refreshFileDates(for: url, markSavedNow: false)
-            return true
-        } catch {
+        guard let (readText, snapshot) = Self.readTextAndSnapshot(of: url) else {
             hasExternalConflict = false
             if !FileManager.default.fileExists(atPath: url.path) {
                 hasMissingFile = true
                 lastSaveFailed = true
             }
-            lastError = (.openNote, error)
+            lastError = (.openNote, CocoaError(.fileReadUnknown))
             return false
         }
+        text = readText
+        isDirty = false
+        lastError = nil
+        lastSaveFailed = false
+        hasExternalConflict = false
+        hasMissingFile = false
+        conflictDeferred = false
+        diskSnapshot = snapshot
+        refreshFileDates(for: url, markSavedNow: false)
+        return true
     }
 
     private func writeToDisk(_ url: URL, force: Bool) -> Bool {
@@ -276,6 +276,23 @@ final class EditorViewModel {
                         writeError = CocoaError(.fileWriteNoPermission)
                         return
                     }
+                    // Verify the bytes just written are still the buffer we wrote.
+                    // Otherwise another writer replaced the file between the write
+                    // and the new clean snapshot.
+                    let expected = text.data(using: .utf8) ?? Data()
+                    guard let current = Self.captureSnapshot(of: coordinatedURL),
+                          current.content == expected else {
+                        if !FileManager.default.fileExists(atPath: coordinatedURL.path) {
+                            hasMissingFile = true
+                            lastSaveFailed = true
+                        } else {
+                            hasExternalConflict = true
+                            conflictDeferred = false
+                        }
+                        detectedConflict = true
+                        return
+                    }
+                    diskSnapshot = current
                     didWrite = true
                 } catch {
                     writeError = error
@@ -298,7 +315,6 @@ final class EditorViewModel {
             hasExternalConflict = false
             hasMissingFile = false
             conflictDeferred = false
-            rememberDiskSnapshot(for: url)
             refreshFileDates(for: url, markSavedNow: true)
             return true
         } catch {
@@ -367,6 +383,30 @@ final class EditorViewModel {
         let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value
         let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
         return FileMetadata(date: date, size: size, device: device, inode: inode)
+    }
+
+    /// Reads UTF-8 text and its snapshot from one coherent byte read, so the
+    /// buffer and conflict identity cannot describe different disk versions.
+    nonisolated static func readTextAndSnapshot(of url: URL) -> (String, DiskSnapshot?)? {
+        for _ in 0..<2 {
+            guard let before = metadata(of: url),
+                  let content = try? Data(contentsOf: url),
+                  let after = metadata(of: url),
+                  before == after,
+                  let text = String(data: content, encoding: .utf8) else {
+                continue
+            }
+            let snapshot = DiskSnapshot(
+                path: url.path,
+                date: after.date,
+                size: after.size,
+                device: after.device,
+                inode: after.inode,
+                content: content
+            )
+            return (text, snapshot)
+        }
+        return nil
     }
 
     private nonisolated static func captureSnapshot(of url: URL) -> DiskSnapshot? {

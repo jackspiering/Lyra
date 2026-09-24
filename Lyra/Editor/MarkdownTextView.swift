@@ -12,6 +12,9 @@ struct MarkdownTextView: NSViewRepresentable {
     var onWikiLink: ((String) -> Void)?
     /// Bumped to show the system find bar (⌘F).
     var findBarToken: Int = 0
+    /// Consumes a find-bar request after it is shown, so note switches do not
+    /// reopen the panel from a stale token.
+    var onFindBarShown: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -100,6 +103,7 @@ struct MarkdownTextView: NSViewRepresentable {
             context.coordinator.lastFindBarToken = findBarToken
             if findBarToken > 0 {
                 context.coordinator.showFindBar()
+                onFindBarShown?()
             }
         }
     }
@@ -236,23 +240,41 @@ final class LyraTextView: NSTextView {
     /// Best-effort PNG bytes from common pasteboard image representations.
     /// Never loads remote URLs — a copied https link must paste as text, not trigger a fetch.
     static func pngDataFromPasteboard(_ pb: NSPasteboard) -> Data? {
-        if let data = pb.data(forType: .png) { return data }
+        if let data = pb.data(forType: .png),
+           PreviewImage.imageSizeIfWithinBudget(data) != nil {
+            return data
+        }
         if let tiff = pb.data(forType: .tiff),
+           PreviewImage.imageSizeIfWithinBudget(tiff) != nil,
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             return png
         }
-        if let img = NSImage(pasteboard: pb), let data = AttachmentStore.pngData(from: img) {
+        if let img = NSImage(pasteboard: pb),
+           let data = budgetedPNG(from: img) {
             return data
         }
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
             for url in urls {
-                guard url.isFileURL else { continue }
-                if let img = NSImage(contentsOf: url), let data = AttachmentStore.pngData(from: img) {
-                    return data
+                guard url.isFileURL,
+                      let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes),
+                      PreviewImage.imageSizeIfWithinBudget(data) != nil,
+                      let img = NSImage(data: data),
+                      let png = budgetedPNG(from: img) else {
+                    continue
                 }
+                return png
             }
         }
         return nil
+    }
+
+    private static func budgetedPNG(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              PreviewImage.imageSizeIfWithinBudget(tiff) != nil,
+              let rep = NSBitmapImageRep(data: tiff) else {
+            return nil
+        }
+        return rep.representation(using: .png, properties: [:])
     }
 }
