@@ -15,7 +15,7 @@
   </a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
   <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version 0.10.2" src="https://img.shields.io/badge/version-0.10.2-informational?style=flat-square">
+  <img alt="Version 0.11.0" src="https://img.shields.io/badge/version-0.11.0-informational?style=flat-square">
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   </a>
@@ -43,18 +43,21 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 
 ## Features
 
-- **Source mode:** TextKit editing with Markdown syntax highlighting, undo, autosave, and standard text editing behavior. Command-click a wiki link to follow it.
+- **Writing column:** Title, Source, and Reading share one centered column of about 680 points, so lines stay a comfortable length in any window size and Command-E does not shift the text.
+- **Source mode:** TextKit editing, undo, autosave, and standard text editing behavior. Markdown stays plain text. Syntax markers such as `#`, `**`, and `[[ ]]` are drawn quietly, headings are sized by level, and code uses a monospaced face. Command-click a wiki link to follow it.
 - **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links. Reading is not editable.
 - **Note tabs:** Open multiple notes inside one vault window without losing the sidebar.
 - **Multiple vaults:** Open separate vault folders in separate windows.
-- **Filename identity:** The title bar and tab show the file stem. Editing the title renames the file. The first heading is content only.
-- **Sidebar filter:** Filter the sidebar by note name or path. This is not Find.
+- **Filename identity:** The title at the top of the note and the tab show the file stem, with the vault and folder path above it. Editing the title renames the file. The first heading is content only.
+- **Sidebar:** Shows the vault name and note count, a note count for each folder, and a filter for note names and paths. The filter is not Find.
 - **Find:** Command-F finds text in the open note. Shift-Command-F searches note bodies in memory and shows a path plus one snippet.
 - **Wiki links:** Path-aware `[[Note]]`, `[[Folder/Note]]`, and `[[path|alias]]`. A leading YAML `aliases:` list adds extra names. If more than one note matches, pick from a list. Lyra does not guess. An unresolved link can create a file after you confirm.
-- **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. There is no graph view.
+- **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. Each card shows the linking note, its folder, and the line around the link. There is no graph view.
 - **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link.
 - **PDF export:** Export the open note.
 - **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window. If a remembered vault folder moved, Lyra asks before reopening it.
+- **Status:** A small pill in the corner of the note shows word and character counts and the last save time. Hover it to see when the note was created.
+- **Appearance:** Two built-in looks follow your System, Light, or Dark setting. *Night* uses deep navy with the gold of the Lyra logo. *Parchment* uses warm paper with bronze-gold. There is no theme picker.
 - **Preferences:** Configure appearance, new-note naming, and Trash confirmations.
 
 ## Quick Start

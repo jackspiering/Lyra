@@ -32,7 +32,7 @@ PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](do
 - Update `docs/architecture.md` when structure or invariants change
 - Do not expand into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke (v0.7)
+## Manual smoke (v0.11)
 
 Required (~10 minutes):
 
@@ -52,13 +52,16 @@ Required (~10 minutes):
 14. **Export PDF…** with a long code fence and `**bold**` — multi-page PDF, bold not literal asterisks
 15. Body text uses Inter; code fences stay monospaced
 16. File → New Window opens another vault window; File menu has New Note / Open Vault / Refresh / Export
+17. **Appearance:** switch Settings → Appearance between Light and Dark — sidebar, tab strip, note, and backlinks change together (Parchment / Night) with no stray system-gray bands
+18. **Column:** resize the window narrow and wide — the title and Source text stay left-aligned in one centered column; **⌘E** to Reading does not shift the text sideways
+19. **Source styling:** `#`, `**`, and `[[ ]]` markers are dim but still present and editable; the caret and selection are gold; typing after a heading returns to body size
 
 Optional:
 
-17. `[[Other Note]]` opens from Reading when the file exists
-18. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading (pasting a browser URL must not hang on network)
-19. Unreadable child folder in the vault — rest of the sidebar still appears
-20. Eject/unplug the drive holding a dirty note — visible save failure, not silence
+20. `[[Other Note]]` opens from Reading when the file exists; the backlinks card on the target shows the linking line
+21. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading (pasting a browser URL must not hang on network)
+22. Unreadable child folder in the vault — rest of the sidebar still appears
+23. Eject/unplug the drive holding a dirty note — visible save failure, not silence
 
 ## License
 
