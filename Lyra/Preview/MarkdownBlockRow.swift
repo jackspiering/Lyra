@@ -14,11 +14,13 @@ struct MarkdownBlockRow: View {
                 .font(LyraFonts.heading(level: level))
                 .foregroundStyle(Color(nsColor: LyraTheme.heading))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, level <= 2 ? 6 : 2)
+                .padding(.top, level <= 2 ? 12 : 6)
 
         case .paragraph(let content):
             Text(inline(content))
-                .font(LyraFonts.body)
+                .font(LyraFonts.prose)
+                .lineSpacing(LyraFonts.proseLineSpacing)
+                .foregroundStyle(Color(nsColor: LyraTheme.ink))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
         case .listItem(let content, let ordinal, let depth, let taskChecked):
@@ -32,38 +34,50 @@ struct MarkdownBlockRow: View {
                 } else {
                     Text(ordinal.map { "\($0)." } ?? "•")
                         .foregroundStyle(Color(nsColor: LyraTheme.listMarker))
+                        .font(LyraFonts.prose)
                         .frame(minWidth: 16, alignment: .trailing)
                 }
                 Text(inline(content))
-                    .font(LyraFonts.body)
+                    .font(LyraFonts.prose)
+                    .lineSpacing(LyraFonts.proseLineSpacing)
+                    .foregroundStyle(Color(nsColor: LyraTheme.ink))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.leading, CGFloat(depth) * 20)
 
         case .quote(let content):
             HStack(alignment: .top, spacing: 0) {
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(LyraTheme.accentColor)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(LyraTheme.accentColor.opacity(0.7))
                     .frame(width: 3)
                 Text(inline(content))
-                    .font(LyraFonts.body)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 10)
+                    .font(LyraFonts.prose)
+                    .lineSpacing(LyraFonts.proseLineSpacing)
+                    .foregroundStyle(Color(nsColor: LyraTheme.quote))
+                    .padding(.leading, 16)
+                    .padding(.vertical, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         case .code(let code):
             Text(code.isEmpty ? " " : code)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: 13, design: .monospaced))
+                .lineSpacing(3)
                 .foregroundStyle(Color(nsColor: LyraTheme.code))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
+                .padding(14)
                 .background(Color(nsColor: LyraTheme.codeBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
+                )
 
         case .thematicBreak:
-            Divider()
-                .padding(.vertical, 4)
+            Rectangle()
+                .fill(LyraTheme.hairlineColor)
+                .frame(height: 1)
+                .padding(.vertical, 10)
 
         case .image(let alt, let path):
             if let noteDirectory, let vaultRoot,

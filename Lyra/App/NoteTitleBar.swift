@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Editable note title above Source / Reading. Commits on Return or focus loss.
+/// Editable note title at the top of the writing column. Commits on Return or focus loss.
 struct NoteTitleBar: View {
     /// Live display title (filename stem).
     let title: String
+    /// Vault name and folders above the note, shown quietly over the title.
+    var breadcrumb: [String] = []
     /// Called with the committed title string (Return / focus loss).
     var onCommit: (String) -> Void
 
@@ -12,9 +14,29 @@ struct NoteTitleBar: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !breadcrumb.isEmpty {
+                Text(breadcrumb.joined(separator: "  ›  "))
+                    .font(LyraFonts.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .accessibilityLabel("In \(breadcrumb.joined(separator: ", "))")
+            }
+            titleField
+        }
+        .frame(maxWidth: LyraTheme.columnWidth, alignment: .leading)
+        .padding(.horizontal, LyraTheme.columnMargin)
+        .padding(.top, 36)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var titleField: some View {
         TextField("Title", text: $draft)
-            .font(LyraFonts.heading(level: 1))
+            .font(LyraFonts.title)
             .textFieldStyle(.plain)
+            .accessibilityLabel("Note title")
             .focused($focused)
             .onSubmit { commit() }
             .onExitCommand { revertAndBlur() }
@@ -33,10 +55,6 @@ struct NoteTitleBar: View {
                 }
                 commit()
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func commit() {

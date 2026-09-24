@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -51,6 +52,8 @@ struct ContentView: View {
         rootShell
             // Empty chrome title — vault name must not repeat in toolbar principal.
             .navigationTitle("")
+            // Toolbar and title bar sit on the same chrome tone as the tab strip.
+            .containerBackground(LyraTheme.chromeColor, for: .window)
             .frame(minWidth: 900, minHeight: 560)
             .font(LyraFonts.body)
             .background(
@@ -105,15 +108,26 @@ struct ContentView: View {
     private var rootShell: some View {
         if store.rootURL == nil {
             ContentUnavailableView {
-                Label("No Vault Open", systemImage: "folder.badge.questionmark")
+                VStack(spacing: 14) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 96, height: 96)
+                        .accessibilityHidden(true)
+                    Text("No Vault Open")
+                        .font(LyraFonts.title)
+                }
             } description: {
                 Text("Open a folder of Markdown files to begin.")
+                    .font(LyraFonts.body)
             } actions: {
                 Button("Open Vault…") {
                     openVault()
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(LyraTheme.paperColor)
         } else {
             vaultWorkspace
         }
@@ -205,11 +219,10 @@ struct ContentView: View {
         .disabled(editor.fileURL == nil)
         .help("Export current note to PDF")
 
-        Button {
-            showBacklinks.toggle()
-        } label: {
+        Toggle(isOn: $showBacklinks) {
             Label("Backlinks", systemImage: "link")
         }
+        .toggleStyle(.button)
         .disabled(editor.fileURL == nil)
         .help("Show or hide backlinks")
 
@@ -252,32 +265,39 @@ struct ContentView: View {
                 onCloseTab: { closeTab(id: tabs.selectedTabID) }
             )
         } else {
-            VStack(spacing: 0) {
-                NoteTitleBar(
-                    title: NoteTitle.displayTitle(markdown: editor.text, fileURL: editor.fileURL),
-                    onCommit: commitNoteTitle
-                )
-                .id(editor.fileURL?.path)
-                HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    NoteTitleBar(
+                        title: NoteTitle.displayTitle(markdown: editor.text, fileURL: editor.fileURL),
+                        breadcrumb: NoteTitle.breadcrumb(fileURL: editor.fileURL, vaultRoot: store.rootURL),
+                        onCommit: commitNoteTitle
+                    )
+                    .id(editor.fileURL?.path)
                     noteContent
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if showBacklinks, let url = editor.fileURL {
-                        Divider()
-                        BacklinksInspector(
-                            items: store.backlinks(to: url, liveBodies: liveBodies()),
-                            onOpen: { wikiFlow.open($0) },
-                            onHide: { showBacklinks = false }
-                        )
-                    }
+                        .overlay(alignment: .bottomTrailing) {
+                            EditorStatusBar(
+                                wordCount: NoteStats.wordCount(editor.text),
+                                characterCount: NoteStats.characterCount(editor.text),
+                                created: editor.createdAt,
+                                lastSaved: editor.lastSavedAt
+                            )
+                            .padding(14)
+                        }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                EditorStatusBar(
-                    wordCount: NoteStats.wordCount(editor.text),
-                    characterCount: NoteStats.characterCount(editor.text),
-                    created: editor.createdAt,
-                    lastSaved: editor.lastSavedAt
-                )
+                .background(LyraTheme.paperColor)
+                if showBacklinks, let url = editor.fileURL {
+                    Rectangle()
+                        .fill(LyraTheme.hairlineColor)
+                        .frame(width: 1)
+                    BacklinksInspector(
+                        items: store.backlinks(to: url, liveBodies: liveBodies()),
+                        onOpen: { wikiFlow.open($0) },
+                        onHide: { showBacklinks = false }
+                    )
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

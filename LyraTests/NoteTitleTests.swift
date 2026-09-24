@@ -38,4 +38,26 @@ final class NoteTitleTests: XCTestCase {
         XCTAssertEqual(result.renamedStem, "Note")
         XCTAssertEqual(result.markdown, md)
     }
+
+    func testBreadcrumbListsVaultThenFolders() {
+        let root = URL(fileURLWithPath: "/Users/me/Field Notes")
+        let note = URL(fileURLWithPath: "/Users/me/Field Notes/Essays/Drafts/On Slow Writing.md")
+        XCTAssertEqual(
+            NoteTitle.breadcrumb(fileURL: note, vaultRoot: root),
+            ["Field Notes", "Essays", "Drafts"]
+        )
+    }
+
+    func testBreadcrumbAtVaultRootIsVaultName() {
+        let root = URL(fileURLWithPath: "/vault")
+        let note = URL(fileURLWithPath: "/vault/Inbox.md")
+        XCTAssertEqual(NoteTitle.breadcrumb(fileURL: note, vaultRoot: root), ["vault"])
+    }
+
+    func testBreadcrumbOutsideVaultOrMissingIsEmpty() {
+        let root = URL(fileURLWithPath: "/vault")
+        XCTAssertEqual(NoteTitle.breadcrumb(fileURL: URL(fileURLWithPath: "/elsewhere/A.md"), vaultRoot: root), [])
+        XCTAssertEqual(NoteTitle.breadcrumb(fileURL: URL(fileURLWithPath: "/vault-2/A.md"), vaultRoot: root), [])
+        XCTAssertEqual(NoteTitle.breadcrumb(fileURL: nil, vaultRoot: root), [])
+    }
 }
