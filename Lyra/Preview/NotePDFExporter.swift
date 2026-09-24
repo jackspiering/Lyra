@@ -27,15 +27,19 @@ enum NotePDFExporter {
 
     static let defaultMaxPageCount = 2000
 
+    /// `documentTitle` becomes the PDF's Title metadata (Preview, Finder,
+    /// Spotlight); it is not drawn on the page.
     static func pdfData(
         markdown: String,
         noteDirectory: URL,
         vaultRoot: URL,
+        documentTitle: String? = nil,
         maxPages: Int = defaultMaxPageCount
     ) throws -> Data {
         try pdfData(
             notes: [NoteSource(title: "", markdown: markdown, noteDirectory: noteDirectory)],
             vaultRoot: vaultRoot,
+            documentTitle: documentTitle,
             maxPages: maxPages
         )
     }
@@ -44,9 +48,15 @@ enum NotePDFExporter {
     static func pdfData(
         notes: [NoteSource],
         vaultRoot: URL,
+        documentTitle: String? = nil,
         maxPages: Int = defaultMaxPageCount
     ) throws -> Data {
-        try Renderer(notes: notes, vaultRoot: vaultRoot, maxPages: maxPages).run()
+        try Renderer(
+            notes: notes,
+            vaultRoot: vaultRoot,
+            documentTitle: documentTitle,
+            maxPages: maxPages
+        ).run()
     }
 
     // MARK: - Renderer
@@ -54,6 +64,7 @@ enum NotePDFExporter {
     private final class Renderer {
         let notes: [NoteSource]
         let vaultRoot: URL
+        let documentTitle: String?
         let maxPages: Int
 
         private var ctx: CGContext!
@@ -63,9 +74,10 @@ enum NotePDFExporter {
         private var stopped = false
         private let contentBottom = NotePDFExporter.pageHeight - NotePDFExporter.margin
 
-        init(notes: [NoteSource], vaultRoot: URL, maxPages: Int) {
+        init(notes: [NoteSource], vaultRoot: URL, documentTitle: String?, maxPages: Int) {
             self.notes = notes
             self.vaultRoot = vaultRoot
+            self.documentTitle = documentTitle
             self.maxPages = max(1, maxPages)
             self.noteDirectory = notes.first?.noteDirectory ?? vaultRoot
         }
@@ -81,7 +93,11 @@ enum NotePDFExporter {
                 throw CocoaError(.fileWriteUnknown)
             }
             var mediaBox = pageRect
-            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            var info: [CFString: Any] = [kCGPDFContextCreator: "Lyra"]
+            if let documentTitle, !documentTitle.isEmpty {
+                info[kCGPDFContextTitle] = documentTitle
+            }
+            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, info as CFDictionary) else {
                 throw CocoaError(.fileWriteUnknown)
             }
             ctx = context
@@ -563,9 +579,7 @@ enum NotePDFExporter {
                 if intent.contains(.stronglyEmphasized) {
                     face = LyraFonts.ui(size: font.pointSize, weight: .bold)
                 } else if intent.contains(.emphasized) {
-                    // NSFontDescriptor.withSymbolicTraits is non-optional on macOS (unlike UIKit).
-                    let italic = font.fontDescriptor.withSymbolicTraits(.italic)
-                    face = NSFont(descriptor: italic, size: font.pointSize) ?? font
+                    face = LyraFonts.italic(size: font.pointSize)
                 }
                 if intent.contains(.code) {
                     face = LyraFonts.code(size: font.pointSize)

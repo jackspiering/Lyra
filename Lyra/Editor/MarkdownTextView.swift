@@ -6,6 +6,12 @@ struct MarkdownTextView: NSViewRepresentable {
     var vaultRoot: URL?
     /// Current note URL (for note-relative attachment links on paste).
     var noteURL: URL?
+    /// Owner that keeps this note's text view alive across Reading toggles
+    /// and tab switches, so undo, caret, and scroll survive.
+    var viewOwner: EditorViewModel?
+    /// View ▸ Bigger / Smaller. Magnifies the whole Source view, so the
+    /// type scale and writing column keep their proportions.
+    var zoom: CGFloat = 1
     var onEdit: () -> Void
     var onPasteError: ((String) -> Void)?
     /// Command-click a `[[wiki]]` span.
@@ -21,6 +27,17 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
+        if let cached = viewOwner?.sourceView as? NSScrollView,
+           let textView = cached.documentView as? LyraTextView {
+            cached.removeFromSuperview()
+            cached.magnification = zoom
+            context.coordinator.attach(textView)
+            if textView.string != text {
+                context.coordinator.loadDocument(text)
+            }
+            return cached
+        }
+
         let textView = LyraTextView()
         textView.minSize = .zero
         textView.maxSize = NSSize(
@@ -36,8 +53,6 @@ struct MarkdownTextView: NSViewRepresentable {
         )
         textView.textContainer?.widthTracksTextView = true
 
-        textView.delegate = context.coordinator
-        textView.textStorage?.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
         textView.font = LyraFonts.ui(size: LyraFonts.proseSize)
@@ -54,17 +69,8 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.vaultRoot = vaultRoot
-        textView.noteURL = noteURL
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
-        let coordinator = context.coordinator
-        textView.onPasteError = { message in
-            coordinator.parent.onPasteError?(message)
-        }
-        textView.onWikiLink = { name in
-            coordinator.parent.onWikiLink?(name)
-        }
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -76,9 +82,11 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 56, right: 0)
         scrollView.documentView = textView
+        scrollView.magnification = zoom
 
-        context.coordinator.textView = textView
+        context.coordinator.attach(textView)
         context.coordinator.loadDocument(text)
+        viewOwner?.sourceView = scrollView
 
         return scrollView
     }
@@ -86,16 +94,10 @@ struct MarkdownTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? LyraTextView else { return }
-        textView.vaultRoot = vaultRoot
-        textView.noteURL = noteURL
-        textView.textStorage?.delegate = context.coordinator
-        let coordinator = context.coordinator
-        textView.onPasteError = { message in
-            coordinator.parent.onPasteError?(message)
+        if abs(scrollView.magnification - zoom) > 0.001 {
+            scrollView.magnification = zoom
         }
-        textView.onWikiLink = { name in
-            coordinator.parent.onWikiLink?(name)
-        }
+        context.coordinator.attach(textView)
         if textView.string != text {
             context.coordinator.loadDocument(text)
         }
@@ -113,9 +115,51 @@ struct MarkdownTextView: NSViewRepresentable {
         weak var textView: LyraTextView?
         var lastFindBarToken = 0
         private var isApplying = false
+        /// Set when an edit removes fence characters, so the next pass
+        /// restyles the whole note instead of one paragraph.
+        private var needsFullHighlight = false
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
+            // A reused text view must not reopen the find bar from an old token.
+            self.lastFindBarToken = parent.findBarToken
+        }
+
+        /// Point a (new or reused) text view at this coordinator and the
+        /// current SwiftUI values.
+        func attach(_ textView: LyraTextView) {
+            self.textView = textView
+            textView.delegate = self
+            textView.textStorage?.delegate = self
+            textView.vaultRoot = parent.vaultRoot
+            textView.noteURL = parent.noteURL
+            textView.onPasteError = { [weak self] message in
+                self?.parent.onPasteError?(message)
+            }
+            textView.onWikiLink = { [weak self] name in
+                self?.parent.onWikiLink?(name)
+            }
+        }
+
+        /// Each note keeps its own undo stack; the window's shared manager
+        /// would let ⌘Z in one tab undo an edit in a hidden one.
+        func undoManager(for view: NSTextView) -> UndoManager? {
+            (view as? LyraTextView)?.documentUndoManager
+        }
+
+        func textView(
+            _ textView: NSTextView,
+            shouldChangeTextIn affectedCharRange: NSRange,
+            replacementString: String?
+        ) -> Bool {
+            let current = textView.string as NSString
+            if NSMaxRange(affectedCharRange) <= current.length {
+                let removed = current.substring(with: affectedCharRange)
+                if removed.contains("``") || removed.contains("~~") {
+                    needsFullHighlight = true
+                }
+            }
+            return true
         }
 
         func showFindBar() {
@@ -141,7 +185,8 @@ struct MarkdownTextView: NSViewRepresentable {
                 let loc = min(r.location, newLength)
                 return NSValue(range: NSRange(location: loc, length: min(r.length, newLength - loc)))
             }
-            textView.undoManager?.removeAllActions()
+            // Old undo steps refer to text that no longer exists.
+            textView.documentUndoManager.removeAllActions()
             isApplying = false
         }
 
@@ -162,7 +207,9 @@ struct MarkdownTextView: NSViewRepresentable {
         ) {
             guard !isApplying, editedMask.contains(.editedCharacters) else { return }
             isApplying = true
-            MarkdownHighlighter.applyHighlighting(to: textStorage, range: editedRange)
+            let range: NSRange? = needsFullHighlight ? nil : editedRange
+            needsFullHighlight = false
+            MarkdownHighlighter.applyHighlighting(to: textStorage, range: range)
             isApplying = false
         }
     }
@@ -175,6 +222,8 @@ final class LyraTextView: NSTextView {
     var noteURL: URL?
     var onPasteError: ((String) -> Void)?
     var onWikiLink: ((String) -> Void)?
+    /// This note's own undo stack (see `Coordinator.undoManager(for:)`).
+    let documentUndoManager = UndoManager()
 
     private static let columnTopInset: CGFloat = 4
 
@@ -220,9 +269,14 @@ final class LyraTextView: NSTextView {
     @discardableResult
     func pasteImageIfPossible() -> Bool {
         guard let root = vaultRoot else { return false }
-        guard let data = Self.pngDataFromPasteboard(NSPasteboard.general) else { return false }
+        guard let image = Self.imageFromPasteboard(NSPasteboard.general) else { return false }
         do {
-            let rel = try AttachmentStore.savePNG(data: data, vaultRoot: root, noteURL: noteURL)
+            let rel = try AttachmentStore.save(
+                data: image.data,
+                fileExtension: image.fileExtension,
+                vaultRoot: root,
+                noteURL: noteURL
+            )
             let encoded = rel.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? rel
             let insertion = "![](\(encoded))"
             let range = selectedRange()
@@ -237,34 +291,44 @@ final class LyraTextView: NSTextView {
         }
     }
 
-    /// Best-effort PNG bytes from common pasteboard image representations.
-    /// Never loads remote URLs — a copied https link must paste as text, not trigger a fetch.
-    static func pngDataFromPasteboard(_ pb: NSPasteboard) -> Data? {
+    /// Image bytes to store for a paste, or `nil` to paste as text.
+    /// Copied image *files* keep their bytes (a JPEG stays JPEG). Clipboard
+    /// images become PNG, but only when no text is listed before them, so
+    /// text copied from Office or Numbers pastes as text. Everything is
+    /// budgeted, and remote URLs are never loaded — a copied https link must
+    /// paste as text, not trigger a fetch.
+    static func imageFromPasteboard(_ pb: NSPasteboard) -> (data: Data, fileExtension: String)? {
+        let fileURLs = pb.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL] ?? []
+        if !fileURLs.isEmpty {
+            for url in fileURLs {
+                guard let ext = AttachmentStore.imageFileExtension(for: url),
+                      let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes),
+                      PreviewImage.imageSizeIfWithinBudget(data) != nil else {
+                    continue
+                }
+                return (data, ext)
+            }
+            return nil
+        }
+
+        let types = pb.types?.map(\.rawValue) ?? []
+        guard AttachmentStore.prefersImagePaste(types: types) else { return nil }
         if let data = pb.data(forType: .png),
            PreviewImage.imageSizeIfWithinBudget(data) != nil {
-            return data
+            return (data, "png")
         }
         if let tiff = pb.data(forType: .tiff),
            PreviewImage.imageSizeIfWithinBudget(tiff) != nil,
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
-            return png
+            return (png, "png")
         }
         if let img = NSImage(pasteboard: pb),
            let data = budgetedPNG(from: img) {
-            return data
-        }
-        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
-            for url in urls {
-                guard url.isFileURL,
-                      let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes),
-                      PreviewImage.imageSizeIfWithinBudget(data) != nil,
-                      let img = NSImage(data: data),
-                      let png = budgetedPNG(from: img) else {
-                    continue
-                }
-                return png
-            }
+            return (data, "png")
         }
         return nil
     }

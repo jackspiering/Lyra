@@ -130,4 +130,35 @@ final class AttachmentStoreTests: XCTestCase {
         let rel = AttachmentStore.relativePath(from: noteDir, to: attach)
         XCTAssertEqual(rel, "../_attachments/pasted-image.png")
     }
+
+    func testTextListedBeforeImageWinsPaste() {
+        // Excel / Numbers: text first, then a picture of the cells.
+        XCTAssertFalse(AttachmentStore.prefersImagePaste(types: [
+            "public.utf8-plain-text", "public.rtf", "public.tiff", "com.adobe.pdf",
+        ]))
+        // Screenshot or Preview copy: image only.
+        XCTAssertTrue(AttachmentStore.prefersImagePaste(types: ["public.png", "public.tiff"]))
+        // Browser "Copy Image": image first, URL text after.
+        XCTAssertTrue(AttachmentStore.prefersImagePaste(types: ["public.tiff", "public.utf8-plain-text"]))
+        // PDF alone is not an image paste.
+        XCTAssertFalse(AttachmentStore.prefersImagePaste(types: ["com.adobe.pdf"]))
+    }
+
+    func testImageFileExtension() {
+        XCTAssertEqual(AttachmentStore.imageFileExtension(for: URL(fileURLWithPath: "/tmp/Photo.JPG")), "jpg")
+        XCTAssertEqual(AttachmentStore.imageFileExtension(for: URL(fileURLWithPath: "/tmp/a.gif")), "gif")
+        XCTAssertNil(AttachmentStore.imageFileExtension(for: URL(fileURLWithPath: "/tmp/doc.pdf")))
+        XCTAssertNil(AttachmentStore.imageFileExtension(for: URL(fileURLWithPath: "/tmp/notes.txt")))
+        XCTAssertNil(AttachmentStore.imageFileExtension(for: URL(fileURLWithPath: "/tmp/noext")))
+    }
+
+    func testUniqueFilenameKeepsExtension() {
+        let name = AttachmentStore.uniqueFilename(
+            fileExtension: "jpg",
+            now: Date(timeIntervalSince1970: 0),
+            existing: []
+        )
+        XCTAssertTrue(name.hasPrefix("pasted-image-"))
+        XCTAssertTrue(name.hasSuffix(".jpg"))
+    }
 }

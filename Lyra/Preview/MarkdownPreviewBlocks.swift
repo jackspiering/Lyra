@@ -7,6 +7,8 @@ enum MarkdownPreviewBlocks {
         allowed.remove(charactersIn: "()")
         return allowed
     }()
+    private static let wikiPattern = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#)
+    private static let orderedItemPattern = try? NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.*)$"#)
 
     enum Block: Equatable {
         case heading(level: Int, text: String)
@@ -25,6 +27,14 @@ enum MarkdownPreviewBlocks {
         let lines = splitLines(source)
         var i = 0
         var paragraphIndices: [Int] = []
+
+        // Leading YAML frontmatter is ordinary text, shown as a code block
+        // rather than two rules around a paragraph.
+        if let frontmatterEnd = leadingFrontmatterEnd(lines) {
+            let yaml = lines[1..<frontmatterEnd].map(\.text).joined(separator: "\n")
+            blocks.append(.code(yaml))
+            i = frontmatterEnd + 1
+        }
 
         func flushParagraph() {
             guard !paragraphIndices.isEmpty else { return }
@@ -169,7 +179,7 @@ enum MarkdownPreviewBlocks {
 
     /// Rewrite bare `[[…]]` wiki links (not inside code) to markdown `lyra-wiki:` links.
     private static func rewriteWikis(in source: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return source }
+        guard let regex = wikiPattern else { return source }
         let ns = source as NSString
         var result = source
         let matches = regex.matches(in: source, range: NSRange(location: 0, length: ns.length)).reversed()
@@ -214,6 +224,46 @@ enum MarkdownPreviewBlocks {
         return encoded.removingPercentEncoding ?? encoded
     }
 
+    /// What a click on a Reading link does.
+    enum LinkTarget: Equatable {
+        case wiki(String)
+        case note(URL)
+        case external(URL)
+        case unsupported
+    }
+
+    /// Web and mail links open in the system handler. A `file:` link opens
+    /// only when it stays inside the vault and is a plain, non-executable
+    /// file (an attachment, not an app or script). Relative links to Markdown
+    /// notes inside the vault open as notes. Every other scheme is ignored so
+    /// a note from a shared vault cannot launch apps.
+    static func linkTarget(for url: URL, noteDirectory: URL?, vaultRoot: URL?) -> LinkTarget {
+        if let name = wikiLinkName(from: url) { return .wiki(name) }
+        if let scheme = url.scheme?.lowercased() {
+            if ["http", "https", "mailto"].contains(scheme) { return .external(url) }
+            guard scheme == "file", let vaultRoot, isOpenableAttachment(url, vaultRoot: vaultRoot) else {
+                return .unsupported
+            }
+            return .external(url)
+        }
+        guard let noteDirectory, let vaultRoot else { return .unsupported }
+        let path = url.relativePath
+        guard (path as NSString).pathExtension.lowercased() == "md",
+              let note = MarkdownImagePath.resolve(path: path, noteDirectory: noteDirectory, vaultRoot: vaultRoot)
+        else {
+            return .unsupported
+        }
+        return .note(note)
+    }
+
+    private static func isOpenableAttachment(_ url: URL, vaultRoot: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileSystemVault.isSafePath(url, within: vaultRoot)
+            && FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && !isDirectory.boolValue
+            && !FileManager.default.isExecutableFile(atPath: url.path)
+    }
+
     // MARK: - Line split
 
     private struct Line {
@@ -244,6 +294,16 @@ enum MarkdownPreviewBlocks {
             }
         }
         return lines
+    }
+
+    /// Index of the closing `---` when the note starts with a `---` block.
+    private static func leadingFrontmatterEnd(_ lines: [Line]) -> Int? {
+        guard let first = lines.first, first.text.trimmingCharacters(in: .whitespaces) == "---" else {
+            return nil
+        }
+        return lines.indices.dropFirst().first {
+            lines[$0].text.trimmingCharacters(in: .whitespaces) == "---"
+        }
     }
 
     private struct Fence {
@@ -384,7 +444,7 @@ enum MarkdownPreviewBlocks {
             }
             return .listItem(text: body, ordinal: nil, depth: depth, taskChecked: nil)
         }
-        guard let regex = try? NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.*)$"#) else { return nil }
+        guard let regex = orderedItemPattern else { return nil }
         let ns = trimmed as NSString
         guard let match = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: ns.length)),
               match.numberOfRanges > 2 else { return nil }

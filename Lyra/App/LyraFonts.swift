@@ -10,7 +10,7 @@ enum LyraFonts {
     static func registerBundledFonts() -> [String] {
         guard !didRegister else { return [] }
         var failed: [String] = []
-        for name in ["Inter-Regular", "Inter-SemiBold", "Inter-Bold"] {
+        for name in ["Inter-Regular", "Inter-Italic", "Inter-SemiBold", "Inter-Bold"] {
             let url = Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts")
                 ?? Bundle.main.url(forResource: name, withExtension: "ttf")
             guard let url else {
@@ -28,6 +28,12 @@ enum LyraFonts {
 
     static func ui(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         NSFont(name: face(weight), size: size) ?? .systemFont(ofSize: size, weight: weight)
+    }
+
+    /// Emphasis face. Falls back to the system italic if Inter-Italic is missing.
+    static func italic(size: CGFloat) -> NSFont {
+        if let inter = NSFont(name: "Inter-Italic", size: size) { return inter }
+        return NSFontManager.shared.convert(.systemFont(ofSize: size), toHaveTrait: .italicFontMask)
     }
 
     static func code(size: CGFloat = 12) -> NSFont {

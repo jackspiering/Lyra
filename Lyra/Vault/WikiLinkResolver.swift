@@ -113,6 +113,28 @@ struct WikiLinkResolver: Sendable {
         }
     }
 
+    /// `body` with every `[[link]]` that uniquely resolves to `oldURL`
+    /// pointed at `newStem`, or `nil` when nothing changed. Folder paths, a
+    /// trailing `.md`, and `|alias` text are kept. Resolve with the resolver
+    /// from before the rename.
+    func rewritingLinks(in body: String, from oldURL: URL, toStem newStem: String) -> String? {
+        let matches = WikiLinkSyntax.extractLinks(in: body).filter { match in
+            if case .unique(let url) = resolve(match.target) { return url == oldURL }
+            return false
+        }
+        guard !matches.isEmpty else { return nil }
+        let result = NSMutableString(string: body)
+        for match in matches.reversed() {
+            let inner = match.inner
+            let pipe = inner.firstIndex(of: "|")
+            let rawTarget = pipe.map { String(inner[..<$0]) } ?? inner
+            let alias = pipe.map { String(inner[$0...]) } ?? ""
+            let target = WikiLinkSyntax.retarget(rawTarget, toStem: newStem)
+            result.replaceCharacters(in: match.range, with: "[[\(target)\(alias)]]")
+        }
+        return result as String
+    }
+
     private static func makeBacklinkIndex(
         notes: [WikiNote],
         bodies: [URL: String]
