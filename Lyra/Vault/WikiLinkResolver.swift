@@ -12,6 +12,21 @@ struct WikiCandidate: Equatable, Identifiable, Sendable {
     var id: String { url.path }
 }
 
+/// A note that links here, with a line of context around its first such link.
+struct Backlink: Equatable, Identifiable, Sendable {
+    var url: URL
+    var relativePath: String
+    var context: BacklinkContext?
+    var id: String { url.path }
+}
+
+/// Text around a `[[wiki]]` on one line. `link` is the display text, without brackets.
+struct BacklinkContext: Equatable, Sendable {
+    var before: String
+    var link: String
+    var after: String
+}
+
 enum WikiResolveResult: Equatable, Sendable {
     case unique(URL)
     case ambiguous([WikiCandidate])
@@ -133,5 +148,52 @@ struct WikiLinkResolver: Sendable {
             .map { WikiCandidate(url: $0.url, relativePath: $0.relativePath) }
             .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
         return .ambiguous(candidates)
+    }
+}
+
+extension WikiLinkResolver {
+    /// The first `[[wiki]]` in `body` that uniquely resolves to `targetURL`, with the
+    /// text around it on the same line. `nil` when no such link exists.
+    func backlinkContext(in body: String, to targetURL: URL, radius: Int = 60) -> BacklinkContext? {
+        for match in WikiLinkSyntax.extractLinks(in: body) {
+            guard case .unique(let url) = resolve(match.target), url == targetURL,
+                  let range = Range(match.range, in: body) else { continue }
+            let parsed = WikiLinkSyntax.parseInner(match.inner)
+            return Self.context(in: body, around: range, display: parsed.display ?? parsed.target, radius: radius)
+        }
+        return nil
+    }
+
+    /// Up to `radius` characters either side of `range`, clipped to its line. A leading
+    /// list, heading, or quote marker is dropped; clipped ends get an ellipsis.
+    static func context(
+        in body: String,
+        around range: Range<String.Index>,
+        display: String,
+        radius: Int
+    ) -> BacklinkContext {
+        let line = body.lineRange(for: range)
+        let start = body.index(range.lowerBound, offsetBy: -radius, limitedBy: line.lowerBound) ?? line.lowerBound
+        let end = body.index(range.upperBound, offsetBy: radius, limitedBy: line.upperBound) ?? line.upperBound
+
+        var before = String(body[start..<range.lowerBound])
+        var after = String(body[range.upperBound..<end])
+
+        if start == line.lowerBound {
+            if let marker = before.range(of: #"^\s*(?:[-*+]|\d+[.)]|#{1,6}|>+)\s+"#, options: .regularExpression) {
+                before.removeSubrange(marker)
+            }
+        } else {
+            before = "…" + before
+        }
+        before = String(before.drop(while: \.isWhitespace))
+
+        while after.last?.isWhitespace == true {
+            after.removeLast()
+        }
+        if body[end..<line.upperBound].contains(where: { !$0.isNewline }) {
+            after += "…"
+        }
+        return BacklinkContext(before: before, link: display, after: after)
     }
 }

@@ -132,4 +132,42 @@ final class WikiLinkResolverTests: XCTestCase {
         let added = resolver.backlinks(to: world, liveBodies: [hello: "now [[World]]"])
         XCTAssertEqual(added.map(\.url), [hello])
     }
+
+    // MARK: - Backlink context
+
+    func testBacklinkContextShowsSurroundingLineWithDisplayText() {
+        let resolver = makeResolver(urls: [hello, world])
+        let body = "# World\n\nI keep coming back to [[Hello|the greeting]] every morning.\nNext line."
+        let context = resolver.backlinkContext(in: body, to: hello)
+        XCTAssertEqual(
+            context,
+            BacklinkContext(before: "I keep coming back to ", link: "the greeting", after: " every morning.")
+        )
+    }
+
+    func testBacklinkContextSkipsLinksToOtherNotesAndCodeSpans() {
+        let resolver = makeResolver(urls: [hello, world])
+        let body = "`[[Hello]]` then [[World]] then - [[Hello]]"
+        let context = resolver.backlinkContext(in: body, to: hello)
+        XCTAssertEqual(context?.link, "Hello")
+        XCTAssertEqual(context?.before, "`[[Hello]]` then [[World]] then - ")
+        XCTAssertEqual(context?.after, "")
+    }
+
+    func testBacklinkContextDropsLeadingListMarkerAndClipsLongLines() {
+        let resolver = makeResolver(urls: [hello])
+        let listed = resolver.backlinkContext(in: "- [[Hello]]\n", to: hello)
+        XCTAssertEqual(listed, BacklinkContext(before: "", link: "Hello", after: ""))
+
+        let long = String(repeating: "a", count: 100) + " [[Hello]] " + String(repeating: "b", count: 100)
+        let clipped = resolver.backlinkContext(in: long, to: hello, radius: 10)
+        XCTAssertEqual(clipped?.before.first, "…")
+        XCTAssertEqual(clipped?.after.last, "…")
+        XCTAssertEqual(clipped?.link, "Hello")
+    }
+
+    func testBacklinkContextNilWhenNoLinkResolvesToTarget() {
+        let resolver = makeResolver(urls: [hello, world])
+        XCTAssertNil(resolver.backlinkContext(in: "only [[World]] here", to: hello))
+    }
 }
