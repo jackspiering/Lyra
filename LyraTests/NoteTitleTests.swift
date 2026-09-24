@@ -2,19 +2,17 @@ import XCTest
 @testable import Lyra
 
 final class NoteTitleTests: XCTestCase {
-    func testDisplayTitleUsesFilenameStemEvenWhenH1Exists() {
-        let md = "# Hello World\n\nBody paragraph."
+    func testDisplayTitleUsesFilenameStem() {
         let url = URL(fileURLWithPath: "/vault/Welcome.md")
         XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Welcome")
     }
 
-    func testDisplayTitleEmptyMarkdownUsesStem() {
-        let url = URL(fileURLWithPath: "/vault/Empty.md")
-        XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Empty")
+    func testDisplayTitleKeepsInnerDots() {
+        let url = URL(fileURLWithPath: "/vault/Node.js.md")
+        XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Node.js")
     }
 
     func testDisplayTitleNilURLIsEmpty() {
-        XCTAssertEqual(NoteTitle.displayTitle(fileURL: nil), "")
         XCTAssertEqual(NoteTitle.displayTitle(fileURL: nil), "")
     }
 
