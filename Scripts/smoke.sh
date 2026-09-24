@@ -32,6 +32,7 @@ for path in \
   Lyra/Lyra.entitlements \
   Lyra/Info.plist \
   Lyra/Resources/Fonts/Inter-Regular.ttf \
+  Lyra/Resources/Fonts/Inter-Italic.ttf \
   Lyra/Resources/Fonts/Inter-SemiBold.ttf \
   Lyra/Resources/Fonts/Inter-Bold.ttf \
   Lyra/Resources/Fonts/Inter-OFL.txt \

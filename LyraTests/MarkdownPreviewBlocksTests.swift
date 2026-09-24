@@ -179,4 +179,57 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertTrue(prepared.contains("[[Note#heading]]"), "got: \(prepared)")
         XCTAssertFalse(prepared.contains("lyra-wiki:"))
     }
+    func testLeadingFrontmatterRendersAsCode() {
+        let blocks = MarkdownPreviewBlocks.parse("---\naliases: [A]\ntags:\n  - x\n---\n# Title\n")
+        XCTAssertEqual(blocks, [.code("aliases: [A]\ntags:\n  - x"), .heading(level: 1, text: "Title")])
+    }
+
+    func testUnclosedLeadingRuleIsStillThematicBreak() {
+        let blocks = MarkdownPreviewBlocks.parse("---\nBody\n")
+        XCTAssertEqual(blocks, [.thematicBreak, .paragraph("Body")])
+    }
+
+    func testLinkTargetAllowsOnlyWebAndMail() {
+        let web = URL(string: "https://example.com")!
+        XCTAssertEqual(MarkdownPreviewBlocks.linkTarget(for: web, noteDirectory: nil, vaultRoot: nil), .external(web))
+        let mail = URL(string: "mailto:a@example.com")!
+        XCTAssertEqual(MarkdownPreviewBlocks.linkTarget(for: mail, noteDirectory: nil, vaultRoot: nil), .external(mail))
+        for raw in ["file:///Applications/Calculator.app", "shortcuts://run-shortcut?name=x", "x-apple.systempreferences:"] {
+            XCTAssertEqual(
+                MarkdownPreviewBlocks.linkTarget(for: URL(string: raw)!, noteDirectory: nil, vaultRoot: nil),
+                .unsupported,
+                raw
+            )
+        }
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.linkTarget(for: URL(string: "lyra-wiki:My%20Note")!, noteDirectory: nil, vaultRoot: nil),
+            .wiki("My Note")
+        )
+    }
+
+    func testLinkTargetResolvesRelativeNoteInsideVault() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("link-target-\(UUID().uuidString)", isDirectory: true)
+            .resolvingSymlinksInPath()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projects = root.appendingPathComponent("Projects", isDirectory: true)
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        let plan = projects.appendingPathComponent("Plan.md")
+        try "plan".write(to: plan, atomically: true, encoding: .utf8)
+
+        let target = MarkdownPreviewBlocks.linkTarget(
+            for: URL(string: "Projects/Plan.md#goals")!,
+            noteDirectory: root,
+            vaultRoot: root
+        )
+        XCTAssertEqual(target, .note(plan.standardizedFileURL))
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.linkTarget(for: URL(string: "../outside.md")!, noteDirectory: root, vaultRoot: root),
+            .unsupported
+        )
+        XCTAssertEqual(
+            MarkdownPreviewBlocks.linkTarget(for: URL(string: "Projects/image.png")!, noteDirectory: root, vaultRoot: root),
+            .unsupported
+        )
+    }
 }

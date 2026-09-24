@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Lyra
 
@@ -24,5 +25,19 @@ final class PreviewImageTests: XCTestCase {
         XCTAssertEqual(PreviewImage.imageSizeIfWithinBudget(png)?.height, 1)
         XCTAssertNotNil(PreviewImage.decode(png))
         XCTAssertNil(PreviewImage.decode(Data([0x00, 0x01, 0x02])))
+    }
+
+    func testDownsampledDecodeKeepsPointSize() throws {
+        let rep = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 3000, pixelsHigh: 1500,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+
+        let image = try XCTUnwrap(PreviewImage.decode(png, maxPixelSize: 600))
+        XCTAssertEqual(image.size, NSSize(width: 3000, height: 1500))
+        let backing = try XCTUnwrap(image.representations.first)
+        XCTAssertLessThanOrEqual(max(backing.pixelsWide, backing.pixelsHigh), 600)
     }
 }

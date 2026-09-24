@@ -14,7 +14,14 @@ enum PreviewImage {
         return width <= maxDecodedPixels / height
     }
 
-    static func decode(_ data: Data) -> NSImage? {
+    /// Reading shows images at most 480 pt wide; 3× covers Retina and zoom
+    /// without materializing a full 50-megapixel bitmap per image.
+    static let readingMaxPixelSize = 1440
+
+    /// Decodes `data`. With `maxPixelSize`, ImageIO builds a downsampled
+    /// bitmap; the returned image keeps the original point size so layout
+    /// does not change.
+    static func decode(_ data: Data, maxPixelSize: Int? = nil) -> NSImage? {
         guard let size = imageSizeIfWithinBudget(data) else { return nil }
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
@@ -24,8 +31,9 @@ enum PreviewImage {
         // Apply EXIF orientation so phone/scanner photos are upright and the
         // returned size matches the displayed pixels.
         let thumbnailOptions = [
-            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-            kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height),
+            // Always: `IfAbsent` would return a JPEG's tiny embedded thumbnail.
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: min(max(size.width, size.height), maxPixelSize ?? Int.max),
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCache: false,
         ] as CFDictionary

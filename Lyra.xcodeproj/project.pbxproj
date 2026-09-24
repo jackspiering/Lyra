@@ -48,6 +48,7 @@
 		A10000000000000000000028 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* Inter-Regular.ttf */; };
 		A1000000000000000000002A /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002A /* Inter-SemiBold.ttf */; };
 		A1000000000000000000002B /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002B /* Inter-Bold.ttf */; };
+		A10000000000000000000060 /* Inter-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000060 /* Inter-Italic.ttf */; };
 		A1000000000000000000002C /* Inter-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002C /* Inter-OFL.txt */; };
 
 		A10000000000000000000030 /* AppearancePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* AppearancePreference.swift */; };
@@ -145,6 +146,7 @@
 		B10000000000000000000028 /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Regular.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002A /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-SemiBold.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002B /* Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Bold.ttf"; sourceTree = "<group>"; };
+		B10000000000000000000060 /* Inter-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Italic.ttf"; sourceTree = "<group>"; };
 		B1000000000000000000002C /* Inter-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Inter-OFL.txt"; sourceTree = "<group>"; };
 
 		B10000000000000000000030 /* AppearancePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
@@ -368,6 +370,7 @@
 				B10000000000000000000028 /* Inter-Regular.ttf */,
 				B1000000000000000000002A /* Inter-SemiBold.ttf */,
 				B1000000000000000000002B /* Inter-Bold.ttf */,
+				B10000000000000000000060 /* Inter-Italic.ttf */,
 				B1000000000000000000002C /* Inter-OFL.txt */,
 			);
 			path = Fonts;
@@ -457,6 +460,7 @@
 				A10000000000000000000028 /* Inter-Regular.ttf in Resources */,
 				A1000000000000000000002A /* Inter-SemiBold.ttf in Resources */,
 				A1000000000000000000002B /* Inter-Bold.ttf in Resources */,
+				A10000000000000000000060 /* Inter-Italic.ttf in Resources */,
 				A1000000000000000000002C /* Inter-OFL.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
