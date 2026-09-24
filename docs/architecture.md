@@ -8,7 +8,7 @@ Lyra is a single macOS app target with module-shaped folders. This doc is the de
 
 **Why:** The old “focused writer only” sentence fought the vault features. A full Obsidian clone (graph, plugins, sync) fights the invariants. Writing-first PKM is the middle that matches the user.
 
-**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. PDF export stops at 2,000 pages.
+**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. Notes that cannot be read or decoded as UTF-8 are also left out of those indexes. PDF export stops at 2,000 pages.
 
 ## Invariants
 
@@ -64,6 +64,8 @@ One primary type per file when practical.
 
 **Why:** Avoid embedding a browser for the default experience.
 
+**Supported subset:** ATX and Setext headings, fenced code blocks, bullet/ordered/task lists with continuation lines, blockquotes, thematic breaks, inline code/emphasis/links/images, and wiki links. Four-space-indented code blocks, complex nested Markdown, embeds, and heading fragments remain outside the supported Reading subset.
+
 ### Two note view modes (v0.5+)
 
 **Choice:** One detail surface: **Source** | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** toggles. (An earlier no-op “Live” mode was removed. Editable Reading / WYSIWYG was considered again and rejected.)
@@ -88,11 +90,11 @@ One primary type per file when practical.
 
 ### Window chrome decomposition (v0.9.3)
 
-**Choice:** `ContentView` was split so the window shell, dialogs/sheets, command routing, and AppKit bridge helpers live in separate files (`ContentViewChrome`, `ContentViewCommands`, `WindowStateReaders`, `NewNoteNameField`) instead of one 1000+ line file.
+**Choice:** `ContentView` was split so the window shell, dialogs/sheets, command routing, and AppKit bridge helpers live in separate files (`ContentViewChrome`, `VaultCommands`, `WindowStateReaders`, `NewNoteNameField`) instead of one 1000+ line file.
 
 **Why:** The monolith had outgrown “one primary type per file”; the split keeps the module map honest without changing behavior.
 
-**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window (`ContentViewCommands`); from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
+**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window; from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
 
 From 0.10.2 the decomposition continued along the same seams: wiki-link
 resolution, the pick-or-create sheet, and shared tab activation live in
@@ -169,8 +171,8 @@ The sidebar name filter is labeled Filter. It is not bound to ⌘F.
 - UI / stores: `@MainActor`
 - Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
 - Autosave: ~500ms debounce; also save on note switch, background, and quit
-- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently
-- Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root
+- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently. Open/reload and post-write snapshots use one coherent byte read so the buffer and conflict identity cannot describe different disk versions
+- Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root. Note and attachment creation uses exclusive file creation where practical; reads avoid following symlinks and require regular files
 - PDF export: rendering and file I/O run in a detached task; UI panels and error state return to the main actor. Export stops at 2,000 pages and writes a truncation line in the PDF
 - Reading and PDF image decode use ImageIO metadata and a 50-megapixel / 16,384-px budget before materializing a bitmap
 - A stale security-scoped bookmark does not auto-open or re-persist. The first window asks before binding to the resolved folder

@@ -15,7 +15,7 @@ bash Scripts/xcode-test.sh     # xcodebuild build + test (macOS)
 
 Unit tests live in `LyraTests/` (vault helpers, wiki links, naming, blocks, errors, editor durability).
 
-PRs run smoke on Ubuntu, then build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
+PRs run smoke on Ubuntu in parallel with build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
 
 ## Style
 
