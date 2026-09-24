@@ -1,46 +1,44 @@
 import SwiftUI
 
-/// Bottom strip under the note detail: word/character counts and file dates.
+/// Quiet floating pill in the corner of the note: word/character counts and last save.
+/// The created date lives in the tooltip so the pill stays one short line.
 struct EditorStatusBar: View {
     let wordCount: Int
     let characterCount: Int
     let created: Date?
     let lastSaved: Date?
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .short
-        return f
-    }()
-
     var body: some View {
         HStack(spacing: 0) {
-            Text("Words \(wordCount)")
+            Text(wordCount == 1 ? "1 word" : "\(wordCount.formatted()) words")
             sep
-            Text("Characters \(characterCount)")
-            if let created {
-                sep
-                Text("Created \(Self.dateFormatter.string(from: created))")
-            }
+            Text(characterCount == 1 ? "1 character" : "\(characterCount.formatted()) characters")
             if let lastSaved {
                 sep
-                Text("Saved \(Self.dateFormatter.string(from: lastSaved))")
+                Text("Saved \(Self.shortStamp(lastSaved))")
             }
-            Spacer(minLength: 0)
         }
         .font(LyraFonts.caption)
+        .monospacedDigit()
         .foregroundStyle(.secondary)
         .lineLimit(1)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) {
-            Divider()
-        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(LyraTheme.hairlineColor, lineWidth: 1))
+        .help(created.map { "Created \($0.formatted(date: .abbreviated, time: .shortened))" } ?? "")
+        .accessibilityElement(children: .combine)
     }
 
     private var sep: some View {
-        Text("  |  ").foregroundStyle(.tertiary)
+        Text("  ·  ").foregroundStyle(.tertiary)
+    }
+
+    /// Time only for today; date and time otherwise.
+    private static func shortStamp(_ date: Date) -> String {
+        if Calendar.current.isDateInToday(date) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 }

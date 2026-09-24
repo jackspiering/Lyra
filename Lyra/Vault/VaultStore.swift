@@ -197,14 +197,22 @@ final class VaultStore {
         wikiResolver.resolve(text)
     }
 
-    func backlinks(to url: URL, liveBodies: [String: String]) -> [WikiCandidate] {
+    func backlinks(to url: URL, liveBodies: [String: String]) -> [Backlink] {
         var live: [URL: String] = [:]
         for doc in searchDocuments {
             if let body = liveBodies[doc.url.path] {
                 live[doc.url] = body
             }
         }
-        return wikiResolver.backlinks(to: url, liveBodies: live)
+        return wikiResolver.backlinks(to: url, liveBodies: live).map { candidate in
+            let body = live[candidate.url]
+                ?? searchDocuments.first(where: { $0.url == candidate.url })?.body
+            return Backlink(
+                url: candidate.url,
+                relativePath: candidate.relativePath,
+                context: body.flatMap { wikiResolver.backlinkContext(in: $0, to: url) }
+            )
+        }
     }
 
     func searchNoteBodies(query: String, liveBodies: [String: String]) -> [VaultFullTextSearch.Hit] {

@@ -16,10 +16,25 @@ struct VaultSearchPalette: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Search Vault")
                 .font(LyraFonts.headline)
-            TextField("Find in notes", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .focused($queryFocused)
-                .onAppear { queryFocused = true }
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Find in notes", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(LyraFonts.headline)
+                    .focused($queryFocused)
+                    .onAppear { queryFocused = true }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(LyraTheme.fillColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
+            )
             if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text("Type to search note bodies.")
                     .foregroundStyle(.secondary)
@@ -33,15 +48,23 @@ struct VaultSearchPalette: View {
                     Button {
                         onOpen(hit.url)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text((((hit.relativePath as NSString).lastPathComponent) as NSString).deletingPathExtension)
+                                .font(LyraFonts.labelEmphasized)
+                                .lineLimit(1)
                             Text(hit.relativePath)
+                                .font(LyraFonts.caption)
+                                .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             Text(hit.snippet)
-                                .font(.system(size: 12))
+                                .font(LyraFonts.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         }
+                        .padding(.vertical, 3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

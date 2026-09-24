@@ -37,9 +37,17 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textStorage?.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
-        textView.font = LyraFonts.ui(size: 14)
-        textView.backgroundColor = NSColor.textBackgroundColor
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.font = LyraFonts.ui(size: LyraFonts.proseSize)
+        textView.textColor = LyraTheme.ink
+        textView.backgroundColor = LyraTheme.paper
+        textView.drawsBackground = true
+        textView.defaultParagraphStyle = MarkdownHighlighter.paragraphStyle
+        textView.typingAttributes = MarkdownHighlighter.baseAttributes
+        textView.insertionPointColor = LyraTheme.accent
+        textView.selectedTextAttributes = [.backgroundColor: LyraTheme.selection]
+        // Column edges come from the container inset alone, so they line up with the title.
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.updateColumnInset()
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -61,6 +69,9 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
+        // Room to scroll the last line above the floating status pill.
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 56, right: 0)
         scrollView.documentView = textView
 
         context.coordinator.textView = textView
@@ -153,12 +164,31 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 }
 
-/// `NSTextView` that pastes clipboard images into the vault `_attachments` folder.
+/// `NSTextView` that pastes clipboard images into the vault `_attachments` folder
+/// and keeps its text in a centered writing column.
 final class LyraTextView: NSTextView {
     var vaultRoot: URL?
     var noteURL: URL?
     var onPasteError: ((String) -> Void)?
     var onWikiLink: ((String) -> Void)?
+
+    private static let columnTopInset: CGFloat = 4
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateColumnInset()
+    }
+
+    /// Center a `LyraTheme.columnWidth` column; only touches layout when the inset changes.
+    func updateColumnInset() {
+        let inset = NSSize(
+            width: LyraTheme.columnInset(forWidth: bounds.width),
+            height: Self.columnTopInset
+        )
+        if textContainerInset != inset {
+            textContainerInset = inset
+        }
+    }
 
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.command), let onWikiLink {

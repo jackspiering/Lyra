@@ -2,7 +2,7 @@
 
 Lyra is a single macOS app target with module-shaped folders. This doc is the decision log that keeps the product local-first.
 
-## Product (v0.10)
+## Product (v0.11)
 
 **Choice:** Native Mac PKM over a folder of Markdown. Writing is first. Wiki links, backlinks, and in-memory full-text search exist so a person can leave Obsidian. The app is public and small.
 
@@ -106,6 +106,14 @@ helper so presentation policy cannot fork.
 
 **Why:** Readable open-source screen font; registered at launch with `CTFontManagerRegisterFontsForURL`.
 
+### Visual system (v0.11)
+
+**Choice:** One palette in `LyraTheme` with two looks that follow the system appearance. *Night* (dark) uses navy surfaces with the logo gold as accent. *Parchment* (light) uses warm paper with a deeper bronze-gold. Surfaces, ink, markup, and accent are named tokens; views do not use system gray backgrounds (`.bar`, `windowBackgroundColor`) in the vault window. Title, Source, and Reading share one centered writing column (`LyraTheme.columnWidth`, 680pt). Source sets it through a width-dependent `textContainerInset` with zero line-fragment padding, so the text lines up with the SwiftUI title. Prose is Inter 16pt with 7pt line spacing. The word-count status bar became a floating pill. Mockups live in `docs/design/`.
+
+**Why:** Lyra looked like a stock SwiftUI sample. The brand only showed up in syntax colors, and full-width 14pt text made long lines. A single column and a calmer page make writing, the first job, feel better. It uses no new dependencies and adds no theme picker.
+
+**Consequence:** Source styling is still plain text. `MarkdownHighlighter` sizes headings by level, draws syntax markers (`#`, `**`, `_`, backticks, `[[ ]]`, link URLs) in the quiet `markup` color, uses a monospaced face for code, and adds paragraph spacing. It never hides characters, so this is not WYSIWYG. Only the attributes of the edited paragraph are restyled, as before. PDF export keeps its own print colors.
+
 ### Plain-language errors (v0.5)
 
 **Choice:** `UserFacingError` maps Cocoa/POSIX failures to short titles and actionable tips before alerts. Fallback Cocoa copy has POSIX absolute paths reduced to the last path component.
@@ -136,7 +144,7 @@ Reading click and Source Command-click use the same rules. Preview still rewrite
 
 **Why:** Backlinks are what a person leaving Obsidian looks for. A graph view is a second product.
 
-**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading. The backlink index is rebuilt on each vault scan. Open editors overlay their live text onto that index.
+**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading. The backlink index is rebuilt on each vault scan. Open editors overlay their live text onto that index. From 0.11 each card also shows the line around the first link that resolves here (`WikiLinkResolver.backlinkContext`). It is computed from the in-memory bodies when the inspector renders and is not stored.
 
 ### Search and Find
 

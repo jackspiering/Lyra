@@ -244,4 +244,21 @@ final class FileSystemVaultTests: XCTestCase {
         try String(repeating: "x", count: 64).write(to: large, atomically: true, encoding: .utf8)
         XCTAssertNil(FileSystemVault.indexedUTF8Body(at: large, maxBytes: 16))
     }
+
+    func testNoteCountCountsNestedNotesOnly() {
+        let root = URL(fileURLWithPath: "/vault")
+        let note = { (name: String) in
+            VaultNode(name: name, url: root.appendingPathComponent(name), isDirectory: false, children: nil)
+        }
+        let tree = VaultNode(name: "vault", url: root, isDirectory: true, children: [
+            note("A.md"),
+            VaultNode(name: "Sub", url: root.appendingPathComponent("Sub"), isDirectory: true, children: [
+                note("B.md"),
+                VaultNode(name: "Empty", url: root.appendingPathComponent("Sub/Empty"), isDirectory: true, children: []),
+            ]),
+        ])
+        XCTAssertEqual(tree.noteCount, 2)
+        XCTAssertEqual(tree.children?[1].noteCount, 1)
+        XCTAssertEqual(note("C.md").noteCount, 1)
+    }
 }
