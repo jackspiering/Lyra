@@ -34,6 +34,8 @@ struct VaultPalette: View {
     @State private var items: [VaultPaletteItem] = []
     @State private var selection: VaultPaletteItem.ID?
     @State private var hasResults = false
+    /// Measured height of the result rows; the list hugs it up to a cap.
+    @State private var contentHeight: CGFloat = 0
 
     /// Row limit shared with the search index, so "200+" means "refine".
     private static let limit = VaultFullTextSearch.defaultLimit
@@ -145,6 +147,11 @@ struct VaultPalette: View {
                         }
                     }
                     .padding(6)
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { height in
+                        contentHeight = height
+                    }
                 }
                 .frame(height: listHeight)
                 .onChange(of: selection) { _, id in
@@ -154,10 +161,11 @@ struct VaultPalette: View {
         }
     }
 
-    /// Hug short result lists; scroll long ones.
+    /// Hug short result lists; scroll long ones. Until the rows are
+    /// measured, estimate from the row count so the panel does not jump.
     private var listHeight: CGFloat {
-        let rowHeight: CGFloat = mode == .goToFile ? 40 : 66
-        return min(CGFloat(items.count) * (rowHeight + 2) + 12, 392)
+        let estimate = CGFloat(items.count) * (mode == .goToFile ? 35 : 53) + 12
+        return min(contentHeight > 0 ? contentHeight : estimate, 392)
     }
 
     private var emptyMessage: String {

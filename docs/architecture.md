@@ -114,7 +114,23 @@ helper so presentation policy cannot fork.
 
 **Why:** Lyra looked like a stock SwiftUI sample. The brand only showed up in syntax colors, and full-width 14pt text made long lines. A single column and a calmer page make writing, the first job, feel better. It uses no new dependencies and adds no theme picker.
 
+From 0.13, Go to File and Search Vault share one Spotlight-style palette over the window (`VaultPalette`), on a `raised` surface above a `scrim`. The welcome page replaces the stock “No Vault Open” view and uses an accent button whose label is `onAccent` (the system prominent style put white text on gold). On macOS 26 the sidebar drops its opaque `sidebar` fill so the Liquid Glass sidebar shows the window's Night or Parchment tone through it; macOS 15 keeps the fill.
+
 **Consequence:** Source styling is still plain text. `MarkdownHighlighter` sizes headings by level, draws syntax markers (`#`, `**`, `_`, backticks, `[[ ]]`, link URLs) in the quiet `markup` color, uses a monospaced face for code, and adds paragraph spacing. It never hides characters, so this is not WYSIWYG. Only the attributes of the edited paragraph are restyled, as before. PDF export keeps its own print colors.
+
+### Toolchain (v0.13)
+
+**Choice:** Build with Xcode 26 and the macOS 26 SDK; keep the deployment target at macOS 15. CI and release builds run on GitHub's `macos-26` runner.
+
+**Why:** macOS 26 is the current system, and an app built with the older SDK runs there without Liquid Glass. The app code compiled unchanged with warnings as errors. Swift 5 language mode stays; the Swift 6 migration is still deferred (`docs/ci.md`).
+
+### Window snapshots (v0.13)
+
+**Choice:** `WindowSnapshotTests` renders the real views (welcome, Source, Reading, empty tab, sidebar, palettes, backlinks) over a sample vault in Night and Parchment to PNG, offscreen, from the existing unit-test target. It runs only when `LYRA_SNAPSHOTS=1`; CI sets it and uploads the `lyra-snapshots` artifact.
+
+**Why:** Contributors and agents without a Mac need to see UI changes. macOS cannot run in Docker on non-Apple hardware, and Apple's `container` runs Linux, so the macOS runner renders instead. It is not a UI test suite: there are no pixel assertions and no second target.
+
+**Consequence:** Offscreen rendering cannot draw system materials. Liquid Glass (the macOS 26 sidebar and dark toolbar) comes out blank or white, so the sidebar is also rendered on its own. Verify glass and vibrancy by hand on a Mac.
 
 ### Plain-language errors (v0.5)
 
@@ -138,6 +154,8 @@ helper so presentation policy cannot fork.
 - Create uses the path when the link has one. A bare name creates a `.md` file in the same folder as the linking note. Then open the new note with the existing tab rules.
 - Command-click a wiki link in Source to follow it. The same resolve rules apply.
 
+**Speed:** `WikiLinkResolver` builds lookup maps once per scan (filename stem, every path suffix after a slash, alias, URL). A resolve is a dictionary lookup, not a pass over every note. Building the backlink index resolves every link in the vault, so the old linear resolve made each scan quadratic in the note count.
+
 **YAML:** Parse only a leading `---` block for `aliases:` (string or list). Those names resolve as extra stems. All other frontmatter is ordinary text.
 
 Reading click and Source Command-click use the same rules. Preview still rewrites `[[path|alias]]` to a `lyra-wiki:` link for display.
@@ -157,7 +175,9 @@ Other Reading links: `http`, `https`, and `mailto` open in the system handler. A
 **Choice:**
 
 - **⌘F** — system find bar on the Source `NSTextView`.
-- **⇧⌘F** — vault full-text search. In-memory index, rebuilt on each vault scan. Results show note, path, and one snippet, capped at 200; ↑/↓ and Return work from the query field. This is a lightweight palette, not a third workspace.
+- **⌘O** — Go to File: a quick switcher over the window's notes. Ranking ignores case and prefers the exact name, then a name prefix, a word in the name, anywhere in the name, every query word in the name, the path, and last the query's letters in order (`VaultSearch.rankNotes`). It replaced an `NSOpenPanel` that could pick files outside the vault.
+- **⇧⌘F** — vault full-text search. In-memory index, rebuilt on each vault scan. Results show note, path, and one snippet, capped at 200; ↑/↓ and Return work from the query field.
+- Both use one palette over the window, not a sheet or a third workspace. Ranking and body search run in a detached task, so typing stays smooth in a large vault. A note opened from the palette, or just created, takes keyboard focus in Source; a sidebar click leaves focus in the sidebar for arrow-key browsing.
 - The sidebar name/path filter stays. It is not Find.
 
 **Why:** A writer expects ⌘F to search this note. Body search is how they leave Obsidian without a disk index.
@@ -170,10 +190,12 @@ The sidebar name filter is labeled Filter. It is not bound to ⌘F.
 
 **Why:** Hundreds of notes can pay for a full scan. A watcher is extra sandbox surface.
 
+**Consequence (0.13):** A rescan stats every note (size, modification date, file number) and reuses the indexed body when the stamp is unchanged, so switching back to Lyra rereads only notes that changed. The stamp is taken before the read, so a write that lands mid-read is caught by the next scan. The wiki and search indexes are rebuilt only when the tree or a body changed, and observed store properties are assigned only when their value changes, so an idle activation does not redraw the sidebar or backlinks. The body cache lives in memory only and is dropped when a vault opens.
+
 ### Concurrency
 
 - UI / stores: `@MainActor`
-- Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
+- Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame. Unchanged note bodies come from an in-memory cache keyed by path and file stamp
 - Autosave: ~500ms debounce; also save on note switch, background, and quit A conflict the user deferred stays deferred when the app goes to the background; ⌘S, window close, and quit still surface it.
 - External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently. Open/reload and post-write snapshots use one coherent byte read so the buffer and conflict identity cannot describe different disk versions Existing notes are replaced with `FileManager.replaceItemAt`, which keeps creation date, permissions, and Finder tags.
 - Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root. Note and attachment creation uses exclusive file creation where practical; reads avoid following symlinks and require regular files

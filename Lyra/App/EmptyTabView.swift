@@ -17,7 +17,7 @@ struct EmptyTabView: View {
                 .resizable()
                 .interpolation(.high)
                 .frame(width: 64, height: 64)
-                .opacity(0.6)
+                .opacity(0.8)
                 .accessibilityHidden(true)
             VStack(spacing: 2) {
                 EmptyTabAction(title: "New Note", systemImage: "square.and.pencil", shortcut: "⌘N", action: onNewNote)

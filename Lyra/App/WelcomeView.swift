@@ -43,9 +43,9 @@ struct WelcomeView: View {
         .background {
             ZStack {
                 LyraTheme.paperColor
-                // A soft glow of the logo gold behind the icon.
+                // A soft glow behind the icon.
                 RadialGradient(
-                    colors: [LyraTheme.accentSoftColor, .clear],
+                    colors: [LyraTheme.glowColor, .clear],
                     center: UnitPoint(x: 0.5, y: 0.34),
                     startRadius: 0,
                     endRadius: 420

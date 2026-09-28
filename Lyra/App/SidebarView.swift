@@ -195,7 +195,7 @@ struct SidebarView: View {
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
                     .font(LyraFonts.label)
-                    .accessibilityLabel("Rename \(node.name)")
+                    .accessibilityLabel("Rename \(Self.displayName(node))")
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename(node) }
                     .onExitCommand { cancelRename() }
@@ -208,7 +208,7 @@ struct SidebarView: View {
                 Image(systemName: node.isDirectory ? "folder" : "doc.text")
                     .foregroundStyle(.secondary)
                     .frame(width: 16, alignment: .center)
-                Text(node.name)
+                Text(Self.displayName(node))
                     .font(LyraFonts.label)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -221,7 +221,11 @@ struct SidebarView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .accessibilityLabel(node.isDirectory ? "Folder \(node.name), \(node.noteCount) notes" : "Note \(node.name)")
+            .accessibilityLabel(
+                node.isDirectory
+                    ? "Folder \(node.name), \(node.noteCount) notes"
+                    : "Note \(Self.displayName(node))"
+            )
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
             // Select on the first click without waiting out the double-click
@@ -233,6 +237,12 @@ struct SidebarView: View {
                 beginRename(node)
             })
         }
+    }
+
+    /// Notes show their name (the filename stem), as the tab and title do;
+    /// `.md` is implied. Folders show their full name.
+    static func displayName(_ node: VaultNode) -> String {
+        node.isDirectory ? node.name : (node.name as NSString).deletingPathExtension
     }
 
     private func handleReturnKey() -> KeyPress.Result {
@@ -251,7 +261,7 @@ struct SidebarView: View {
     private func beginRename(_ node: VaultNode) {
         suppressFocusCommit = false
         store.selection = node.id
-        renameDraft = node.name
+        renameDraft = Self.displayName(node)
         renamingID = node.id
         DispatchQueue.main.async {
             renameFieldFocused = true
@@ -276,7 +286,7 @@ struct SidebarView: View {
             }
             return
         }
-        if trimmed == node.name {
+        if trimmed == Self.displayName(node) || trimmed == node.name {
             cancelRename()
             return
         }

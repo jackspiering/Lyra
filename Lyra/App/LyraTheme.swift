@@ -40,6 +40,15 @@ enum LyraTheme {
         dynamic(light: rgb(0xFFFDF9), dark: rgb(0x1A1E3E))
     }
 
+    /// Soft light behind the welcome page's icon: warm gold on paper, the
+    /// icon's indigo at night (gold over navy turns muddy).
+    static var glow: NSColor {
+        dynamic(
+            light: NSColor(srgbRed: 0.93, green: 0.72, blue: 0.38, alpha: 0.22),
+            dark: NSColor(srgbRed: 0.36, green: 0.36, blue: 0.78, alpha: 0.30)
+        )
+    }
+
     /// Dims the window behind a floating panel.
     static var scrim: NSColor {
         dynamic(
@@ -151,6 +160,7 @@ enum LyraTheme {
     static var fillColor: Color { Color(nsColor: fill) }
     static var hairlineColor: Color { Color(nsColor: hairline) }
     static var raisedColor: Color { Color(nsColor: raised) }
+    static var glowColor: Color { Color(nsColor: glow) }
     static var scrimColor: Color { Color(nsColor: scrim) }
     static var onAccentColor: Color { Color(nsColor: onAccent) }
     static var inkColor: Color { Color(nsColor: ink) }

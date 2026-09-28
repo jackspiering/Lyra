@@ -246,6 +246,7 @@ struct ContentView: View {
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 220)
+        .disabled(editor.fileURL == nil)
         .help("Source or Reading (⌘E)")
 
         Button {
