@@ -6,8 +6,12 @@ import Foundation
 final class AppSession {
     static let shared = AppSession()
 
-    /// Only the first vault window restores the last-opened bookmark.
+    /// Only one window per launch reopens the last-opened vault; a window
+    /// that restores its own remembered folder also counts.
     private(set) var didRestoreLaunchVault = false
+    /// Stores whose window has closed. Their failed editors are orphaned:
+    /// no window is left to show recovery for them.
+    private var closedStores: Set<ObjectIdentifier> = []
     /// Folders chosen for newly created windows, keyed by the window that
     /// should consume them. A FIFO list would let a later window bind to the
     /// wrong pick if scene creation order differs from enqueue order.
@@ -18,17 +22,43 @@ final class AppSession {
         // cancelled quit can retry the save instead of losing its buffer.
         // The store is also retained for a failed editor so its security scope
         // is not released before a retry.
-        var editor: EditorViewModel?
-        var store: VaultStore?
+        var editor: EditorViewModel
+        var store: VaultStore
     }
 
     private var entries: [ObjectIdentifier: Entry] = [:]
 
-    /// Returns true once — used by `VaultStore` init so only one window auto-opens the last vault.
+    /// Returns true once, so only one window auto-opens the last vault.
     func claimLaunchVaultRestore() -> Bool {
         if didRestoreLaunchVault { return false }
         didRestoreLaunchVault = true
         return true
+    }
+
+    /// A window reopened its own remembered vault; no window should also
+    /// reopen the last-opened one.
+    func markLaunchVaultRestored() {
+        didRestoreLaunchVault = true
+    }
+
+    /// The window owning `store` closed.
+    func windowClosed(store: VaultStore) {
+        closedStores.insert(ObjectIdentifier(store))
+    }
+
+    /// Failed editors whose window has closed.
+    func orphaned(_ editors: [EditorViewModel]) -> [EditorViewModel] {
+        editors.filter { editor in
+            guard let entry = entries[ObjectIdentifier(editor)] else { return true }
+            return closedStores.contains(ObjectIdentifier(entry.store))
+        }
+    }
+
+    /// Drop editors the user chose to discard at quit.
+    func discard(_ editors: [EditorViewModel]) {
+        for editor in editors {
+            unregister(editor: editor)
+        }
     }
 
     @discardableResult
@@ -47,13 +77,11 @@ final class AppSession {
     func register(editor: EditorViewModel, store: VaultStore) {
         editor.vaultRoot = store.rootURL
         entries[ObjectIdentifier(editor)] = Entry(editor: editor, store: store)
-        prune()
     }
 
     func updateVaultRoot(for store: VaultStore, root: URL?) {
-        for key in entries.keys {
-            guard let entry = entries[key], entry.store === store, let editor = entry.editor else { continue }
-            editor.vaultRoot = root
+        for entry in entries.values where entry.store === store {
+            entry.editor.vaultRoot = root
         }
     }
 
@@ -64,26 +92,13 @@ final class AppSession {
     /// Returns editors that blocked save (conflict / missing / I/O).
     @discardableResult
     func saveAllEditors() -> [EditorViewModel] {
-        prune()
-        var failed: [EditorViewModel] = []
-        for entry in entries.values {
-            guard let editor = entry.editor else { continue }
-            if !editor.saveIfNeeded() {
-                failed.append(editor)
-            }
-        }
-        return failed
+        entries.values.map(\.editor).filter { !$0.saveIfNeeded() }
     }
 
     func releaseAllVaultAccess() {
-        prune()
         for entry in entries.values {
-            entry.store?.releaseAccess()
+            entry.store.releaseAccess()
         }
-    }
-
-    private func prune() {
-        entries = entries.filter { $0.value.editor != nil }
     }
 }
 

@@ -28,6 +28,11 @@ final class EditorViewModel {
     /// True while there is an error the UI has not yet flushed.
     var hasError: Bool { lastError != nil }
 
+    /// Source text view (an AppKit `NSScrollView`) kept alive across Reading
+    /// toggles and tab switches so undo, caret, and scroll survive. Dropped
+    /// when a different note opens or the tab empties.
+    @ObservationIgnored var sourceView: AnyObject?
+
     /// File identity observed at the last successful open/save/reload.
     ///
     /// Metadata alone is not enough here: an atomic replacement can retain the
@@ -73,6 +78,10 @@ final class EditorViewModel {
             return false
         }
         text = readText
+        if fileURL?.path != url.path {
+            // A different note gets a fresh text view (undo, caret, scroll).
+            sourceView = nil
+        }
         fileURL = url
         isDirty = false
         lastError = nil
@@ -97,6 +106,30 @@ final class EditorViewModel {
         lastSaveFailed = false
         rememberDiskSnapshot(for: newURL)
         refreshFileDates(for: newURL, markSavedNow: false)
+    }
+
+    /// Adopt outside edits (git pull, scripts, other editors) for a clean
+    /// buffer on window activation or vault refresh. A dirty buffer is left
+    /// alone: its next save raises Keep Mine / Reload. A deferred conflict
+    /// stays deferred so the dialog does not return on every activation.
+    func syncWithDiskIfClean() {
+        guard !isDirty, !conflictDeferred, !hasExternalConflict, !hasMissingFile,
+              let url = fileURL else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            hasMissingFile = true
+            return
+        }
+        guard hasDiskChanged(relativeTo: url) else { return }
+        reloadFromDisk()
+    }
+
+    /// Lifecycle save (app deactivation). Unlike ⌘S, window close, and quit,
+    /// it respects a deferred conflict or missing file so Cancel is not undone
+    /// by switching apps.
+    @discardableResult
+    func saveUnlessDeferred() -> Bool {
+        if conflictDeferred { return true }
+        return saveIfNeeded()
     }
 
     /// Cancel on the conflict dialog: stop autosaving without treating Cancel as overwrite.
@@ -146,7 +179,9 @@ final class EditorViewModel {
     func saveIfNeeded(force: Bool = false) -> Bool {
         saveTask?.cancel()
         saveTask = nil
-        guard isDirty, let url = fileURL else { return true }
+        // A forced save always writes, so Save Here recreates a vanished
+        // note even when its buffer is clean.
+        guard let url = fileURL, isDirty || force else { return true }
 
         if !FileManager.default.fileExists(atPath: url.path) {
             if force {
@@ -157,12 +192,7 @@ final class EditorViewModel {
             return false
         }
 
-        if !force, hasDiskChanged(relativeTo: url) {
-            hasExternalConflict = true
-            conflictDeferred = false
-            return false
-        }
-
+        // The external-change check runs once, inside the coordinated write.
         return writeToDisk(url, force: force)
     }
 
@@ -271,7 +301,7 @@ final class EditorViewModel {
                             throw CocoaError(.fileWriteNoPermission)
                         }
                     }
-                    try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
+                    try Self.replaceContents(of: coordinatedURL, with: Data(text.utf8))
                     if let vaultRoot, !FileSystemVault.isSafePath(coordinatedURL, within: vaultRoot) {
                         writeError = CocoaError(.fileWriteNoPermission)
                         return
@@ -325,9 +355,39 @@ final class EditorViewModel {
         }
     }
 
+    /// Replace a note's bytes while keeping its identity: creation date,
+    /// permissions, and Finder tags survive (`replaceItemAt` preserves them,
+    /// unlike write-temp-and-rename). A new file must not clobber one that
+    /// appeared since the missing-file check.
+    private nonisolated static func replaceContents(of url: URL, with data: Data) throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else {
+            try data.write(to: url, options: .withoutOverwriting)
+            return
+        }
+        let scratch = try fileManager.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: url,
+            create: true
+        )
+        // Stage in a private subfolder; the scratch folder itself is only
+        // removed when empty, so a shared replacement directory is never swept.
+        let stagingFolder = scratch.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: stagingFolder, withIntermediateDirectories: false)
+        defer {
+            try? fileManager.removeItem(at: stagingFolder)
+            rmdir(scratch.path)
+        }
+        let staged = stagingFolder.appendingPathComponent(url.lastPathComponent)
+        try data.write(to: staged)
+        _ = try fileManager.replaceItemAt(url, withItemAt: staged)
+    }
+
     private func clearBuffer() {
         saveTask?.cancel()
         saveTask = nil
+        sourceView = nil
         fileURL = nil
         text = ""
         isDirty = false

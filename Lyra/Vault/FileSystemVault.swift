@@ -262,6 +262,27 @@ enum FileSystemVault {
         (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
     }
 
+    /// Moves `source` to `dest`. A case-only rename (`note.md` → `Note.md`)
+    /// goes through a hidden temporary sibling, because on a case-insensitive
+    /// volume the destination already "exists" as the same file.
+    static func move(_ source: URL, to dest: URL, fileManager: FileManager = .default) throws {
+        let isCaseOnly = source.path != dest.path
+            && source.path.lowercased() == dest.path.lowercased()
+        guard isCaseOnly else {
+            try fileManager.moveItem(at: source, to: dest)
+            return
+        }
+        let temporary = source.deletingLastPathComponent()
+            .appendingPathComponent(".lyra-rename-\(UUID().uuidString)")
+        try fileManager.moveItem(at: source, to: temporary)
+        do {
+            try fileManager.moveItem(at: temporary, to: dest)
+        } catch {
+            try? fileManager.moveItem(at: temporary, to: source)
+            throw error
+        }
+    }
+
     static func collectNoteURLs(from node: VaultNode) -> [URL] {
         if !node.isDirectory {
             return node.url.pathExtension.lowercased() == "md" ? [node.url] : []

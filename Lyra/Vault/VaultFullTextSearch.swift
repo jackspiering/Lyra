@@ -15,8 +15,12 @@ enum VaultFullTextSearch {
         var body: String
     }
 
+    /// Upper bound on palette rows; a one-letter query should not list the vault.
+    static let defaultLimit = 200
+
     /// Case-insensitive substring match on path or body. Empty query returns no hits.
-    static func search(documents: [Document], query: String) -> [Hit] {
+    /// Sorted by path, then capped at `limit`.
+    static func search(documents: [Document], query: String, limit: Int = defaultLimit) -> [Hit] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if q.isEmpty { return [] }
         var hits: [Hit] = []
@@ -33,7 +37,7 @@ enum VaultFullTextSearch {
             )
         }
         hits.sort { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
-        return hits
+        return Array(hits.prefix(max(0, limit)))
     }
 
     static func snippet(in text: String, query: String, radius: Int = 42) -> String? {
@@ -41,6 +45,7 @@ enum VaultFullTextSearch {
         let start = text.index(range.lowerBound, offsetBy: -radius, limitedBy: text.startIndex) ?? text.startIndex
         let end = text.index(range.upperBound, offsetBy: radius, limitedBy: text.endIndex) ?? text.endIndex
         var slice = String(text[start..<end])
+            .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\t", with: " ")
         while slice.contains("  ") {

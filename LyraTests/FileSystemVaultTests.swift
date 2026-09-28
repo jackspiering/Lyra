@@ -297,4 +297,34 @@ final class FileSystemVaultTests: XCTestCase {
         XCTAssertEqual(tree.children?[1].noteCount, 1)
         XCTAssertEqual(note("C.md").noteCount, 1)
     }
+
+    func testCaseOnlyMoveRenamesFile() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("case-move-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let lower = root.appendingPathComponent("note.md")
+        try "body".write(to: lower, atomically: true, encoding: .utf8)
+
+        let upper = root.appendingPathComponent("Note.md")
+        try FileSystemVault.move(lower, to: upper)
+
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(names, ["Note.md"])
+        XCTAssertEqual(try String(contentsOf: upper, encoding: .utf8), "body")
+    }
+
+    func testMoveRefusesExistingDifferentFile() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("move-exists-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = root.appendingPathComponent("a.md")
+        let b = root.appendingPathComponent("b.md")
+        try "a".write(to: a, atomically: true, encoding: .utf8)
+        try "b".write(to: b, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try FileSystemVault.move(a, to: b))
+        XCTAssertEqual(try String(contentsOf: b, encoding: .utf8), "b")
+    }
 }

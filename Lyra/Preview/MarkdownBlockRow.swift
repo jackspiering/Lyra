@@ -166,7 +166,7 @@ private struct MarkdownPreviewImage: View {
                 finishedLoading = true
                 return
             }
-            guard let decoded = PreviewImage.decode(data) else {
+            guard let decoded = PreviewImage.decode(data, maxPixelSize: PreviewImage.readingMaxPixelSize) else {
                 failure = "Image is too large or couldn't be decoded: \(url.lastPathComponent)"
                 finishedLoading = true
                 return

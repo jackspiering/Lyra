@@ -181,4 +181,23 @@ final class NotePDFExporterTests: XCTestCase {
         XCTAssertTrue(text.contains("AlphaNote"), "got: \(text)")
         XCTAssertTrue(text.contains("BetaNote"), "got: \(text)")
     }
+
+    func testDocumentTitleIsWrittenToMetadata() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let data = try NotePDFExporter.pdfData(
+            markdown: "Body",
+            noteDirectory: root,
+            vaultRoot: root,
+            documentTitle: "Roadmap"
+        )
+        let doc = try XCTUnwrap(PDFDocument(data: data))
+        XCTAssertEqual(doc.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String, "Roadmap")
+    }
+
+    func testItalicFaceIsItalic() {
+        let font = LyraFonts.italic(size: 12)
+        XCTAssertTrue(font.fontDescriptor.symbolicTraits.contains(.italic), "got \(font.fontName)")
+    }
 }

@@ -218,14 +218,14 @@ struct SidebarView: View {
             .accessibilityLabel(node.isDirectory ? "Folder \(node.name), \(node.noteCount) notes" : "Note \(node.name)")
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
-            // Register double-tap before single-tap so rename wins on double-click.
-            .onTapGesture(count: 2) {
+            // Select on the first click without waiting out the double-click
+            // interval; a double-click still renames.
+            .onTapGesture {
                 store.selection = node.id
+            }
+            .simultaneousGesture(TapGesture(count: 2).onEnded {
                 beginRename(node)
-            }
-            .onTapGesture(count: 1) {
-                store.selection = node.id
-            }
+            })
         }
     }
 

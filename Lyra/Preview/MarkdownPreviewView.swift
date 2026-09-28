@@ -6,6 +6,8 @@ struct MarkdownPreviewView: View {
     var noteDirectory: URL?
     var vaultRoot: URL?
     var onWikiLink: ((String) -> Void)?
+    /// Relative link to a Markdown note inside the vault.
+    var onNoteLink: ((URL) -> Void)?
 
     var body: some View {
         ScrollView {
@@ -39,20 +41,18 @@ struct MarkdownPreviewView: View {
         }
         .background(LyraTheme.paperColor)
         .environment(\.openURL, OpenURLAction { url in
-            if let name = MarkdownPreviewBlocks.wikiLinkName(from: url) {
+            switch MarkdownPreviewBlocks.linkTarget(for: url, noteDirectory: noteDirectory, vaultRoot: vaultRoot) {
+            case .wiki(let name):
                 onWikiLink?(name)
                 return .handled
-            }
-            guard let scheme = url.scheme?.lowercased() else { return .handled }
-            if ["http", "https", "mailto"].contains(scheme) {
+            case .note(let note):
+                onNoteLink?(note)
+                return .handled
+            case .external:
                 return .systemAction
+            case .unsupported:
+                return .discarded
             }
-            // Local files open only when they remain inside the vault.
-            if scheme == "file", let vaultRoot,
-               FileSystemVault.isSafePath(url, within: vaultRoot) {
-                return .systemAction
-            }
-            return .handled
         })
     }
 }

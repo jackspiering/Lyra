@@ -13,6 +13,8 @@ final class PDFExportFlow {
     /// Surfaces a failed pre-export save on the active note.
     private let flushError: (EditorViewModel) -> Void
     private var exportTask: Task<Void, Never>?
+    /// A save panel is showing; another export must not stack a second one.
+    private var isSavePanelOpen = false
 
     init(
         store: VaultStore,
@@ -55,9 +57,10 @@ final class PDFExportFlow {
     }
 
     private func export(markdown: String, noteURL: URL) {
-        guard let vault = store.rootURL else { return }
+        guard !isSavePanelOpen, let vault = store.rootURL else { return }
+        let window = NSApp.keyWindow
         let noteDirectory = noteURL.deletingLastPathComponent()
-        let suggestedName = noteURL.deletingPathExtension().lastPathComponent + ".pdf"
+        let stem = noteURL.deletingPathExtension().lastPathComponent
         exportTask?.cancel()
         exportTask = Task { @MainActor in
             do {
@@ -65,25 +68,38 @@ final class PDFExportFlow {
                     try NotePDFExporter.pdfData(
                         markdown: markdown,
                         noteDirectory: noteDirectory,
-                        vaultRoot: vault
+                        vaultRoot: vault,
+                        documentTitle: stem
                     )
                 }.value
                 guard !Task.isCancelled else { return }
                 let panel = NSSavePanel()
                 panel.allowedContentTypes = [.pdf]
-                panel.nameFieldStringValue = suggestedName
+                panel.nameFieldStringValue = stem + ".pdf"
                 panel.directoryURL = noteDirectory
-                panel.begin { [weak store] resp in
-                    guard resp == .OK, let url = panel.url else { return }
-                    do {
-                        try data.write(to: url, options: .atomic)
-                    } catch {
-                        store?.present(error: error, context: .exportPDF)
+                isSavePanelOpen = true
+                if let window {
+                    panel.beginSheetModal(for: window) { [weak self] resp in
+                        self?.finishExport(resp, panel: panel, data: data)
+                    }
+                } else {
+                    panel.begin { [weak self] resp in
+                        self?.finishExport(resp, panel: panel, data: data)
                     }
                 }
             } catch {
                 store.present(error: error, context: .exportPDF)
             }
+        }
+    }
+
+    private func finishExport(_ response: NSApplication.ModalResponse, panel: NSSavePanel, data: Data) {
+        isSavePanelOpen = false
+        guard response == .OK, let url = panel.url else { return }
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            store.present(error: error, context: .exportPDF)
         }
     }
 }
