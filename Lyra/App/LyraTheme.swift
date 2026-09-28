@@ -35,6 +35,19 @@ enum LyraTheme {
         )
     }
 
+    /// Floating panels (the Go to File / Search palette): a step above `paper`.
+    static var raised: NSColor {
+        dynamic(light: rgb(0xFFFDF9), dark: rgb(0x1A1E3E))
+    }
+
+    /// Dims the window behind a floating panel.
+    static var scrim: NSColor {
+        dynamic(
+            light: NSColor(srgbRed: 0.18, green: 0.13, blue: 0.06, alpha: 0.16),
+            dark: NSColor(srgbRed: 0.02, green: 0.03, blue: 0.08, alpha: 0.45)
+        )
+    }
+
     /// 1px separators.
     static var hairline: NSColor {
         dynamic(
@@ -63,6 +76,11 @@ enum LyraTheme {
     /// Gold in Night; a deeper bronze-gold in Parchment so it reads on paper.
     static var accent: NSColor {
         dynamic(light: rgb(0x93601F), dark: gold)
+    }
+
+    /// Text and glyphs on an `accent` fill: white on bronze, navy on gold.
+    static var onAccent: NSColor {
+        dynamic(light: .white, dark: rgb(0x121530))
     }
 
     /// Tinted fill behind active accent controls.
@@ -132,6 +150,10 @@ enum LyraTheme {
     static var sidebarColor: Color { Color(nsColor: sidebar) }
     static var fillColor: Color { Color(nsColor: fill) }
     static var hairlineColor: Color { Color(nsColor: hairline) }
+    static var raisedColor: Color { Color(nsColor: raised) }
+    static var scrimColor: Color { Color(nsColor: scrim) }
+    static var onAccentColor: Color { Color(nsColor: onAccent) }
+    static var inkColor: Color { Color(nsColor: ink) }
 
     // MARK: - Layout
 

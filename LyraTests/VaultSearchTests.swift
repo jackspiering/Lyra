@@ -125,4 +125,50 @@ final class VaultSearchTests: XCTestCase {
             ]
         )
     }
+
+    // MARK: - Go to File ranking
+
+    private func entries(_ paths: [String]) -> [VaultSearch.NoteEntry] {
+        paths.map { VaultSearch.NoteEntry(url: URL(fileURLWithPath: "/v/" + $0), relativePath: $0) }
+    }
+
+    private func ranked(_ paths: [String], _ query: String) -> [String] {
+        VaultSearch.rankNotes(entries(paths), query: query).map(\.relativePath)
+    }
+
+    func testRankEmptyQueryListsNotesByPath() {
+        XCTAssertEqual(
+            ranked(["b/Note 10.md", "a.md", "b/Note 2.md"], "  "),
+            ["a.md", "b/Note 2.md", "b/Note 10.md"]
+        )
+    }
+
+    func testRankPrefersExactThenPrefixThenWordThenSubstring() {
+        let paths = ["Rewriting.md", "Writing Goals.md", "On Slow Writing.md", "Writing.md", "x/Notes.md"]
+        XCTAssertEqual(
+            ranked(paths, "writing"),
+            ["Writing.md", "Writing Goals.md", "On Slow Writing.md", "Rewriting.md"]
+        )
+    }
+
+    func testRankMatchesFolderPathAndLettersInOrder() {
+        XCTAssertEqual(ranked(["Essays/Draft.md", "Other.md"], "essays"), ["Essays/Draft.md"])
+        XCTAssertEqual(ranked(["On Slow Writing.md", "Other.md"], "osw"), ["On Slow Writing.md"])
+        XCTAssertEqual(ranked(["On Slow Writing.md"], "writing slow"), ["On Slow Writing.md"])
+        XCTAssertTrue(ranked(["On Slow Writing.md"], "zzz").isEmpty)
+    }
+
+    func testRankIsCaseInsensitiveAndBreaksTiesByShorterName() {
+        XCTAssertEqual(ranked(["b/Deep Work Notes.md", "a/DEEP WORK.md"], "deep work"), ["a/DEEP WORK.md", "b/Deep Work Notes.md"])
+    }
+
+    func testRankHonoursLimit() {
+        XCTAssertEqual(VaultSearch.rankNotes(entries(["a.md", "b.md", "c.md"]), query: "", limit: 2).count, 2)
+    }
+
+    func testNoteEntryNameAndFolder() {
+        let entry = VaultSearch.NoteEntry(url: URL(fileURLWithPath: "/v/Essays/On Slow Writing.md"), relativePath: "Essays/On Slow Writing.md")
+        XCTAssertEqual(entry.name, "On Slow Writing")
+        XCTAssertEqual(entry.folder, "Essays")
+    }
 }

@@ -208,7 +208,9 @@ struct LyraApp: App {
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(!(vaultCommands?.canDeleteSelection ?? false))
             }
-            CommandMenu("View") {
+            // Joins the system View menu (toolbar, sidebar, full screen)
+            // instead of adding a second top-level "View" menu.
+            CommandGroup(before: .toolbar) {
                 Button("Toggle Source / Reading") {
                     vaultCommands?.toggleViewMode()
                 }
@@ -239,6 +241,8 @@ struct LyraApp: App {
                 }
                 .keyboardShortcut("0", modifiers: .command)
                 .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Divider()
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") {

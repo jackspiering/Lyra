@@ -28,7 +28,15 @@ struct SidebarView: View {
             scanLimitsBanner
             treeList
         }
-        .background(LyraTheme.sidebarColor)
+        .background {
+            if #available(macOS 26, *) {
+                // Liquid Glass sidebar: an opaque fill would hide the glass,
+                // which already picks up the window's Night / Parchment tone.
+                Color.clear
+            } else {
+                LyraTheme.sidebarColor
+            }
+        }
     }
 
     /// Lyre mark, vault folder name, and note count.
@@ -136,8 +144,7 @@ struct SidebarView: View {
                 return
             }
             guard let id = renamingID,
-                  let root = store.rootNode,
-                  let node = FileSystemVault.findNode(id: id, in: root) else {
+                  let node = store.node(withID: id) else {
                 return
             }
             commitRename(node)
@@ -145,8 +152,7 @@ struct SidebarView: View {
         // Selection menu (rows). Empty-area New Note/Folder uses the view-level menu below.
         .contextMenu(forSelectionType: VaultNode.ID.self) { ids in
             if let id = ids.first,
-               let root = store.rootNode,
-               let node = FileSystemVault.findNode(id: id, in: root) {
+               let node = store.node(withID: id) {
                 if node.isDirectory {
                     Button("New Note") {
                         store.selection = id
@@ -235,8 +241,7 @@ struct SidebarView: View {
             return .ignored
         }
         guard let id = store.selection,
-              let root = store.rootNode,
-              let node = FileSystemVault.findNode(id: id, in: root) else {
+              let node = store.node(withID: id) else {
             return .ignored
         }
         beginRename(node)

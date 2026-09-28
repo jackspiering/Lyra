@@ -70,6 +70,11 @@ final class WindowSnapshotTests: XCTestCase {
                 try render(view, name: "window-\(mode.rawValue)", dark: dark)
             }
         }
+        for dark in [true, false] {
+            let (store, _) = try openSampleVault(vault, openNotes: false)
+            let view = ContentView(store: store, tabs: NoteTabController(), openNewVaultWindow: nil)
+            try render(view, name: "window-empty-tab", dark: dark)
+        }
     }
 
     func testRenderPanels() throws {
@@ -87,22 +92,38 @@ final class WindowSnapshotTests: XCTestCase {
                 size: NSSize(width: 280, height: 560)
             )
             try render(
-                SnapshotSearchPalette(store: store),
-                name: "search",
+                SidebarView(store: store).frame(width: 260, height: 560),
+                name: "sidebar",
                 dark: dark,
-                size: NSSize(width: 720, height: 520)
+                size: NSSize(width: 260, height: 560)
+            )
+            try render(
+                SnapshotPalette(store: store, mode: .searchVault, query: "writing"),
+                name: "palette-search",
+                dark: dark,
+                size: NSSize(width: 760, height: 560)
+            )
+            try render(
+                SnapshotPalette(store: store, mode: .goToFile, query: "wr"),
+                name: "palette-go-to-file",
+                dark: dark,
+                size: NSSize(width: 760, height: 460)
             )
         }
     }
 
     // MARK: - Helpers
 
-    private func openSampleVault(_ vault: URL) throws -> (VaultStore, NoteTabController) {
+    private func openSampleVault(
+        _ vault: URL,
+        openNotes: Bool = true
+    ) throws -> (VaultStore, NoteTabController) {
         let store = VaultStore()
         let tabs = NoteTabController()
         store.openVault(at: vault)
         spin(until: { store.rootNode != nil }, timeout: 10)
         XCTAssertNotNil(store.rootNode, "sample vault did not scan")
+        guard openNotes else { return (store, tabs) }
         let main = vault.appendingPathComponent(SampleVault.mainNote)
         XCTAssertTrue(tabs.openInActiveTab(url: main))
         for extra in SampleVault.extraTabs {
@@ -124,7 +145,7 @@ final class WindowSnapshotTests: XCTestCase {
         let controller = NSHostingController(rootView: view)
         controller.sizingOptions = []
         controller.sceneBridgingOptions = [.toolbars, .title]
-        let window = NSWindow(
+        let window = SnapshotWindow(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
@@ -142,6 +163,9 @@ final class WindowSnapshotTests: XCTestCase {
 
         // Let SwiftUI lay out, run `.task`s (word counts, backlinks), and draw.
         spin(for: 1.2)
+        // Nothing focused: a field editor would draw its selection.
+        window.makeFirstResponder(nil)
+        spin(for: 0.1)
 
         let target: NSView = window.contentView?.superview ?? controller.view
         target.layoutSubtreeIfNeeded()
@@ -179,21 +203,32 @@ final class WindowSnapshotTests: XCTestCase {
     }
 }
 
-/// The Search Vault palette over a paper backdrop, with a query typed.
-private struct SnapshotSearchPalette: View {
+/// A window the test can size beyond the CI display (1024×768), which would
+/// otherwise clamp every frame.
+private final class SnapshotWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+}
+
+/// A palette over a paper backdrop, with a query typed.
+private struct SnapshotPalette: View {
     let store: VaultStore
-    @State private var query = "writing"
+    let mode: VaultPalette.Mode
+    @State var query: String
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             LyraTheme.paperColor
-            VaultSearchPalette(
+            VaultPalette(
+                mode: mode,
                 query: $query,
-                search: { store.searchNoteBodies(query: $0, liveBodies: [:]) },
+                results: { query in
+                    await ContentView.paletteResults(mode: mode, query: query, store: store, liveBodies: [:])
+                },
                 onOpen: { _ in },
                 onClose: {}
             )
-            .padding(.top, 40)
         }
     }
 }

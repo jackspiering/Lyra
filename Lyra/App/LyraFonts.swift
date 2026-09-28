@@ -53,6 +53,8 @@ enum LyraFonts {
     static var label: Font { font(13) }
     static var labelEmphasized: Font { font(13, weight: .semibold) }
     static var headline: Font { font(15, weight: .semibold) }
+    /// Query field of the Go to File / Search palette.
+    static var paletteQuery: Font { font(18) }
     /// Note title above the column.
     static var title: Font { font(32, weight: .bold) }
 
