@@ -209,4 +209,11 @@ final class MarkdownHighlighterTests: XCTestCase {
         converted.getRed(&r, green: &g, blue: &b, alpha: &a)
         return (r, g, b, a)
     }
+
+    func testTouchesFenceChecksTheWholeParagraph() {
+        let source = "intro\n```\ncode"
+        XCTAssertFalse(MarkdownHighlighter.touchesFence(in: source, range: NSRange(location: 2, length: 0)))
+        XCTAssertTrue(MarkdownHighlighter.touchesFence(in: source, range: NSRange(location: 7, length: 1)))
+        XCTAssertFalse(MarkdownHighlighter.touchesFence(in: "", range: NSRange(location: 4, length: 3)))
+    }
 }

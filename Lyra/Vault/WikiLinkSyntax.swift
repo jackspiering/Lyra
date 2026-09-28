@@ -224,8 +224,25 @@ enum WikiLinkSyntax {
         return raw[index...].allSatisfy { $0 == " " || $0 == "\t" }
     }
 
+    /// Code spans between fenced blocks. A backtick inside a fence must not pair
+    /// with one after it and hide the real code span or link that follows.
     private static func inlineCodeRanges(in ns: NSString, excluding fences: [NSRange]) -> [NSRange] {
-        let source = ns as String
+        var ranges: [NSRange] = []
+        var start = 0
+        let end = NSRange(location: ns.length, length: 0)
+        for fence in fences.sorted(by: { $0.location < $1.location }) + [end] {
+            if fence.location > start {
+                let segment = NSRange(location: start, length: fence.location - start)
+                ranges += inlineCodeRanges(in: ns.substring(with: segment)).map { range in
+                    NSRange(location: range.location + segment.location, length: range.length)
+                }
+            }
+            start = max(start, NSMaxRange(fence))
+        }
+        return ranges
+    }
+
+    private static func inlineCodeRanges(in source: String) -> [NSRange] {
         var ranges: [NSRange] = []
         var cursor = source.startIndex
         while cursor < source.endIndex {
@@ -243,10 +260,7 @@ enum WikiLinkSyntax {
                 cursor = openingEnd
                 continue
             }
-            let nsRange = NSRange(openingStart..<closing.upperBound, in: source)
-            if !fences.contains(where: { NSIntersectionRange($0, nsRange).length > 0 }) {
-                ranges.append(nsRange)
-            }
+            ranges.append(NSRange(openingStart..<closing.upperBound, in: source))
             cursor = closing.upperBound
         }
         return ranges
