@@ -97,4 +97,23 @@ final class WikiLinkSyntaxTests: XCTestCase {
         let markdown = "~~~\na ` b\n~~~\n`[[Code]]` and [[Link]]"
         XCTAssertEqual(WikiLinkSyntax.extractLinks(in: markdown).map(\.target), ["Link"])
     }
+
+    func testFencedCodeRangesHonourIndentationAndMarkers() {
+        func fenced(_ markdown: String) -> [String] {
+            let ns = markdown as NSString
+            return WikiLinkSyntax.fencedCodeRanges(in: markdown).map { ns.substring(with: $0) }
+        }
+        // Up to three spaces opens a fence; a tab (four columns) does not.
+        XCTAssertEqual(fenced("a\n   ```\ncode\n   ```\nb"), ["   ```\ncode\n   ```\n"])
+        XCTAssertEqual(fenced("\t```\ncode"), [])
+        XCTAssertEqual(fenced("    ```\ncode"), [])
+        // A closing fence needs the same marker, at least as long.
+        XCTAssertEqual(fenced("~~~~\n```\n~~~\nstill code\n~~~~\nafter"), ["~~~~\n```\n~~~\nstill code\n~~~~\n"])
+        // A backtick run with a backtick later on the line is inline code, not a fence.
+        XCTAssertEqual(fenced("``` a ` b\ntext"), [])
+        // Unclosed fences run to the end; CRLF lines work.
+        XCTAssertEqual(fenced("x\r\n```\r\ny"), ["```\r\ny"])
+        // Text around a fence is untouched: lines that start with prose are skipped cheaply.
+        XCTAssertEqual(fenced("prose ``` not a fence\n- ```\nlist"), [])
+    }
 }

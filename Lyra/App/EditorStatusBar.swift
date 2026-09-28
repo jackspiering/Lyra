@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Below this many UTF-16 units, counting takes well under a millisecond.
+/// Below this many UTF-8 bytes (an O(1) count), counting takes well under a millisecond.
 private let statusBarInlineCountLimit = 20_000
 
 /// Quiet floating pill in the corner of the note: word/character counts and last save.
@@ -36,7 +36,7 @@ struct EditorStatusBar: View {
             // Short notes count at once, so switching notes never shows the
             // previous note's numbers. Long ones wait for a typing pause and
             // count off the main actor.
-            if text.utf16.count <= statusBarInlineCountLimit {
+            if text.utf8.count <= statusBarInlineCountLimit {
                 wordCount = NoteStats.wordCount(text)
                 characterCount = NoteStats.characterCount(text)
                 return
