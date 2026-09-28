@@ -37,10 +37,52 @@ enum FileSystemVault {
         try scanNode(root: root, shouldCancel: shouldCancel, depth: 0, maxDepth: maxDepth)
     }
 
-    enum IndexedBody: Equatable {
+    enum IndexedBody: Equatable, Sendable {
         case body(String)
         case oversized
         case unreadable
+    }
+
+    /// What a note looked like on disk when its body was indexed. Size,
+    /// modification date, and file number together catch in-place writes and
+    /// atomic replacements, so an unchanged stamp means the body can be reused.
+    struct FileStamp: Equatable, Sendable {
+        var size: Int
+        var modified: Date
+        var fileNumber: UInt64?
+    }
+
+    /// An indexed note body and the stamp it was read at.
+    struct CachedBody: Equatable, Sendable {
+        var stamp: FileStamp
+        var body: IndexedBody
+    }
+
+    /// Current stamp for `url` without following a final symlink, or `nil`
+    /// when the file cannot be inspected.
+    static func fileStamp(at url: URL) -> FileStamp? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (attributes[.size] as? NSNumber)?.intValue,
+              let modified = attributes[.modificationDate] as? Date else {
+            return nil
+        }
+        let fileNumber = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
+        return FileStamp(size: size, modified: modified, fileNumber: fileNumber)
+    }
+
+    /// The body to index for `url`: the cached one when the file's stamp is
+    /// unchanged, otherwise a fresh bounded read. `didRead` reports which.
+    static func indexedBody(
+        at url: URL,
+        cached: CachedBody?
+    ) -> (body: IndexedBody, stamp: FileStamp?, didRead: Bool) {
+        // Stamp before reading: a write that lands mid-read changes the stamp,
+        // so the next scan reads again instead of trusting a torn body.
+        let stamp = fileStamp(at: url)
+        if let stamp, let cached, cached.stamp == stamp {
+            return (cached.body, stamp, false)
+        }
+        return (indexedUTF8Body(at: url), stamp, true)
     }
 
     /// Reads at most `maxBytes` of UTF-8 without following a final-path symlink.
@@ -293,6 +335,19 @@ enum FileSystemVault {
     static func parentDirectory(for selection: VaultNode?, vaultRoot: URL) -> URL {
         guard let selection else { return vaultRoot }
         return selection.isDirectory ? selection.url : selection.url.deletingLastPathComponent()
+    }
+
+    /// Every node in the tree (the root included) by its id, for O(1) lookup.
+    static func nodesByID(in root: VaultNode) -> [VaultNode.ID: VaultNode] {
+        var index: [VaultNode.ID: VaultNode] = [:]
+        func visit(_ node: VaultNode) {
+            index[node.id] = node
+            for child in node.children ?? [] {
+                visit(child)
+            }
+        }
+        visit(root)
+        return index
     }
 
     static func findNode(id: String, in node: VaultNode) -> VaultNode? {

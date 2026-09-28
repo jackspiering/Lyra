@@ -327,4 +327,55 @@ final class FileSystemVaultTests: XCTestCase {
         XCTAssertThrowsError(try FileSystemVault.move(a, to: b))
         XCTAssertEqual(try String(contentsOf: b, encoding: .utf8), "b")
     }
+
+    func testIndexedBodyReusesCacheUntilTheFileChanges() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let note = root.appendingPathComponent("note.md")
+        try "first".write(to: note, atomically: true, encoding: .utf8)
+
+        let fresh = FileSystemVault.indexedBody(at: note, cached: nil)
+        XCTAssertTrue(fresh.didRead)
+        XCTAssertEqual(fresh.body, .body("first"))
+        let stamp = try XCTUnwrap(fresh.stamp)
+
+        // Same stamp: the cached body is returned without reading the file.
+        let cached = FileSystemVault.CachedBody(stamp: stamp, body: .body("cached"))
+        let reused = FileSystemVault.indexedBody(at: note, cached: cached)
+        XCTAssertFalse(reused.didRead)
+        XCTAssertEqual(reused.body, .body("cached"))
+
+        // A different size (an edit) forces a fresh read.
+        try "second, longer".write(to: note, atomically: true, encoding: .utf8)
+        let changed = FileSystemVault.indexedBody(at: note, cached: cached)
+        XCTAssertTrue(changed.didRead)
+        XCTAssertEqual(changed.body, .body("second, longer"))
+
+        // A missing file has no stamp and reads as unreadable.
+        try FileManager.default.removeItem(at: note)
+        let missing = FileSystemVault.indexedBody(at: note, cached: cached)
+        XCTAssertNil(missing.stamp)
+        XCTAssertEqual(missing.body, .unreadable)
+    }
+
+    func testNodesByIDIndexesEveryNode() {
+        let root = URL(fileURLWithPath: "/v")
+        let folder = root.appendingPathComponent("Essays")
+        let note = folder.appendingPathComponent("Draft.md")
+        let tree = VaultNode(name: "v", url: root, isDirectory: true, children: [
+            VaultNode(name: "Essays", url: folder, isDirectory: true, children: [
+                VaultNode(name: "Draft.md", url: note, isDirectory: false, children: nil),
+            ]),
+        ])
+        let index = FileSystemVault.nodesByID(in: tree)
+        XCTAssertEqual(index.count, 3)
+        XCTAssertEqual(index[note.path]?.name, "Draft.md")
+        XCTAssertEqual(index[folder.path]?.isDirectory, true)
+        XCTAssertEqual(index[root.path]?.name, "v")
+    }
 }

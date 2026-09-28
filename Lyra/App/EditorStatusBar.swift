@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Below this many UTF-16 units, counting takes well under a millisecond.
+private let statusBarInlineCountLimit = 20_000
+
 /// Quiet floating pill in the corner of the note: word/character counts and last save.
 /// The created date lives in the tooltip so the pill stays one short line.
 struct EditorStatusBar: View {
@@ -30,6 +33,14 @@ struct EditorStatusBar: View {
         .help(created.map { "Created \($0.formatted(date: .abbreviated, time: .shortened))" } ?? "")
         .accessibilityElement(children: .combine)
         .task(id: text) {
+            // Short notes count at once, so switching notes never shows the
+            // previous note's numbers. Long ones wait for a typing pause and
+            // count off the main actor.
+            if text.utf16.count <= statusBarInlineCountLimit {
+                wordCount = NoteStats.wordCount(text)
+                characterCount = NoteStats.characterCount(text)
+                return
+            }
             try? await Task.sleep(nanoseconds: 150_000_000)
             guard !Task.isCancelled else { return }
             let counts = await Task.detached(priority: .utility) {
