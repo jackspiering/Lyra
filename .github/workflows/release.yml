@@ -89,6 +89,9 @@ jobs:
           fi
           echo "ok: $V matches MARKETING_VERSION"
 
+      - name: Structural smoke
+        run: bash Scripts/smoke.sh
+
       - name: Build DMG
         env:
           VERSION: ${{ steps.ver.outputs.version }}
@@ -130,7 +133,7 @@ jobs:
             Ad-hoc-signed macOS build for testing (not notarized).
 
             - Open the DMG and drag **Lyra** to **Applications**.
-            - First launch: right-click → **Open** if Gatekeeper warns (ad-hoc CI build).
+            - First launch: if macOS blocks Lyra, open **System Settings → Privacy & Security** and click **Open Anyway** (ad-hoc CI build; Control-click → Open is unreliable on macOS 15+).
             - Built by GitHub Actions on `macos-15`.
             - Verify the DMG against the SHA-256 below (also in `SHA256SUMS.txt`).
 
