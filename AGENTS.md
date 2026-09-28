@@ -99,20 +99,21 @@ Views are verified by hand on a Mac — note what you could not check in the PR.
 2. **Update `README.md`** for anything a user can see.
 3. Update `docs/architecture.md` when structure, invariants, or a recorded
    decision changes.
-4. **Bump the version in every PR**, using semantic versioning
-   (`MAJOR.MINOR.PATCH`):
-   - **PATCH** for fixes, docs, tests, CI, and other changes with no new feature.
+4. **Consider a version bump** (semantic versioning, `MAJOR.MINOR.PATCH`).
+   Bump when the PR changes what ships in the app; skip it for docs, tests,
+   CI, and tooling that users never see:
+   - **PATCH** for a bug fix or other behavior change with no new feature.
    - **MINOR** for a new user-facing feature or setting.
    - **MAJOR** for a breaking change (after 1.0; before 1.0, breaking changes
      bump MINOR).
 
-   Update `MARKETING_VERSION` in all four configurations in
-   `Lyra.xcodeproj/project.pbxproj`, raise `CURRENT_PROJECT_VERSION` by one,
-   and point the README version badge and release link at the new version
-   (smoke checks the link). Bump from the current `main`: if another PR lands
-   first, merge `main` and bump again past it.
+   A bump updates `MARKETING_VERSION` in all four configurations in
+   `Lyra.xcodeproj/project.pbxproj`, raises `CURRENT_PROJECT_VERSION` by one,
+   and points the README version badge and release link at the new version
+   (smoke checks the link). If another PR bumped first, merge `main` and
+   bump from its version.
 5. Run `bash Scripts/smoke.sh`; on a Mac also `bash Scripts/xcode-test.sh`.
-6. PR description: what, why, how verified, the version bump, and what still
-   needs a manual look.
+6. PR description: what, why, how verified, the version bump (or why none),
+   and what still needs a manual look.
 
 When in doubt, choose fewer files, fewer abstractions, and less configuration.
