@@ -587,8 +587,7 @@ struct ContentView: View {
                 return false
             }
         }
-        store.selection = node.id
-        guard let newURL = store.renameSelected(to: newName) else {
+        guard let newURL = store.renameItem(at: node.url, to: newName) else {
             return false
         }
         tabs.relocateOpenNotes(oldPath: oldPath, newURL: newURL)
@@ -617,9 +616,10 @@ struct ContentView: View {
                 return
             }
         }
+        // Rename by path, not by moving the sidebar selection: a selection change
+        // would try to open the old path after the file has moved.
         let oldPath = url.path
-        store.selection = oldPath
-        guard let newURL = store.renameSelected(to: stem + ".md") else { return }
+        guard let newURL = store.renameItem(at: url, to: stem + ".md") else { return }
         tabs.relocateOpenNotes(oldPath: oldPath, newURL: newURL)
     }
 

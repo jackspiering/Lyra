@@ -113,6 +113,9 @@ struct MarkdownTextView: NSViewRepresentable {
         weak var textView: LyraTextView?
         var lastFindBarToken = 0
         private var isApplying = false
+        /// Set when an edit replaces text on a fence line. The post-edit paragraph
+        /// may no longer contain the marker, so the next restyle covers the document.
+        private var needsFullRestyle = false
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
@@ -145,6 +148,18 @@ struct MarkdownTextView: NSViewRepresentable {
             isApplying = false
         }
 
+        func textView(
+            _ textView: NSTextView,
+            shouldChangeTextIn affectedCharRange: NSRange,
+            replacementString: String?
+        ) -> Bool {
+            if !needsFullRestyle,
+               MarkdownHighlighter.touchesFence(in: textView.string, range: affectedCharRange) {
+                needsFullRestyle = true
+            }
+            return true
+        }
+
         func textDidChange(_ notification: Notification) {
             guard !isApplying, let textView else { return }
             parent.text = textView.string
@@ -162,7 +177,9 @@ struct MarkdownTextView: NSViewRepresentable {
         ) {
             guard !isApplying, editedMask.contains(.editedCharacters) else { return }
             isApplying = true
-            MarkdownHighlighter.applyHighlighting(to: textStorage, range: editedRange)
+            let restyleAll = needsFullRestyle
+            needsFullRestyle = false
+            MarkdownHighlighter.applyHighlighting(to: textStorage, range: restyleAll ? nil : editedRange)
             isApplying = false
         }
     }

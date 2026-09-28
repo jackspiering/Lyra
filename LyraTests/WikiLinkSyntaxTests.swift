@@ -72,4 +72,9 @@ final class WikiLinkSyntaxTests: XCTestCase {
         ).map(\.target)
         XCTAssertEqual(targets, ["Real"])
     }
+
+    func testBacktickInsideFenceDoesNotPairWithCodeSpanAfterIt() {
+        let markdown = "~~~\na ` b\n~~~\n`[[Code]]` and [[Link]]"
+        XCTAssertEqual(WikiLinkSyntax.extractLinks(in: markdown).map(\.target), ["Link"])
+    }
 }

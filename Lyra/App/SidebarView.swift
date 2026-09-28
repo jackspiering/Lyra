@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var store: VaultStore
-    /// Save editor, `renameSelected`, relocate open note. Returns `true` on success.
+    /// Save editor, `renameItem`, relocate open note. Returns `true` on success.
     var onCommitRename: (VaultNode, String) -> Bool = { _, _ in false }
     var onRequestDelete: () -> Void = {}
     var onNewNote: () -> Void = {}

@@ -101,7 +101,7 @@ My Vault/
 
 Lyra does not create a sidecar database or proprietary note format. Hidden files, package directories, and symlinked entries are ignored by the vault tree. Clipboard images are stored in `_attachments/` and referenced with relative paths.
 
-Search, aliases, and backlinks skip note bodies larger than 2 MB and notes that cannot be read or decoded as UTF-8 (the editor can still open readable files). Folders nested deeper than 64 levels are listed empty. PDF export of a single note stops at 2,000 pages.
+Search, aliases, and backlinks skip note bodies larger than 2 MB and notes that cannot be read or decoded as UTF-8 (the editor can still open readable files, and `[[links]]` to them still resolve). Folders nested deeper than 64 levels are listed empty. PDF export of a single note stops at 2,000 pages.
 
 ## Build From Source
 

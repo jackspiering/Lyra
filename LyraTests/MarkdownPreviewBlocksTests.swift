@@ -85,6 +85,11 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
         XCTAssertTrue(prepared.contains("[hi](lyra-wiki:Hello)"), "got: \(prepared)")
     }
 
+    func testPrepareInlineEmptyAliasShowsTarget() {
+        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("See [[Hello|]]")
+        XCTAssertTrue(prepared.contains("[Hello](lyra-wiki:Hello)"), "got: \(prepared)")
+    }
+
     func testPrepareInlineEscapesWikiDestinationParentheses() {
         let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown("See [[A)B]]")
         XCTAssertTrue(prepared.contains("[A)B](lyra-wiki:A%29B)"), "got: \(prepared)")

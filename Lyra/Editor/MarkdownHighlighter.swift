@@ -132,11 +132,8 @@ enum MarkdownHighlighter {
         let fencedRanges = WikiLinkSyntax.fencedCodeRanges(in: source)
         // Toggling a fence can restyle the rest of the document. Fall back to a
         // full pass only for edits containing a fence marker.
-        if range != nil {
-            let paragraphText = (source as NSString).substring(with: target)
-            if paragraphText.contains("```") || paragraphText.contains("~~~") {
-                target = full
-            }
+        if range != nil, touchesFence(in: source, range: target) {
+            target = full
         }
         let fencedTargetRanges = fencedRanges.compactMap { fence -> NSRange? in
             let intersection = NSIntersectionRange(fence, target)
@@ -179,6 +176,16 @@ enum MarkdownHighlighter {
             }
         }
         storage.endEditing()
+    }
+
+    /// Whether the paragraphs around `range` hold a fence marker. Callers check the
+    /// text before an edit too: deleting a fence restyles code far below the edit.
+    static func touchesFence(in source: String, range: NSRange) -> Bool {
+        let ns = source as NSString
+        let location = min(max(0, range.location), ns.length)
+        let length = min(max(0, range.length), ns.length - location)
+        let paragraph = ns.substring(with: ns.paragraphRange(for: NSRange(location: location, length: length)))
+        return paragraph.contains("```") || paragraph.contains("~~~")
     }
 
     /// Bold at the current size, so `**bold**` inside a heading stays heading-sized.
