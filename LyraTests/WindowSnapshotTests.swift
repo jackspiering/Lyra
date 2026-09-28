@@ -117,8 +117,9 @@ final class WindowSnapshotTests: XCTestCase {
         _ view: V,
         name: String,
         dark: Bool,
-        size: NSSize = WindowSnapshotTests.windowSize
+        size: NSSize? = nil
     ) throws {
+        let size = size ?? Self.windowSize
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         let controller = NSHostingController(rootView: view)
         controller.sizingOptions = []
