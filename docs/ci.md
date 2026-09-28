@@ -2,8 +2,8 @@
 
 ## Goals
 
-1. Catch broken structure on every PR without a Mac (docs, entitlements, version consistency).
-2. Build and unit-test the macOS app on a Mac runner.
+1. Catch broken structure on every PR without a Mac (docs, entitlements, version consistency, shell and workflow lint).
+2. Build and unit-test the macOS app on a Mac runner, and show what the UI looks like.
 3. Attach an ad-hoc-signed DMG on version tags (sandbox applied; not notarized).
 
 ## Pipelines
@@ -12,15 +12,25 @@
 
 | Job | Runner | What |
 |-----|--------|------|
-| `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` (structure + `Scripts/lint.sh` whitespace and shell syntax checks) |
-| `macos` | `macos-15` | `Scripts/xcode-test.sh` (Debug build + unit tests), in parallel with smoke |
+| `smoke` | `ubuntu-latest` | `Scripts/smoke.sh` (structure + `Scripts/lint.sh`: whitespace, shell syntax, ShellCheck), then actionlint on the workflows |
+| `changes` | `ubuntu-latest` | Diffs the PR (or push) against its base. Outputs `app=false` when nothing under `Lyra/`, `LyraTests/`, `Lyra.xcodeproj/`, `Scripts/`, or `.github/workflows/` changed |
+| `macos` | `macos-26` (Xcode 26) | `Scripts/xcode-test.sh` (Debug build + unit tests). Skipped for docs-only changes; a skipped job still satisfies a required check. Runs in parallel with smoke |
+
+The macOS job also:
+
+- pipes the build through `xcbeautify`, so compiler errors and failing tests show as annotations on the PR;
+- writes a test summary (passed, failed, skipped, and each failure) to the run page;
+- renders window snapshots (`TEST_RUNNER_LYRA_SNAPSHOTS=1`, see `LyraTests/WindowSnapshotTests.swift`) and uploads them as the `lyra-snapshots` artifact;
+- uploads the `.xcresult` bundle when the job fails.
 
 | Setting | Value |
 |---------|--------|
-| Actions | `actions/checkout` pinned to the v7.0.1 commit SHA |
+| Actions | `checkout` and `upload-artifact` pinned to v7.0.1 commit SHAs |
+| actionlint | v1.7.12 release binary, verified against its SHA-256 (no third-party action) |
 | Permissions | `contents: read` |
-| Concurrency | cancel in-progress runs on the same ref |
-| Timeouts | smoke 5m, macos 30m |
+| Concurrency | a newer push cancels a pull request's running checks; runs on `main` are never cancelled |
+| Timeouts | smoke 5m, changes 5m, macos 30m |
+| Artifacts | `lyra-snapshots` 14 days; `Lyra-xcresult` (failures only) 7 days |
 
 ### Releases — `.github/workflows/release.yml`
 
@@ -45,13 +55,15 @@ Version guard: the version must be three-part semver and match `MARKETING_VERSIO
 | Artifact retention | 14 days |
 | Timeout | 45m |
 
-Dependabot (`.github/dependabot.yml`) opens monthly PRs for GitHub Actions updates.
+Dependabot (`.github/dependabot.yml`) opens one grouped PR a month for GitHub Actions updates.
 
 ## Local
 
 ```bash
 bash Scripts/smoke.sh
 bash Scripts/xcode-test.sh                              # Mac + Xcode
+RESULT_BUNDLE=build/Lyra.xcresult bash Scripts/xcode-test.sh   # keep an .xcresult
+TEST_RUNNER_LYRA_SNAPSHOTS=1 bash Scripts/xcode-test.sh # also render window PNGs
 VERSION=0.12.0 bash Scripts/package-dmg.sh              # → build/dist/Lyra-0.12.0.dmg
 ```
 
@@ -93,9 +105,12 @@ What we researched and intentionally chose:
 |-------|--------|-----|
 | Checkout / artifacts | SHA-pinned v7.0.1 | Current maintained lines (`checkout` v7, `upload-artifact` v7); Node 20-era `@v4` is aging |
 | Releases | SHA-pinned `softprops/action-gh-release` v3.0.3 | Replaces ad-hoc `gh release` shell; v2 unmaintained (Node 20 deprecation) |
-| Runner | Keep **`macos-15`** | Matches deployment target (macOS 15+); `macos-26` exists but is unnecessary churn for now |
+| Runner | **`macos-26`** with its default Xcode 26 (from 0.13) | macOS 26 is current; building with its SDK gives Liquid Glass on macOS 26 while the app still deploys to macOS 15. The app compiled unchanged with warnings as errors |
 | Permissions | Read-only CI; write only on Release | Least privilege for `GITHUB_TOKEN` |
-| Caching / lint matrix | Not added | Single target, small app; DerivedData cache is YAGNI until pain shows. A lightweight `Scripts/lint.sh` (trailing whitespace, final newline, and shell syntax) runs inside smoke; SwiftLint and multi-config lint matrices are still deferred |
+| Caching / lint matrix | Not added | Single target, small app; a full macOS run takes about two minutes, so a DerivedData cache is YAGNI until pain shows. `Scripts/lint.sh` (trailing whitespace, final newline, shell syntax, ShellCheck) and actionlint run inside smoke; SwiftLint and multi-config lint matrices are still deferred |
+| Docs-only changes | `changes` job gates the macOS job | Skips a macOS build when no code, test, script, or workflow file changed; `if:` skipping keeps required checks green |
+| Logs | `xcbeautify` (preinstalled on the runner) | Short logs plus PR annotations; `LYRA_RAW_LOG=1` prints raw `xcodebuild` output |
+| UI preview | Offscreen snapshots in the unit-test target | macOS cannot run in Docker on non-Apple hardware and Apple's `container` runs Linux, so the macOS runner renders the UI instead. No UI test target and no pixel assertions |
 | Action pins | Full commit SHAs with version comments | Release job has `contents: write`; Dependabot still opens PRs that bump the SHA + comment |
 | Smoke script | Lean invariants, not every Swift path | macOS build is the compiler check; smoke covers docs/fonts/entitlements/version |
 

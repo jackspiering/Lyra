@@ -232,9 +232,19 @@ final class LyraTextView: NSTextView {
     }
 
     /// Center a `LyraTheme.columnWidth` column; only touches layout when the inset changes.
+    ///
+    /// Measures the scroll view rather than the text view: an always-visible
+    /// (legacy) scroller narrows the text view, which would otherwise start
+    /// the column left of the title and of Reading.
     func updateColumnInset() {
+        let width: CGFloat
+        if let scrollView = enclosingScrollView {
+            width = scrollView.frame.width / max(scrollView.magnification, 0.01)
+        } else {
+            width = bounds.width
+        }
         let inset = NSSize(
-            width: LyraTheme.columnInset(forWidth: bounds.width),
+            width: LyraTheme.columnInset(forWidth: width),
             height: Self.columnTopInset
         )
         if textContainerInset != inset {
@@ -278,11 +288,9 @@ final class LyraTextView: NSTextView {
             )
             let encoded = rel.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? rel
             let insertion = "![](\(encoded))"
-            let range = selectedRange()
-            if shouldChangeText(in: range, replacementString: insertion) {
-                insertText(insertion, replacementRange: range)
-                didChangeText()
-            }
+            // insertText runs shouldChangeText/didChangeText itself, so the
+            // paste is one undo step and one text-change notification.
+            insertText(insertion, replacementRange: selectedRange())
             return true
         } catch {
             onPasteError?(UserFacingError.message(for: error, context: .pasteImage))

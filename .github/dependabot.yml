@@ -6,6 +6,11 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    # One pull request per month for all action bumps.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - dependencies
       - ci

@@ -14,8 +14,8 @@
     <img alt="CI" src="https://github.com/jackspiering/Lyra/actions/workflows/ci.yml/badge.svg">
   </a>
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black?style=flat-square">
-  <img alt="Swift 5.10" src="https://img.shields.io/badge/Swift-5.10-F05138?style=flat-square">
-  <img alt="Version 0.12.0" src="https://img.shields.io/badge/version-0.12.0-informational?style=flat-square">
+  <img alt="Xcode 26" src="https://img.shields.io/badge/Xcode-26-147EFB?style=flat-square">
+  <img alt="Version 0.13.0" src="https://img.shields.io/badge/version-0.13.0-informational?style=flat-square">
   <a href="LICENSE">
     <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   </a>
@@ -31,11 +31,12 @@ Writing is the first job. Wiki links and the vault tree support that job. They a
 - **Native:** SwiftUI and AppKit. A real menu bar, windows, TextKit editing, and sandbox support.
 - **Writing first:** Source and Reading stay in one window. You draft in Source. You review in Reading.
 - **Durable:** Autosave, external-edit detection, missing-file recovery, and guarded window closing protect in-memory work. Saving keeps a note's creation date, permissions, and Finder tags.
+- **Fast:** Switching back to Lyra rereads only the notes that changed on disk. Wiki links, backlinks, and search stay quick in vaults with thousands of notes.
 - **Local:** Wiki links, relative images, attachments, and PDF use ordinary Markdown conventions.
 
 ## Download
 
-Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.12.0), then drag Lyra to Applications.
+Download the latest [Lyra release](https://github.com/jackspiering/Lyra/releases/tag/v0.13.0), then drag Lyra to Applications.
 
 The release DMG is ad-hoc signed for App Sandbox and is not notarized. If macOS blocks the first launch, open **System Settings > Privacy & Security > Open Anyway**. You can also [build Lyra from source](#build-from-source).
 
@@ -48,16 +49,17 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 - **Reading mode:** Native Markdown block rendering with headings, lists, quotes, code, images, and clickable wiki links. Reading is not editable. Links to notes open in Lyra. Web and mail links open in your browser or mail app. A `file:` link opens only for a plain file inside the vault. Other link types do nothing. A leading YAML block shows as code.
 - **Note tabs:** Open multiple notes inside one vault window without losing the sidebar.
 - **Multiple vaults:** Open separate vault folders in separate windows. Each window reopens its own vault after you relaunch Lyra.
-- **Filename identity:** The title at the top of the note and the tab show the file stem, with the vault and folder path above it. Editing the title renames the file. The first heading is content only. After a rename, Lyra offers to update `[[links]]` that point at the old name.
+- **Filename identity:** The title at the top of the note, the tab, and the sidebar show the file stem (no `.md`), with the vault and folder path above the title. Editing the title renames the file. The first heading is content only. After a rename, Lyra offers to update `[[links]]` that point at the old name.
 - **Sidebar:** Shows the vault name and note count, a note count for each folder, and a filter for note names and paths. The filter is not Find.
-- **Find:** Command-F finds text in the open note (from Reading it switches to Source first). Shift-Command-F searches note bodies in memory and shows a path plus one snippet. Use the arrow keys and Return to open a result.
+- **Go to File:** Command-O opens a quick switcher over the window. Type part of a note's name, or a few of its letters in order (`osw` finds "On Slow Writing"). Use the arrow keys and Return to open a note, and Escape to close.
+- **Find:** Command-F finds text in the open note (from Reading it switches to Source first). Shift-Command-F opens the same palette to search note bodies in memory. Each result shows the note, its folder, and one snippet with your words highlighted. A note you open from the palette, or create, is ready for typing.
 - **Wiki links:** Path-aware `[[Note]]`, `[[Folder/Note]]`, and `[[path|alias]]`. A leading YAML `aliases:` list adds extra names. If more than one note matches, pick from a list. Lyra does not guess. An unresolved link can create a file after you confirm. Lyra does not offer to create files for links to images or other attachments.
 - **Backlinks:** A hidden inspector lists notes that uniquely link here with `[[wiki]]`. Each card shows the linking note, its folder, and the line around the link. There is no graph view.
 - **Image paste:** Paste an image with Command-V to store it under `_attachments/` and insert a relative Markdown image link. A copied image file keeps its format. Text copied from Office or Numbers pastes as text.
 - **PDF export:** Export the open note.
 - **Recovery controls:** Review external changes, recreate a moved note when requested, and prevent failed saves from closing a window. If a remembered vault folder moved, Lyra asks before reopening it. An open note with no unsaved edits reloads when its file changes outside Lyra.
 - **Status:** A small pill in the corner of the note shows word and character counts and the last save time. Hover it to see when the note was created.
-- **Appearance:** Two built-in looks follow your System, Light, or Dark setting. *Night* uses deep navy with the gold of the Lyra logo. *Parchment* uses warm paper with bronze-gold. There is no theme picker.
+- **Appearance:** Two built-in looks follow your System, Light, or Dark setting. *Night* uses deep navy with the gold of the Lyra logo. *Parchment* uses warm paper with bronze-gold. On macOS 26 the sidebar and toolbar use Liquid Glass. There is no theme picker.
 - **Preferences:** Configure appearance, new-note naming, and Trash confirmations.
 
 ## Quick Start
@@ -72,7 +74,7 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 
 | Shortcut | Action |
 | --- | --- |
-| Command-O | Go to File, or Open Vault when no vault is open |
+| Command-O | Go to File (quick switcher), or Open Vault when no vault is open |
 | Command-N | Create a note |
 | Shift-Command-N | Open a new vault window |
 | Command-T | Open a new note tab |
@@ -84,7 +86,7 @@ Each GitHub Release includes a SHA-256 checksum (`SHA256SUMS.txt` and the releas
 | Command-Plus / Command-Minus | Zoom the editor in or out |
 | Command-0 | Reset editor zoom |
 | Shift-Command-F | Search note bodies in the vault |
-| Command-Delete | Move the selected item to Trash |
+| Command-Delete | Move the selected item to Trash (while you type, it deletes to the start of the line instead) |
 
 Autosave runs after approximately 500 milliseconds of inactivity. If a note changes outside Lyra, the editor presents Keep Mine and Reload Theirs options. Dirty windows stay open until their buffers save or you explicitly choose a recovery action. Cancel on that dialog pauses autosave for the note until you press Command-S; switching apps does not bring the dialog back.
 
@@ -109,9 +111,8 @@ Search, aliases, and backlinks skip note bodies larger than 2 MB and notes that 
 
 Requirements:
 
-- macOS 15 or later
-- Xcode 16 or later
-- Swift 5.10 toolchain or later (the project uses Swift 5 language mode)
+- macOS 15 or later to run; a Mac that runs Xcode 26 to build
+- Xcode 26 or later (the project uses Swift 5 language mode)
 
 Clone the repository and open the Xcode project:
 
@@ -134,6 +135,8 @@ bash Scripts/smoke.sh
 # Build and unit tests, requires macOS and Xcode
 bash Scripts/xcode-test.sh
 ```
+
+Every pull request's **Build & test (macOS)** run also uploads a `lyra-snapshots` artifact: the vault window, sidebar, palettes, and backlinks rendered over a sample vault in Night and Parchment. Render them locally with `TEST_RUNNER_LYRA_SNAPSHOTS=1 bash Scripts/xcode-test.sh`; the PNGs land in the app container's `tmp/LyraSnapshots` folder.
 
 Release packaging details are documented in [docs/ci.md](docs/ci.md).
 

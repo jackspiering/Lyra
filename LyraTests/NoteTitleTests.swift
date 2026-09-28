@@ -7,6 +7,14 @@ final class NoteTitleTests: XCTestCase {
         XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Welcome")
     }
 
+    @MainActor
+    func testSidebarShowsNoteStemAndFullFolderName() {
+        let note = VaultNode(name: "Node.js.md", url: URL(fileURLWithPath: "/v/Node.js.md"), isDirectory: false, children: nil)
+        let folder = VaultNode(name: "Archive.md", url: URL(fileURLWithPath: "/v/Archive.md"), isDirectory: true, children: [])
+        XCTAssertEqual(SidebarView.displayName(note), "Node.js")
+        XCTAssertEqual(SidebarView.displayName(folder), "Archive.md")
+    }
+
     func testDisplayTitleKeepsInnerDots() {
         let url = URL(fileURLWithPath: "/vault/Node.js.md")
         XCTAssertEqual(NoteTitle.displayTitle(fileURL: url), "Node.js")

@@ -2,6 +2,7 @@
 # Lightweight whitespace checks that run anywhere (Linux CI included).
 # The macOS compile job catches type errors; this catches drift it cannot:
 # trailing whitespace, missing final newlines, and shell syntax in tracked files.
+# ShellCheck also runs when it is installed (it is on GitHub's Ubuntu runners).
 #
 # No formatter dependency — deliberately objective so it never bikesheds style.
 set -euo pipefail
@@ -41,6 +42,15 @@ while IFS= read -r file; do
     fail=1
   fi
 done <<< "$FILES"
+
+if command -v shellcheck >/dev/null 2>&1; then
+  if ! git ls-files -z '*.sh' | xargs -0 shellcheck; then
+    echo "  FAIL: shellcheck"
+    fail=1
+  fi
+else
+  echo "  skip: shellcheck not installed"
+fi
 
 if [[ "$fail" -ne 0 ]]; then
   echo "== lint FAILED =="

@@ -20,6 +20,15 @@ final class VaultStore {
     private var isAccessingSecurityScope = false
     private var wikiResolver = WikiLinkResolver()
     private var searchDocuments: [VaultFullTextSearch.Document] = []
+    /// Every node of `rootNode` by id, so selection lookups do not walk the tree.
+    private var nodesByID: [VaultNode.ID: VaultNode] = [:]
+    /// Every note with its vault-relative path, for Go to File. Read on demand,
+    /// never from a view body, so it is not observed.
+    @ObservationIgnored private(set) var noteEntries: [VaultSearch.NoteEntry] = []
+    /// Indexed note bodies from the last scan with the stamp they were read at.
+    /// A rescan (every window activation) re-reads only notes that changed.
+    /// In memory only; disk stays the source of truth.
+    private var bodyCache: [String: FileSystemVault.CachedBody] = [:]
     /// True when scan stopped walking folders deeper than `FileSystemVault.maxDirectoryDepth`.
     private(set) var scanDidTruncate = false
     /// True when at least one note was too large to index for search/backlinks.
@@ -105,6 +114,9 @@ final class VaultStore {
         lastCreateParentPath = nil
         selection = nil
         rootNode = nil
+        nodesByID = [:]
+        noteEntries = []
+        bodyCache = [:]
         scanDidTruncate = false
         scanSkippedLargeNotes = false
         scanSkippedUnreadableNotes = false
@@ -112,12 +124,22 @@ final class VaultStore {
     }
 
     /// Scan the vault off the main actor so large trees don't beachball the UI.
+    ///
+    /// Rescans are cheap when little changed: unchanged note bodies come from
+    /// `bodyCache`, the wiki and search indexes are rebuilt only when the tree
+    /// or a body changed, and observed properties are assigned only when their
+    /// value differs, so the sidebar and backlinks do not redraw for nothing.
     func refresh() {
         guard let rootURL else { return }
         refreshTask?.cancel()
         refreshGeneration += 1
         let generation = refreshGeneration
         let url = rootURL
+        let previous = ScanBaseline(
+            tree: rootNode,
+            cache: bodyCache,
+            index: rootNode == nil ? nil : ScanIndex(resolver: wikiResolver, documents: searchDocuments)
+        )
         // Retain security-scoped access for this scan. The task is cancelled
         // before scopes change, but file I/O cannot be cancelled mid-read.
         let retainedScanAccess = isAccessingSecurityScope
@@ -131,77 +153,22 @@ final class VaultStore {
             }
             do {
                 let scanTask = Task.detached(priority: .userInitiated) {
-                    let scanned = try FileSystemVault.scanResult(
-                        root: url,
-                        shouldCancel: { Task.isCancelled }
-                    )
-                    let noteURLs = FileSystemVault.collectNoteURLs(from: scanned.node)
-                    var notes: [WikiNote] = []
-                    var documents: [VaultFullTextSearch.Document] = []
-                    var urlBodies: [URL: String] = [:]
-                    var skippedLarge = false
-                    var skippedUnreadable = false
-                    for noteURL in noteURLs {
-                        if Task.isCancelled { throw CancellationError() }
-                        let relative = FileSystemVault.relativePath(for: noteURL, under: url)
-                        switch FileSystemVault.indexedUTF8Body(at: noteURL) {
-                        case .body(let body):
-                            notes.append(
-                                WikiNote(
-                                    url: noteURL,
-                                    relativePath: relative,
-                                    aliases: FrontmatterAliases.parse(from: body)
-                                )
-                            )
-                            documents.append(
-                                VaultFullTextSearch.Document(
-                                    url: noteURL,
-                                    relativePath: relative,
-                                    body: body
-                                )
-                            )
-                            urlBodies[noteURL] = body
-                        case .oversized:
-                            skippedLarge = true
-                            // Still a note: `[[links]]` to it must resolve, not offer Create.
-                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
-                        case .unreadable:
-                            skippedUnreadable = true
-                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
-                        }
-                    }
-                    let resolver = WikiLinkResolver(notes: notes, bodies: urlBodies)
-                    return (scanned.node, resolver, documents, scanned.didTruncate, skippedLarge, skippedUnreadable)
+                    try Self.scan(root: url, previous: previous)
                 }
-                let (node, resolver, documents, didTruncate, skippedLarge, skippedUnreadable) = try await withTaskCancellationHandler(
+                let output = try await withTaskCancellationHandler(
                     operation: { try await scanTask.value },
                     onCancel: { scanTask.cancel() }
                 )
                 try Task.checkCancellation()
                 guard let self, generation == self.refreshGeneration else { return }
-                self.rootNode = node
-                self.wikiResolver = resolver
-                self.searchDocuments = documents
-                self.scanDidTruncate = didTruncate
-                self.scanSkippedLargeNotes = skippedLarge
-                self.scanSkippedUnreadableNotes = skippedUnreadable
-                self.indexVersion += 1
-                // Apply pending selection only after the tree contains the new path.
-                if let pending = self.pendingSelection {
-                    if FileSystemVault.findNode(id: pending, in: node) != nil {
-                        self.selection = pending
-                    }
-                    self.pendingSelection = nil
-                }
-                // External deletes/renames must not leave a selection pointing nowhere.
-                if let selection = self.selection,
-                   FileSystemVault.findNode(id: selection, in: node) == nil {
-                    self.selection = nil
-                }
+                self.apply(output)
             } catch {
                 guard let self, generation == self.refreshGeneration else { return }
                 if error is CancellationError { return }
                 self.rootNode = nil
+                self.nodesByID = [:]
+                self.noteEntries = []
+                self.bodyCache = [:]
                 self.selection = nil
                 self.pendingSelection = nil
                 self.wikiResolver = WikiLinkResolver()
@@ -214,9 +181,137 @@ final class VaultStore {
         }
     }
 
+    /// Index state a rescan compares against.
+    private struct ScanBaseline: Sendable {
+        var tree: VaultNode?
+        var cache: [String: FileSystemVault.CachedBody]
+        var index: ScanIndex?
+    }
+
+    private struct ScanIndex: Sendable {
+        var resolver: WikiLinkResolver
+        var documents: [VaultFullTextSearch.Document]
+    }
+
+    private struct ScanOutput: Sendable {
+        var tree: VaultNode
+        /// `nil` when the tree matches the previous scan.
+        var nodesByID: [VaultNode.ID: VaultNode]?
+        /// `nil` when the tree matches the previous scan.
+        var noteEntries: [VaultSearch.NoteEntry]?
+        /// `nil` when neither the tree nor any note body changed.
+        var index: ScanIndex?
+        var cache: [String: FileSystemVault.CachedBody]
+        var didTruncate: Bool
+        var skippedLarge: Bool
+        var skippedUnreadable: Bool
+    }
+
+    /// Walks the tree and indexes note bodies. Runs off the main actor.
+    private nonisolated static func scan(root url: URL, previous: ScanBaseline) throws -> ScanOutput {
+        let scanned = try FileSystemVault.scanResult(root: url, shouldCancel: { Task.isCancelled })
+        let treeChanged = scanned.node != previous.tree
+        var cache: [String: FileSystemVault.CachedBody] = [:]
+        var entries: [(url: URL, relativePath: String, body: FileSystemVault.IndexedBody)] = []
+        var bodiesChanged = false
+        var skippedLarge = false
+        var skippedUnreadable = false
+        for noteURL in FileSystemVault.collectNoteURLs(from: scanned.node) {
+            if Task.isCancelled { throw CancellationError() }
+            let read = FileSystemVault.indexedBody(at: noteURL, cached: previous.cache[noteURL.path])
+            if read.didRead { bodiesChanged = true }
+            if let stamp = read.stamp {
+                cache[noteURL.path] = FileSystemVault.CachedBody(stamp: stamp, body: read.body)
+            }
+            switch read.body {
+            case .body: break
+            case .oversized: skippedLarge = true
+            case .unreadable: skippedUnreadable = true
+            }
+            entries.append((noteURL, FileSystemVault.relativePath(for: noteURL, under: url), read.body))
+        }
+
+        // Nothing moved and no body changed: keep the current indexes.
+        var index: ScanIndex?
+        if previous.index == nil || treeChanged || bodiesChanged {
+            var notes: [WikiNote] = []
+            var documents: [VaultFullTextSearch.Document] = []
+            var urlBodies: [URL: String] = [:]
+            for entry in entries {
+                if Task.isCancelled { throw CancellationError() }
+                guard case .body(let body) = entry.body else {
+                    // Still a note: `[[links]]` to it must resolve, not offer Create.
+                    notes.append(WikiNote(url: entry.url, relativePath: entry.relativePath, aliases: []))
+                    continue
+                }
+                notes.append(
+                    WikiNote(
+                        url: entry.url,
+                        relativePath: entry.relativePath,
+                        aliases: FrontmatterAliases.parse(from: body)
+                    )
+                )
+                documents.append(
+                    VaultFullTextSearch.Document(url: entry.url, relativePath: entry.relativePath, body: body)
+                )
+                urlBodies[entry.url] = body
+            }
+            index = ScanIndex(resolver: WikiLinkResolver(notes: notes, bodies: urlBodies), documents: documents)
+        }
+        return ScanOutput(
+            tree: scanned.node,
+            nodesByID: treeChanged ? FileSystemVault.nodesByID(in: scanned.node) : nil,
+            noteEntries: treeChanged
+                ? entries.map { VaultSearch.NoteEntry(url: $0.url, relativePath: $0.relativePath) }
+                : nil,
+            index: index,
+            cache: cache,
+            didTruncate: scanned.didTruncate,
+            skippedLarge: skippedLarge,
+            skippedUnreadable: skippedUnreadable
+        )
+    }
+
+    private func apply(_ output: ScanOutput) {
+        bodyCache = output.cache
+        if let nodes = output.nodesByID {
+            rootNode = output.tree
+            nodesByID = nodes
+        }
+        if let notes = output.noteEntries {
+            noteEntries = notes
+        }
+        if let index = output.index {
+            wikiResolver = index.resolver
+            searchDocuments = index.documents
+            indexVersion += 1
+        }
+        if scanDidTruncate != output.didTruncate { scanDidTruncate = output.didTruncate }
+        if scanSkippedLargeNotes != output.skippedLarge { scanSkippedLargeNotes = output.skippedLarge }
+        if scanSkippedUnreadableNotes != output.skippedUnreadable {
+            scanSkippedUnreadableNotes = output.skippedUnreadable
+        }
+        // Apply pending selection only after the tree contains the new path.
+        if let pending = pendingSelection {
+            if nodesByID[pending] != nil {
+                selection = pending
+            }
+            pendingSelection = nil
+        }
+        // External deletes/renames must not leave a selection pointing nowhere.
+        if let selection, nodesByID[selection] == nil {
+            self.selection = nil
+        }
+    }
+
     func selectedNode() -> VaultNode? {
-        guard let selection, let rootNode else { return nil }
-        return FileSystemVault.findNode(id: selection, in: rootNode)
+        guard let selection else { return nil }
+        return nodesByID[selection]
+    }
+
+    /// The node with `id` (its path) in the current tree.
+    func node(withID id: VaultNode.ID) -> VaultNode? {
+        nodesByID[id]
     }
 
     func selectedFileURL() -> URL? {
@@ -251,14 +346,20 @@ final class VaultStore {
     }
 
     func searchNoteBodies(query: String, liveBodies: [String: String]) -> [VaultFullTextSearch.Hit] {
-        let documents = searchDocuments.map { doc in
+        VaultFullTextSearch.search(documents: searchCorpus(liveBodies: liveBodies), query: query)
+    }
+
+    /// Scanned note bodies with open editors' text laid over them. Sendable,
+    /// so a caller can run `VaultFullTextSearch.search` off the main actor.
+    func searchCorpus(liveBodies: [String: String]) -> [VaultFullTextSearch.Document] {
+        guard !liveBodies.isEmpty else { return searchDocuments }
+        return searchDocuments.map { doc in
             var copy = doc
             if let live = liveBodies[doc.url.path] {
                 copy.body = live
             }
             return copy
         }
-        return VaultFullTextSearch.search(documents: documents, query: query)
     }
 
     /// Creates a note at an explicit vault path (wiki Create). Intermediate folders are created.
@@ -520,6 +621,15 @@ final class VaultStore {
         }
     }
 
+    /// Vault-relative folder that New Note and New Folder create in; empty
+    /// for the vault root. Shown in the New Note sheet.
+    func newItemFolderPath() -> String {
+        guard let rootURL else { return "" }
+        let parent = createParentDirectory(vaultRoot: rootURL)
+        guard FileSystemVault.isStrictDescendant(parent, root: rootURL) else { return "" }
+        return FileSystemVault.relativePath(for: parent, under: rootURL)
+    }
+
     /// Parent for new notes/folders. A current selection always wins; the
     /// remembered path is only a fallback while a refresh is still landing.
     private func createParentDirectory(vaultRoot: URL) -> URL {
@@ -549,7 +659,7 @@ final class VaultStore {
     /// so callers do not trigger a selection-driven open of the old path.
     @discardableResult
     func renameItem(at url: URL, to newName: String) -> URL? {
-        rename(rootNode.flatMap { FileSystemVault.findNode(id: url.path, in: $0) }, to: newName)
+        rename(nodesByID[url.path], to: newName)
     }
 
     private func rename(_ node: VaultNode?, to newName: String) -> URL? {

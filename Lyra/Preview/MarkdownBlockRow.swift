@@ -99,12 +99,18 @@ struct MarkdownBlockRow: View {
         guard var attributed = try? AttributedString(markdown: prepared, options: options) else {
             return AttributedString(source)
         }
-        // Style wiki + http links with the brand wiki colour.
         for run in attributed.runs {
-            guard run.link != nil else { continue }
             let range = run.range
-            attributed[range].foregroundColor = Color(nsColor: LyraTheme.wiki)
-            attributed[range].underlineStyle = .single
+            // `code` spans get the same ink and wash as in Source.
+            if run.inlinePresentationIntent?.contains(.code) == true {
+                attributed[range].foregroundColor = Color(nsColor: LyraTheme.code)
+                attributed[range].backgroundColor = Color(nsColor: LyraTheme.codeBackground)
+            }
+            // Style wiki + http links with the brand wiki colour.
+            if run.link != nil {
+                attributed[range].foregroundColor = Color(nsColor: LyraTheme.wiki)
+                attributed[range].underlineStyle = .single
+            }
         }
         return attributed
     }

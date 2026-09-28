@@ -40,8 +40,12 @@ struct ContentView: View {
     @State private var findBarToken = 0
     @State private var wikiFlow: WikiFlow
     @State private var pdfExport: PDFExportFlow
-    @State private var showVaultSearch = false
-    @State private var vaultSearchQuery = ""
+    /// Go to File or Search Vault palette over the window; nil when closed.
+    @State private var palette: VaultPalette.Mode?
+    @State private var paletteQuery = ""
+    /// Set when the next note to open should take keyboard focus (a note just
+    /// created, or one picked from the palette) rather than leave it where it is.
+    @State private var focusEditorOnNextOpen = false
     @SceneStorage("lyra.showBacklinks") private var showBacklinks = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -77,7 +81,7 @@ struct ContentView: View {
             .navigationTitle("")
             // Toolbar and title bar sit on the same chrome tone as the tab strip.
             .containerBackground(LyraTheme.chromeColor, for: .window)
-            .frame(minWidth: 900, minHeight: 560)
+            .frame(minWidth: 720, minHeight: 480)
             .font(LyraFonts.body)
             .background(
                 DocumentEditedReader(isEdited: tabs.anyDirty)
@@ -119,13 +123,10 @@ struct ContentView: View {
                 toggleViewMode: { noteViewMode = noteViewMode.next() },
                 createNote: beginNewNote,
                 createFolder: { store.createFolder() },
-                requestDelete: requestDelete,
+                requestDelete: requestDeleteFromMenu,
                 refresh: refreshVault,
                 findInNote: findInNote,
-                findInVault: {
-                    vaultSearchQuery = ""
-                    showVaultSearch = true
-                },
+                findInVault: { openPalette(.searchVault) },
                 toggleBacklinks: { showBacklinks.toggle() },
                 newTab: newTab,
                 openInNewTab: openSelectionInNewTab,
@@ -144,27 +145,7 @@ struct ContentView: View {
     @ViewBuilder
     private var rootShell: some View {
         if store.rootURL == nil {
-            ContentUnavailableView {
-                VStack(spacing: 14) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .accessibilityHidden(true)
-                    Text("No Vault Open")
-                        .font(LyraFonts.title)
-                }
-            } description: {
-                Text("Open a folder of Markdown files to begin.")
-                    .font(LyraFonts.body)
-            } actions: {
-                Button("Open Vault…") {
-                    openVault()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(LyraTheme.paperColor)
+            WelcomeView(onOpenVault: openVault)
         } else {
             vaultWorkspace
         }
@@ -235,17 +216,23 @@ struct ContentView: View {
         } message: { update in
             Text(linkUpdateMessage(update))
         }
-        .sheet(isPresented: $showVaultSearch) {
-            VaultSearchPalette(
-                query: $vaultSearchQuery,
-                search: { store.searchNoteBodies(query: $0, liveBodies: liveBodies()) },
-                onOpen: { url in
-                    showVaultSearch = false
-                    wikiFlow.open(url)
-                },
-                onClose: { showVaultSearch = false }
-            )
+        .overlay {
+            if let mode = palette {
+                VaultPalette(
+                    mode: mode,
+                    query: $paletteQuery,
+                    results: { query in
+                        await Self.paletteResults(mode: mode, query: query, store: store, liveBodies: liveBodies())
+                    },
+                    onOpen: openFromPalette,
+                    onClose: closePalette
+                )
+                // A fresh palette per mode, so switching resets its results.
+                .id(mode)
+                .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.12), value: palette)
     }
 
     @ViewBuilder
@@ -259,6 +246,7 @@ struct ContentView: View {
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 220)
+        .disabled(editor.fileURL == nil)
         .help("Source or Reading (⌘E)")
 
         Button {
@@ -320,6 +308,7 @@ struct ContentView: View {
             EmptyTabView(
                 onNewNote: beginNewNote,
                 onGoToFile: goToFile,
+                onSearchVault: { openPalette(.searchVault) },
                 onCloseTab: { closeTab(id: tabs.selectedTabID) }
             )
         } else {
@@ -526,26 +515,83 @@ struct ContentView: View {
         }
     }
 
-    /// Empty-tab “Go to file” / ⌘O when a vault is open: pick a Markdown note and open it.
+    /// ⌘O: jump to a note by name, or Open Vault when no vault is open.
     private func goToFile() {
-        guard let root = store.rootURL else {
+        guard store.rootURL != nil else {
             openVault()
             return
         }
-        switch VaultNotePicker.pick(vaultRoot: root) {
-        case .note(let url):
-            store.selection = url.path
-            wikiFlow.activate(url)
-        case .outsideVault:
-            store.present(
-                context: .openNote,
-                message: UserFacingError.message(
-                    context: .openNote,
-                    detail: "Go to File opens Markdown notes inside this vault. Open Vault… for another folder."
-                )
-            )
-        case .cancelled:
-            break
+        openPalette(.goToFile)
+    }
+
+    // MARK: - Palette
+
+    private func openPalette(_ mode: VaultPalette.Mode) {
+        guard store.rootURL != nil else { return }
+        if palette != mode {
+            paletteQuery = ""
+        }
+        palette = mode
+    }
+
+    private func closePalette() {
+        palette = nil
+        focusEditorSoon()
+    }
+
+    private func openFromPalette(_ url: URL) {
+        palette = nil
+        focusEditorOnNextOpen = true
+        wikiFlow.open(url)
+        if editor.fileURL?.path == url.path {
+            // Already showing (or opened synchronously): focus it now.
+            focusEditorOnNextOpen = false
+            focusEditorSoon()
+        }
+    }
+
+    /// Palette rows. Ranking and body search run off the main actor so a
+    /// large vault does not stall typing in the query field.
+    static func paletteResults(
+        mode: VaultPalette.Mode,
+        query: String,
+        store: VaultStore,
+        liveBodies: [String: String]
+    ) async -> [VaultPaletteItem] {
+        switch mode {
+        case .goToFile:
+            let notes = store.noteEntries
+            let ranked = await Task.detached(priority: .userInitiated) {
+                VaultSearch.rankNotes(notes, query: query)
+            }.value
+            return ranked.map { VaultPaletteItem(url: $0.url, title: $0.name, folder: $0.folder, snippet: nil) }
+        case .searchVault:
+            guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+            let corpus = store.searchCorpus(liveBodies: liveBodies)
+            let hits = await Task.detached(priority: .userInitiated) {
+                VaultFullTextSearch.search(documents: corpus, query: query)
+            }.value
+            return hits.map { hit in
+                let entry = VaultSearch.NoteEntry(url: hit.url, relativePath: hit.relativePath)
+                return VaultPaletteItem(url: hit.url, title: entry.name, folder: entry.folder, snippet: hit.snippet)
+            }
+        }
+    }
+
+    /// Put the caret in the Source editor once its text view is on screen.
+    /// A just-opened tab builds its text view on the next update, so retry briefly.
+    private func focusEditorSoon() {
+        Task { @MainActor in
+            for _ in 0..<6 {
+                try? await Task.sleep(nanoseconds: 30_000_000)
+                guard noteViewMode == .source, palette == nil else { return }
+                if let scrollView = editor.sourceView as? NSScrollView,
+                   let textView = scrollView.documentView,
+                   let window = textView.window {
+                    window.makeFirstResponder(textView)
+                    return
+                }
+            }
         }
     }
 
@@ -555,9 +601,23 @@ struct ContentView: View {
             let stem = GeneralPreferences.defaultNoteStem
             newNoteName = "\(stem).md"
             showNewNoteSheet = true
-        } else {
-            store.createNote(named: nil)
+        } else if store.createNote(named: nil) {
+            focusEditorOnNextOpen = true
         }
+    }
+
+    /// File ▸ Move to Trash. ⌘⌫ is also the text system's "delete to the
+    /// start of the line": while a text view has focus (the editor, the title,
+    /// a field) the shortcut edits text instead of trashing the selected note.
+    /// Choosing the menu item with the mouse still moves the note to the Trash.
+    private func requestDeleteFromMenu() {
+        if NSApp.currentEvent?.type == .keyDown,
+           let textView = NSApp.keyWindow?.firstResponder as? NSTextView,
+           textView.isEditable {
+            textView.deleteToBeginningOfLine(nil)
+            return
+        }
+        requestDelete()
     }
 
     /// ⌘⌫, File → Move to Trash, or context Delete. Respects note vs folder confirm prefs.
@@ -590,11 +650,10 @@ struct ContentView: View {
             }
         }
         guard store.deleteSelected() else { return }
+        // Close the tabs that showed the trashed notes rather than leaving
+        // empty "New Tab" chips behind; the last tab still stays as an empty tab.
         for tab in affected {
-            if !tab.editor.close() {
-                Self.flushEditorError(tab.editor, presentingOn: store)
-                return
-            }
+            closeTab(id: tab.id)
         }
         // deleteSelected nils selection; re-sync sidebar to whatever note (if any) is still active.
         // handleSelectionChange ignores nil and selectOpenNote avoids re-open/dual-open.
@@ -605,15 +664,23 @@ struct ContentView: View {
 
     private func deleteConfirmSheet() -> some View {
         let node = store.selectedNode()
-        let name = node?.name ?? "this item"
         let isFolder = node?.isDirectory == true
+        let name = node.map { $0.isDirectory ? $0.name : ($0.name as NSString).deletingPathExtension } ?? "this item"
         return VStack(alignment: .leading, spacing: 16) {
-            Text("Move to Trash").font(LyraFonts.headline)
-            Text("Move “\(name)” to the Trash?")
+            SheetHeader(
+                systemImage: "trash",
+                tint: .red,
+                title: "Move “\(name)” to the Trash?",
+                message: isFolder
+                    ? "The folder and every note in it move to the Trash. You can put them back from the Trash in Finder."
+                    : "You can put it back from the Trash in Finder."
+            )
             Toggle("Don’t ask again", isOn: $deleteDontAskAgain)
+                .font(LyraFonts.label)
             HStack {
                 Spacer()
                 Button("Cancel") { showDeleteConfirm = false }
+                    .keyboardShortcut(.cancelAction)
                 Button("Move to Trash", role: .destructive) {
                     if deleteDontAskAgain {
                         let key = isFolder
@@ -627,8 +694,8 @@ struct ContentView: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding()
-        .frame(width: 360)
+        .padding(20)
+        .frame(width: 400)
     }
 
     private var newNoteNameIsValid: Bool {
@@ -639,25 +706,33 @@ struct ContentView: View {
     }
 
     private func newNoteSheet() -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("New Note").font(LyraFonts.headline)
+        let folder = store.newItemFolderPath()
+        return VStack(alignment: .leading, spacing: 16) {
+            SheetHeader(
+                systemImage: "square.and.pencil",
+                tint: LyraTheme.accentColor,
+                title: "New Note",
+                message: "In \(folder.isEmpty ? (store.rootURL?.lastPathComponent ?? "the vault") : folder)"
+            )
             NewNoteNameField(text: $newNoteName, onSubmit: submitNewNote)
             HStack {
                 Spacer()
                 Button("Cancel") { showNewNoteSheet = false }
+                    .keyboardShortcut(.cancelAction)
                 Button("Create", action: submitNewNote)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!newNoteNameIsValid)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!newNoteNameIsValid)
             }
         }
-        .padding()
-        .frame(width: 360)
+        .padding(20)
+        .frame(width: 400)
     }
 
     private func submitNewNote() {
         guard newNoteNameIsValid else { return }
         if store.createNote(named: newNoteName) {
             showNewNoteSheet = false
+            focusEditorOnNextOpen = true
         }
     }
 
@@ -773,8 +848,7 @@ struct ContentView: View {
         // Delete already empties tabs that held the deleted path; empty-tab / new-tab clear selection intentionally.
         guard let newValue else { return }
 
-        guard let root = store.rootNode,
-              let node = FileSystemVault.findNode(id: newValue, in: root) else {
+        guard let node = store.node(withID: newValue) else {
             return
         }
 
@@ -784,6 +858,12 @@ struct ContentView: View {
         }
 
         wikiFlow.activate(node.url)
+        // A sidebar click keeps focus in the sidebar for arrow-key browsing;
+        // a new note or a palette pick goes straight to writing.
+        if focusEditorOnNextOpen, editor.fileURL?.path == node.url.path {
+            focusEditorOnNextOpen = false
+            focusEditorSoon()
+        }
     }
 
 

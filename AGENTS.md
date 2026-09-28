@@ -16,12 +16,18 @@ without Electron. Notes are plain UTF-8 `.md` files. A note’s identity is its
 | --- | --- | --- |
 | Structure, docs, version, whitespace | `bash Scripts/smoke.sh` | Any OS |
 | Whitespace / shell lint only | `bash Scripts/lint.sh` | Any OS |
-| Build + unit tests | `bash Scripts/xcode-test.sh` | macOS + Xcode 16 |
+| Build + unit tests | `bash Scripts/xcode-test.sh` | macOS + Xcode 26 |
+| Window snapshots (PNG) | `TEST_RUNNER_LYRA_SNAPSHOTS=1 bash Scripts/xcode-test.sh` | macOS + Xcode 26 |
 
 There is no Swift toolchain on Linux for this app. If you are not on a Mac, the
-`Build & test (macOS)` CI job is your compiler: push, then read its log. Write
-Swift that type-checks on the first try — annotate closure and collection types
-instead of leaning on inference in large literals.
+`Build & test (macOS)` CI job is your compiler: push, then read its log (errors
+also appear as PR annotations). Its `lyra-snapshots` artifact is your screen:
+the window, sidebar, palettes, and backlinks over a sample vault in Night and
+Parchment. Offscreen rendering cannot draw Liquid Glass, so glass surfaces come
+out blank. Write Swift that type-checks on the first try — annotate closure and
+collection types instead of leaning on inference in large literals. Under Xcode
+26, isolation warnings are errors: a `@MainActor` static used as a default
+argument, or a main-actor call from a nonisolated closure, fails the build.
 
 ## Hard rules
 
@@ -34,7 +40,9 @@ instead of leaning on inference in large literals.
    it. Reading is not editable. No WYSIWYG.
 5. **Stay small.** Out of scope unless a human asks: plugins, graph view, sync,
    accounts, tag index, daily notes, frontmatter UI, `![[embeds]]`,
-   `[[Note#heading]]`, theme picker or marketplace, UI test suites.
+   `[[Note#heading]]`, theme picker or marketplace, UI test suites. (The
+   offscreen `WindowSnapshotTests` render is not one: no assertions, no
+   second target.)
 6. **Privacy in git.** Never commit a personal email. Use the GitHub noreply
    address (`46534141+jackspiering@users.noreply.github.com`), set locally.
 
@@ -75,8 +83,9 @@ The visual system lives in two files. Use them instead of hard-coded values.
 
 - **`LyraTheme`** — colors for the two built-in looks, *Night* (dark) and
   *Parchment* (light), that follow the system appearance: surfaces (`paper`,
-  `chrome`, `sidebar`, `fill`, `hairline`), text (`ink`, `markup`), `accent`
-  (gold / bronze-gold), and Markdown tokens. It also owns the writing column
+  `chrome`, `sidebar`, `raised` for floating panels, `scrim` behind them,
+  `fill`, `hairline`), text (`ink`, `markup`), `accent` (gold / bronze-gold)
+  with `onAccent` for text on it, and Markdown tokens. It also owns the writing column
   (`columnWidth`, `columnMargin`, `columnInset(forWidth:)`) shared by the title,
   Source, and Reading.
 - **`LyraFonts`** — bundled Inter at fixed sizes: `prose` (16pt, 7pt line spacing)
@@ -84,7 +93,9 @@ The visual system lives in two files. Use them instead of hard-coded values.
   `headingSize(level:)` shared by Source and Reading.
 
 Avoid system gray backgrounds (`.bar`, `windowBackgroundColor`) in the vault
-window; they break the palette. Reference mockups: `docs/design/`.
+window; they break the palette. On macOS 26 do not paint opaque fills over
+Liquid Glass (the sidebar, the toolbar); gate them with `#available(macOS 26, *)`
+as `SidebarView` does. Reference mockups: `docs/design/`.
 
 ## Tests
 

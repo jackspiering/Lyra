@@ -10,7 +10,7 @@ enum MarkdownPreviewBlocks {
     private static let wikiPattern = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#)
     private static let orderedItemPattern = try? NSRegularExpression(pattern: #"^(\d+)[.)]\s+(.*)$"#)
 
-    enum Block: Equatable {
+    enum Block: Hashable {
         case heading(level: Int, text: String)
         case paragraph(String)
         /// `ordinal` is nil for bullets; present for ordered lists. `depth` is leading-spaces/2 (preview heuristic).

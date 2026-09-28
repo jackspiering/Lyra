@@ -162,6 +162,11 @@ enum WikiLinkSyntax {
     }
 
     /// Fenced code blocks (``` or ~~~), including an unclosed trailing fence.
+    ///
+    /// Source highlighting calls this on every keystroke, so a line is only
+    /// copied out and parsed when it could be a fence: a backtick or tilde
+    /// after at most three spaces or tabs. Every other line costs a few
+    /// character reads.
     static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
         var ranges: [NSRange] = []
         var i = 0
@@ -170,10 +175,23 @@ enum WikiLinkSyntax {
         var fenceStart = 0
         while i < length {
             let lineStart = i
+            var markerOffset: Int?
             while i < length {
                 let ch = ns.character(at: i)
                 if ch == 0x0A || ch == 0x0D { break }
+                if markerOffset == nil, i - lineStart <= 3 {
+                    if ch == 0x60 || ch == 0x7E {
+                        markerOffset = i - lineStart
+                    } else if ch != 0x20 && ch != 0x09 {
+                        // Not indentation: this line cannot open or close a fence.
+                        markerOffset = -1
+                    }
+                }
                 i += 1
+            }
+            guard let offset = markerOffset, offset >= 0 else {
+                skipLineBreak(in: ns, at: &i)
+                continue
             }
             let line = ns.substring(with: NSRange(location: lineStart, length: i - lineStart))
             if let open = fence {
@@ -197,20 +215,24 @@ enum WikiLinkSyntax {
                 fence = parsed
                 fenceStart = lineStart
             }
-            if i < length {
-                let ch = ns.character(at: i)
-                if ch == 0x0D {
-                    i += 1
-                    if i < length && ns.character(at: i) == 0x0A { i += 1 }
-                } else if ch == 0x0A {
-                    i += 1
-                }
-            }
+            skipLineBreak(in: ns, at: &i)
         }
         if fence != nil {
             ranges.append(NSRange(location: fenceStart, length: length - fenceStart))
         }
         return ranges
+    }
+
+    /// Advances past one `\n`, `\r`, or `\r\n` at `i`, if there is one.
+    private static func skipLineBreak(in ns: NSString, at i: inout Int) {
+        guard i < ns.length else { return }
+        let ch = ns.character(at: i)
+        if ch == 0x0D {
+            i += 1
+            if i < ns.length && ns.character(at: i) == 0x0A { i += 1 }
+        } else if ch == 0x0A {
+            i += 1
+        }
     }
 
     private static func openingFence(_ raw: String) -> (marker: UInt16, run: Int)? {

@@ -2,7 +2,7 @@
 
 ## Setup
 
-1. macOS 15+ and Xcode 16+
+1. A Mac with Xcode 26+ (the app itself runs on macOS 15+)
 2. Clone the repo, open `Lyra.xcodeproj`
 3. Scheme **Lyra** → Run
 
@@ -15,7 +15,7 @@ bash Scripts/xcode-test.sh     # xcodebuild build + test (macOS)
 
 Unit tests live in `LyraTests/` (vault helpers, wiki links, naming, blocks, errors, editor durability).
 
-PRs run smoke on Ubuntu in parallel with build/test on `macos-15`. Details: [docs/ci.md](docs/ci.md).
+PRs run smoke on Ubuntu in parallel with build/test on `macos-26` (skipped for docs-only changes). For UI changes, open the run's `lyra-snapshots` artifact to see the window in Night and Parchment. Details: [docs/ci.md](docs/ci.md).
 
 ## Style
 
@@ -33,7 +33,7 @@ PRs run smoke on Ubuntu in parallel with build/test on `macos-15`. Details: [doc
 - Update `docs/architecture.md` when structure or invariants change
 - Do not expand into plugins, sync, or non-macOS ports unless agreed
 
-## Manual smoke (v0.11)
+## Manual smoke (v0.13)
 
 Required (~10 minutes):
 
@@ -52,17 +52,20 @@ Required (~10 minutes):
 13. **⌘S** saves immediately; failed save shows a plain-language alert and a toolbar indicator
 14. **Export PDF…** with a long code fence and `**bold**` — multi-page PDF, bold not literal asterisks
 15. Body text uses Inter; code fences stay monospaced
-16. File → New Window opens another vault window; File menu has New Note / Open Vault / Refresh / Export
-17. **Appearance:** switch Settings → Appearance between Light and Dark — sidebar, tab strip, note, and backlinks change together (Parchment / Night) with no stray system-gray bands
-18. **Column:** resize the window narrow and wide — the title and Source text stay left-aligned in one centered column; **⌘E** to Reading does not shift the text sideways
-19. **Source styling:** `#`, `**`, and `[[ ]]` markers are dim but still present and editable; the caret and selection are gold; typing after a heading returns to body size
+16. **⌘O** opens Go to File: typing `osw` finds "On Slow Writing"; ↑/↓ + Return open it with the caret in Source; Esc closes
+17. **⇧⌘F** searches bodies in the same palette with highlighted snippets; a click outside closes it
+18. **⌘⌫** while typing deletes to the start of the line and does **not** move the note to the Trash; with the sidebar focused it asks to move the selection to the Trash
+19. File → New Window opens another vault window; File menu has New Note / Open Vault / Refresh / Export
+20. **Appearance:** switch Settings → Appearance between Light and Dark — sidebar, tab strip, note, and backlinks change together (Parchment / Night) with no stray system-gray bands. On macOS 26 the sidebar is Liquid Glass tinted by the window tone
+21. **Column:** resize the window narrow and wide — the title and Source text stay left-aligned in one centered column; **⌘E** to Reading does not shift the text sideways
+22. **Source styling:** `#`, `**`, and `[[ ]]` markers are dim but still present and editable; the caret and selection are gold; typing after a heading returns to body size
 
 Optional:
 
-20. `[[Other Note]]` opens from Reading when the file exists; the backlinks card on the target shows the linking line
-21. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading (pasting a browser URL must not hang on network)
-22. Unreadable child folder in the vault — rest of the sidebar still appears
-23. Eject/unplug the drive holding a dirty note — visible save failure, not silence
+23. `[[Other Note]]` opens from Reading when the file exists; the backlinks card on the target shows the linking line
+24. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading (pasting a browser URL must not hang on network)
+25. Unreadable child folder in the vault — rest of the sidebar still appears
+26. Eject/unplug the drive holding a dirty note — visible save failure, not silence
 
 ## License
 

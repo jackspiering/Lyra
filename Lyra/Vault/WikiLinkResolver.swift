@@ -34,16 +34,52 @@ enum WikiResolveResult: Equatable, Sendable {
 }
 
 /// Path-aware wiki resolve. A real stem or path beats an alias. Never guesses.
+///
+/// Lookups go through maps built once per scan, so resolving a link does not
+/// walk every note. Backlink indexing resolves every link in the vault, which
+/// made a linear resolve quadratic in the note count.
 struct WikiLinkResolver: Sendable {
     private let notes: [WikiNote]
-    /// Target file path → notes that uniquely `[[wiki]]` to it. Built once per scan.
-    private let backlinksByTargetPath: [String: [WikiCandidate]]
+    /// Lowercased filename stem → indices into `notes`, in `notes` order.
+    private let notesByStem: [String: [Int]]
+    /// Lowercased relative path without `.md` (`projects/roadmap`), plus each
+    /// trailing part that starts after a slash and still holds one
+    /// (`b/c` for `a/b/c`) → indices into `notes`.
+    private let notesByPathSuffix: [String: [Int]]
+    /// Lowercased, normalized frontmatter alias → indices into `notes`.
+    private let notesByAlias: [String: [Int]]
+    private let noteIndexByURL: [URL: Int]
+    /// Target file path → notes that uniquely `[[wiki]]` to it. Built once per
+    /// scan; `var` only so `init` can fill it after the lookup maps exist.
+    private var backlinksByTargetPath: [String: [WikiCandidate]] = [:]
 
     init(notes: [WikiNote] = [], bodies: [URL: String] = [:]) {
         self.notes = notes
-        self.backlinksByTargetPath = bodies.isEmpty
-            ? [:]
-            : Self.makeBacklinkIndex(notes: notes, bodies: bodies)
+        var byStem: [String: [Int]] = [:]
+        var byPathSuffix: [String: [Int]] = [:]
+        var byAlias: [String: [Int]] = [:]
+        var byURL: [URL: Int] = [:]
+        for (index, note) in notes.enumerated() {
+            byURL[note.url] = byURL[note.url] ?? index
+            byStem[WikiLinkSyntax.stemKey(forRelativePath: note.relativePath), default: []].append(index)
+            for suffix in Self.pathSuffixKeys(forRelativePath: note.relativePath) {
+                byPathSuffix[suffix, default: []].append(index)
+            }
+            var seenAliases: Set<String> = []
+            for alias in note.aliases {
+                let key = WikiLinkSyntax.normalizeTarget(alias).lowercased()
+                if seenAliases.insert(key).inserted {
+                    byAlias[key, default: []].append(index)
+                }
+            }
+        }
+        self.notesByStem = byStem
+        self.notesByPathSuffix = byPathSuffix
+        self.notesByAlias = byAlias
+        self.noteIndexByURL = byURL
+        if !bodies.isEmpty {
+            self.backlinksByTargetPath = makeBacklinkIndex(bodies: bodies)
+        }
     }
 
     init(noteURLs: [URL], vaultRoot: URL, aliases: [URL: [String]] = [:], bodies: [URL: String] = [:]) {
@@ -61,25 +97,33 @@ struct WikiLinkResolver: Sendable {
         let target = WikiLinkSyntax.parseInner(linkText).target
         guard !target.isEmpty else { return .unresolved }
         let key = target.lowercased()
-        let hasPath = target.contains("/")
 
-        if hasPath {
-            let pathHits = notes.filter { note in
-                let rel = WikiLinkSyntax.relativeKey(forRelativePath: note.relativePath)
-                return rel == key || rel.hasSuffix("/" + key)
-            }
-            return finish(pathHits)
+        // `Folder/Note` matches that path, or any path ending in `/Folder/Note`.
+        if target.contains("/") {
+            return finish(notesByPathSuffix[key] ?? [])
         }
-
-        let stemHits = notes.filter { WikiLinkSyntax.stemKey(forRelativePath: $0.relativePath) == key }
-        if !stemHits.isEmpty {
+        if let stemHits = notesByStem[key], !stemHits.isEmpty {
             return finish(stemHits)
         }
+        return finish(notesByAlias[key] ?? [])
+    }
 
-        let aliasHits = notes.filter { note in
-            note.aliases.contains { WikiLinkSyntax.normalizeTarget($0).lowercased() == key }
+    /// Keys a path-style link can use to reach `relativePath`: the whole
+    /// lowercased path without `.md`, and every part after a slash that
+    /// still contains a slash. Equivalent to `rel == key || rel.hasSuffix("/" + key)`
+    /// for keys that contain a slash.
+    private static func pathSuffixKeys(forRelativePath relativePath: String) -> [String] {
+        let rel = WikiLinkSyntax.relativeKey(forRelativePath: relativePath)
+        guard rel.contains("/") else { return [] }
+        var keys = [rel]
+        var index = rel.startIndex
+        while let slash = rel[index...].firstIndex(of: "/") {
+            let rest = rel[rel.index(after: slash)...]
+            guard rest.contains("/") else { break }
+            keys.append(String(rest))
+            index = rel.index(after: slash)
         }
-        return finish(aliasHits)
+        return keys
     }
 
     /// Notes whose `[[wiki]]` uniquely resolve to `targetURL`.
@@ -104,7 +148,8 @@ struct WikiLinkResolver: Sendable {
                 }
                 return false
             }
-            if hits, let note = notes.first(where: { $0.url == sourceURL }) {
+            if hits, let index = noteIndexByURL[sourceURL] {
+                let note = notes[index]
                 bySource[sourceURL.path] = WikiCandidate(url: note.url, relativePath: note.relativePath)
             }
         }
@@ -138,17 +183,13 @@ struct WikiLinkResolver: Sendable {
         return result as String
     }
 
-    private static func makeBacklinkIndex(
-        notes: [WikiNote],
-        bodies: [URL: String]
-    ) -> [String: [WikiCandidate]] {
-        let resolver = WikiLinkResolver(notes: notes)
+    private func makeBacklinkIndex(bodies: [URL: String]) -> [String: [WikiCandidate]] {
         var index: [String: [WikiCandidate]] = [:]
         for note in notes {
             let body = bodies[note.url] ?? ""
             var seen: Set<String> = []
             for match in WikiLinkSyntax.extractLinks(in: body) {
-                guard case .unique(let url) = resolver.resolve(match.target), url != note.url else {
+                guard case .unique(let url) = resolve(match.target), url != note.url else {
                     continue
                 }
                 let key = url.path
@@ -166,11 +207,11 @@ struct WikiLinkResolver: Sendable {
         return index
     }
 
-    private func finish(_ hits: [WikiNote]) -> WikiResolveResult {
+    private func finish(_ hits: [Int]) -> WikiResolveResult {
         if hits.isEmpty { return .unresolved }
-        if hits.count == 1 { return .unique(hits[0].url) }
+        if hits.count == 1 { return .unique(notes[hits[0]].url) }
         let candidates = hits
-            .map { WikiCandidate(url: $0.url, relativePath: $0.relativePath) }
+            .map { WikiCandidate(url: notes[$0].url, relativePath: notes[$0].relativePath) }
             .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
         return .ambiguous(candidates)
     }

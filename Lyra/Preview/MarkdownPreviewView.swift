@@ -9,25 +9,27 @@ struct MarkdownPreviewView: View {
     /// Relative link to a Markdown note inside the vault.
     var onNoteLink: ((URL) -> Void)?
 
+    /// Parsed blocks for the last text seen, so a window redraw that leaves
+    /// the note unchanged does not parse it again.
+    @State private var cache = BlockCache()
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
-                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let blocks = cache.blocks(for: text)
+                if blocks.isEmpty {
                     Text("Nothing to read yet.")
                         .font(LyraFonts.prose)
                         .foregroundStyle(.secondary)
                 } else {
-                    let blocks = MarkdownPreviewBlocks.parse(text)
-                    ForEach(blocks.indices, id: \.self) { index in
-                        let block = blocks[index]
+                    // Identity is position plus content: inserting or deleting
+                    // a block above must not reuse another block's image state.
+                    ForEach(blocks) { item in
                         MarkdownBlockRow(
-                            block: block,
+                            block: item.block,
                             noteDirectory: noteDirectory,
                             vaultRoot: vaultRoot
                         )
-                        // Stable per-block identity: inserting or deleting a block
-                        // above must not reuse image loading state for another block.
-                        .id("\(index)-\(String(describing: block))")
                     }
                 }
             }
@@ -54,5 +56,29 @@ struct MarkdownPreviewView: View {
                 return .discarded
             }
         })
+    }
+}
+
+/// One Reading block with an identity made of its position and content.
+struct PreviewBlockItem: Identifiable, Hashable {
+    let index: Int
+    let block: MarkdownPreviewBlocks.Block
+    var id: Self { self }
+}
+
+/// Memo for `MarkdownPreviewBlocks.parse`. A reference type so updating it
+/// while `body` runs does not invalidate the view.
+final class BlockCache {
+    private var text: String?
+    private var items: [PreviewBlockItem] = []
+
+    func blocks(for text: String) -> [PreviewBlockItem] {
+        if text != self.text {
+            self.text = text
+            items = MarkdownPreviewBlocks.parse(text).enumerated().map {
+                PreviewBlockItem(index: $0.offset, block: $0.element)
+            }
+        }
+        return items
     }
 }

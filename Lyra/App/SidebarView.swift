@@ -28,7 +28,15 @@ struct SidebarView: View {
             scanLimitsBanner
             treeList
         }
-        .background(LyraTheme.sidebarColor)
+        .background {
+            if #available(macOS 26, *) {
+                // Liquid Glass sidebar: an opaque fill would hide the glass,
+                // which already picks up the window's Night / Parchment tone.
+                Color.clear
+            } else {
+                LyraTheme.sidebarColor
+            }
+        }
     }
 
     /// Lyre mark, vault folder name, and note count.
@@ -136,8 +144,7 @@ struct SidebarView: View {
                 return
             }
             guard let id = renamingID,
-                  let root = store.rootNode,
-                  let node = FileSystemVault.findNode(id: id, in: root) else {
+                  let node = store.node(withID: id) else {
                 return
             }
             commitRename(node)
@@ -145,8 +152,7 @@ struct SidebarView: View {
         // Selection menu (rows). Empty-area New Note/Folder uses the view-level menu below.
         .contextMenu(forSelectionType: VaultNode.ID.self) { ids in
             if let id = ids.first,
-               let root = store.rootNode,
-               let node = FileSystemVault.findNode(id: id, in: root) {
+               let node = store.node(withID: id) {
                 if node.isDirectory {
                     Button("New Note") {
                         store.selection = id
@@ -189,7 +195,7 @@ struct SidebarView: View {
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
                     .font(LyraFonts.label)
-                    .accessibilityLabel("Rename \(node.name)")
+                    .accessibilityLabel("Rename \(Self.displayName(node))")
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename(node) }
                     .onExitCommand { cancelRename() }
@@ -202,7 +208,7 @@ struct SidebarView: View {
                 Image(systemName: node.isDirectory ? "folder" : "doc.text")
                     .foregroundStyle(.secondary)
                     .frame(width: 16, alignment: .center)
-                Text(node.name)
+                Text(Self.displayName(node))
                     .font(LyraFonts.label)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -215,7 +221,11 @@ struct SidebarView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .accessibilityLabel(node.isDirectory ? "Folder \(node.name), \(node.noteCount) notes" : "Note \(node.name)")
+            .accessibilityLabel(
+                node.isDirectory
+                    ? "Folder \(node.name), \(node.noteCount) notes"
+                    : "Note \(Self.displayName(node))"
+            )
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
             // Select on the first click without waiting out the double-click
@@ -229,14 +239,19 @@ struct SidebarView: View {
         }
     }
 
+    /// Notes show their name (the filename stem), as the tab and title do;
+    /// `.md` is implied. Folders show their full name.
+    static func displayName(_ node: VaultNode) -> String {
+        node.isDirectory ? node.name : (node.name as NSString).deletingPathExtension
+    }
+
     private func handleReturnKey() -> KeyPress.Result {
         if renamingID != nil {
             // TextField owns Return while editing (onSubmit).
             return .ignored
         }
         guard let id = store.selection,
-              let root = store.rootNode,
-              let node = FileSystemVault.findNode(id: id, in: root) else {
+              let node = store.node(withID: id) else {
             return .ignored
         }
         beginRename(node)
@@ -246,7 +261,7 @@ struct SidebarView: View {
     private func beginRename(_ node: VaultNode) {
         suppressFocusCommit = false
         store.selection = node.id
-        renameDraft = node.name
+        renameDraft = Self.displayName(node)
         renamingID = node.id
         DispatchQueue.main.async {
             renameFieldFocused = true
@@ -271,7 +286,7 @@ struct SidebarView: View {
             }
             return
         }
-        if trimmed == node.name {
+        if trimmed == Self.displayName(node) || trimmed == node.name {
             cancelRename()
             return
         }

@@ -164,7 +164,12 @@ final class EditorViewModel {
     /// Call after `text` has already been updated (e.g. via Binding).
     func noteEdited() {
         guard fileURL != nil else { return }
-        isDirty = true
+        // Observation notifies on every assignment, even of the same value;
+        // re-setting it per keystroke would redraw the tab bar and window
+        // edited state while typing.
+        if !isDirty {
+            isDirty = true
+        }
         scheduleAutosave()
     }
 
