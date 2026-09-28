@@ -85,6 +85,7 @@
 		A10000000000000000000054 /* ParserFuzzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000054 /* ParserFuzzTests.swift */; };
 		A10000000000000000000055 /* PreviewImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000055 /* PreviewImageTests.swift */; };
 		A10000000000000000000056 /* NoteTabModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000056 /* NoteTabModelTests.swift */; };
+		A10000000000000000000061 /* WindowSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000061 /* WindowSnapshotTests.swift */; };
 		A10000000000000000000057 /* VaultCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000057 /* VaultCommands.swift */; };
 		A10000000000000000000058 /* WikiFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000058 /* WikiFlow.swift */; };
 		A10000000000000000000059 /* PDFExportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000059 /* PDFExportFlow.swift */; };
@@ -184,6 +185,7 @@
 		B10000000000000000000055 /* PreviewImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewImageTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000058 /* WikiFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiFlow.swift; sourceTree = "<group>"; };
 		B10000000000000000000056 /* NoteTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabModelTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000061 /* WindowSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowSnapshotTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000059 /* PDFExportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExportFlow.swift; sourceTree = "<group>"; };
 		B10000000000000000000057 /* VaultCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultCommands.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -257,6 +259,7 @@
 				B10000000000000000000054 /* ParserFuzzTests.swift */,
 				B10000000000000000000055 /* PreviewImageTests.swift */,
 				B10000000000000000000056 /* NoteTabModelTests.swift */,
+				B10000000000000000000061 /* WindowSnapshotTests.swift */,
 			);
 			path = LyraTests;
 			sourceTree = "<group>";
@@ -553,6 +556,7 @@
 				A10000000000000000000054 /* ParserFuzzTests.swift in Sources */,
 				A10000000000000000000055 /* PreviewImageTests.swift in Sources */,
 				A10000000000000000000056 /* NoteTabModelTests.swift in Sources */,
+				A10000000000000000000061 /* WindowSnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

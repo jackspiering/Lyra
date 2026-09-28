@@ -107,11 +107,12 @@ jobs:
     name: Build DMG
     needs: plan
     if: needs.plan.outputs.build == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Same toolchain as CI: the newest Xcode 26 on the macos-26 image.
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -196,7 +197,7 @@ jobs:
 
             - Open the DMG and drag **Lyra** to **Applications**.
             - First launch: if macOS blocks Lyra, open **System Settings → Privacy & Security** and click **Open Anyway** (ad-hoc CI build; Control-click → Open is unreliable on macOS 15+).
-            - Built by GitHub Actions on `macos-15`.
+            - Built by GitHub Actions on `macos-26` with Xcode 26; runs on macOS 15 or later.
             - Verify the DMG against the SHA-256 below (also in `SHA256SUMS.txt`).
 
             SHA-256:
