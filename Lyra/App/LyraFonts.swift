@@ -6,37 +6,68 @@ import SwiftUI
 enum LyraFonts {
     private static var didRegister = false
 
-    static func registerBundledFonts() {
-        guard !didRegister else { return }
-        didRegister = true
-        for name in ["Inter-Regular", "Inter-SemiBold", "Inter-Bold"] {
+    @discardableResult
+    static func registerBundledFonts() -> [String] {
+        guard !didRegister else { return [] }
+        var failed: [String] = []
+        for name in ["Inter-Regular", "Inter-Italic", "Inter-SemiBold", "Inter-Bold"] {
             let url = Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts")
                 ?? Bundle.main.url(forResource: name, withExtension: "ttf")
-            guard let url else { continue }
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            guard let url else {
+                failed.append(name)
+                continue
+            }
+            var error: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+                failed.append(name)
+            }
         }
+        didRegister = failed.isEmpty
+        return failed
     }
 
     static func ui(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         NSFont(name: face(weight), size: size) ?? .systemFont(ofSize: size, weight: weight)
     }
 
+    /// Emphasis face. Falls back to the system italic if Inter-Italic is missing.
+    static func italic(size: CGFloat) -> NSFont {
+        if let inter = NSFont(name: "Inter-Italic", size: size) { return inter }
+        return NSFontManager.shared.convert(.systemFont(ofSize: size), toHaveTrait: .italicFontMask)
+    }
+
     static func code(size: CGFloat = 12) -> NSFont {
         .monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
+    /// Prose size in the writing column (Source and Reading).
+    static let proseSize: CGFloat = 16
+    /// Extra space between prose lines, in points.
+    static let proseLineSpacing: CGFloat = 7
+
     static var body: Font { font(14) }
+    static var prose: Font { font(proseSize) }
     static var caption: Font { font(11) }
+    static var captionEmphasized: Font { font(11, weight: .semibold) }
+    /// Sidebar rows, tab chips, and card titles.
+    static var label: Font { font(13) }
+    static var labelEmphasized: Font { font(13, weight: .semibold) }
     static var headline: Font { font(15, weight: .semibold) }
+    /// Note title above the column.
+    static var title: Font { font(32, weight: .bold) }
+
+    /// Point size for a Markdown heading level (shared by Source and Reading).
+    static func headingSize(level: Int) -> CGFloat {
+        switch level {
+        case 1: return 28
+        case 2: return 22
+        case 3: return 19
+        default: return 17
+        }
+    }
 
     static func heading(level: Int) -> Font {
-        switch level {
-        case 1: return font(28, weight: .bold)
-        case 2: return font(22, weight: .semibold)
-        case 3: return font(18, weight: .semibold)
-        case 4: return font(16, weight: .semibold)
-        default: return font(15, weight: .semibold)
-        }
+        font(headingSize(level: level), weight: level <= 2 ? .bold : .semibold)
     }
 
     private static func font(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

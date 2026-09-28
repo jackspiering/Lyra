@@ -12,6 +12,7 @@ fail=0
 
 FILES="$(git ls-files \
   '*.swift' '*.sh' '*.yml' '*.yaml' '*.md' \
+  '*.plist' '*.entitlements' '*.xcscheme' '*.txt' \
   'Lyra.xcodeproj/project.pbxproj')"
 
 echo "== Lyra lint =="
@@ -21,7 +22,7 @@ while IFS= read -r file; do
     continue
   fi
 
-  trailing="$(grep -nE ' +$' "$file" || true)"
+  trailing="$(grep -nE '[[:blank:]]+$' "$file" || true)"
   if [[ -n "$trailing" ]]; then
     echo "  FAIL: trailing whitespace in $file:"
     printf '%s\n' "$trailing" | sed -n '1,5{s/^/      /;p;}'

@@ -22,8 +22,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if failed.isEmpty {
             return .terminateNow
         }
-        NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
-        return .terminateCancel
+        NSApp.activate(ignoringOtherApps: true)
+        let orphaned = AppSession.shared.orphaned(failed)
+        if orphaned.count < failed.count {
+            // An open window owns at least one failure and shows its recovery.
+            NotificationCenter.default.post(name: .lyraQuitSaveFailed, object: failed)
+            return .terminateCancel
+        }
+        // Only notes from closed windows failed; nothing else would ever
+        // surface them, so ask here instead of cancelling quit silently.
+        guard confirmDiscarding(orphaned) else { return .terminateCancel }
+        AppSession.shared.discard(orphaned)
+        return .terminateNow
+    }
+
+    private func confirmDiscarding(_ editors: [EditorViewModel]) -> Bool {
+        let names = editors
+            .compactMap { $0.fileURL?.deletingPathExtension().lastPathComponent }
+            .joined(separator: ", ")
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Some notes couldn't be saved"
+        alert.informativeText = "Changes to \(names.isEmpty ? "a note" : names) from a closed window "
+            + "couldn't be written to disk. Quit anyway and lose those changes?"
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Discard and Quit")
+        return alert.runModal() == .alertSecondButtonReturn
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -38,6 +62,8 @@ struct VaultWindowRoot: View {
     var handoffID: UUID?
     @State private var store = VaultStore()
     @State private var tabs = NoteTabController()
+    /// This window's vault, so a relaunch reopens every vault window.
+    @SceneStorage("lyra.windowVaultBookmark") private var windowVaultBookmark: Data?
     @AppStorage("lyra.appearance") private var appearanceRaw = AppearancePreference.system.rawValue
     @Environment(\.openWindow) private var openWindow
 
@@ -59,23 +85,39 @@ struct VaultWindowRoot: View {
             if let handoffID,
                let pending = AppSession.shared.takePendingVaultURL(for: handoffID) {
                 store.openVault(at: pending)
+            } else if let windowVaultBookmark {
+                AppSession.shared.markLaunchVaultRestored()
+                store.restoreVault(fromBookmark: windowVaultBookmark)
+            } else if AppSession.shared.claimLaunchVaultRestore() {
+                store.restoreLastVault()
             }
         }
         .onChange(of: appearanceRaw) { _, new in
             AppearanceController.apply(rawValue: new)
         }
+        .onChange(of: store.rootBookmark) { _, bookmark in
+            if let bookmark {
+                windowVaultBookmark = bookmark
+            }
+        }
         .onDisappear {
+            AppSession.shared.windowClosed(store: store)
+            var hasFailedEditor = false
             for editor in tabs.allEditors() {
                 if editor.saveIfNeeded() {
                     AppSession.shared.unregister(editor: editor)
                 } else {
                     // Keep failed editor registered so AppSession can retry on quit;
-                    // do not unregister — prune keeps weak entry alive.
+                    // do not unregister — the retained entry keeps its store alive.
+                    hasFailedEditor = true
                 }
             }
-            // Always balance startAccessingSecurityScopedResource, even when a save
-            // failed. Per-window scope must not leak across window close + reopen.
-            store.releaseAccess()
+            // Balance security-scoped access only when every editor saved.
+            // A retained failed editor keeps its store/scope until a later save
+            // or application termination.
+            if !hasFailedEditor {
+                store.releaseAccess()
+            }
         }
     }
 }
@@ -106,19 +148,23 @@ struct LyraApp: App {
                     vaultCommands?.createNote()
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("New Folder") {
                     vaultCommands?.createFolder()
                 }
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("New Tab") {
                     vaultCommands?.newTab()
                 }
                 .keyboardShortcut("t", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Button("Open in New Tab") {
                     vaultCommands?.openInNewTab()
                 }
+                .disabled(!(vaultCommands?.canOpenInNewTab ?? false))
 
                 Button("Close Tab") {
                     vaultCommands?.closeTab()
@@ -130,11 +176,13 @@ struct LyraApp: App {
                     vaultCommands?.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .importExport) {
                 Button("Export PDF…") {
                     vaultCommands?.exportPDF()
                 }
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .newItem) {
                 Button("Go to File…") {
@@ -150,6 +198,7 @@ struct LyraApp: App {
                     vaultCommands?.refresh()
                 }
                 .keyboardShortcut("r", modifiers: .command)
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
 
                 Divider()
 
@@ -157,27 +206,52 @@ struct LyraApp: App {
                     vaultCommands?.requestDelete()
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!(vaultCommands?.canDeleteSelection ?? false))
             }
             CommandMenu("View") {
                 Button("Toggle Source / Reading") {
                     vaultCommands?.toggleViewMode()
                 }
                 .keyboardShortcut("e", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
 
                 Button("Backlinks") {
                     vaultCommands?.toggleBacklinks()
                 }
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Divider()
+
+                Button("Bigger") {
+                    vaultCommands?.zoomIn()
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Button("Smaller") {
+                    vaultCommands?.zoomOut()
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+
+                Button("Actual Size") {
+                    vaultCommands?.resetZoom()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+                .disabled(!(vaultCommands?.hasOpenNote ?? false))
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") {
                     vaultCommands?.findInNote()
                 }
                 .keyboardShortcut("f", modifiers: .command)
+                .disabled(!(vaultCommands?.canFindInNote ?? false))
 
                 Button("Search Vault…") {
                     vaultCommands?.findInVault()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!(vaultCommands?.isVaultOpen ?? false))
             }
         }
 

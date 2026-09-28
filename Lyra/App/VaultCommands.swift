@@ -22,6 +22,14 @@ struct VaultCommands {
     var newTab: () -> Void
     var openInNewTab: () -> Void
     var closeTab: () -> Void
+    var zoomIn: () -> Void = {}
+    var zoomOut: () -> Void = {}
+    var resetZoom: () -> Void = {}
+    var isVaultOpen: Bool = false
+    var hasOpenNote: Bool = false
+    var canDeleteSelection: Bool = false
+    var canOpenInNewTab: Bool = false
+    var canFindInNote: Bool = false
 }
 
 private struct VaultCommandsKey: FocusedValueKey {

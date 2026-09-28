@@ -32,6 +32,7 @@ for path in \
   Lyra/Lyra.entitlements \
   Lyra/Info.plist \
   Lyra/Resources/Fonts/Inter-Regular.ttf \
+  Lyra/Resources/Fonts/Inter-Italic.ttf \
   Lyra/Resources/Fonts/Inter-SemiBold.ttf \
   Lyra/Resources/Fonts/Inter-Bold.ttf \
   Lyra/Resources/Fonts/Inter-OFL.txt \
@@ -75,6 +76,14 @@ if [[ "$count" -eq 1 ]]; then
 else
   echo "  FAIL: MARKETING_VERSION diverges across configs:"
   printf '%s\n' "$versions"
+  fail=1
+fi
+
+echo "-- release documentation version"
+if grep -q "releases/tag/v${versions}" README.md; then
+  echo "  ok: README release link matches MARKETING_VERSION ($versions)"
+else
+  echo "  FAIL: README release link does not match MARKETING_VERSION ($versions)"
   fail=1
 fi
 

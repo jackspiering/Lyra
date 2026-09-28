@@ -132,4 +132,75 @@ final class WikiLinkResolverTests: XCTestCase {
         let added = resolver.backlinks(to: world, liveBodies: [hello: "now [[World]]"])
         XCTAssertEqual(added.map(\.url), [hello])
     }
+
+    // MARK: - Backlink context
+
+    func testBacklinkContextShowsSurroundingLineWithDisplayText() {
+        let resolver = makeResolver(urls: [hello, world])
+        let body = "# World\n\nI keep coming back to [[Hello|the greeting]] every morning.\nNext line."
+        let context = resolver.backlinkContext(in: body, to: hello)
+        XCTAssertEqual(
+            context,
+            BacklinkContext(before: "I keep coming back to ", link: "the greeting", after: " every morning.")
+        )
+    }
+
+    func testBacklinkContextSkipsLinksToOtherNotesAndCodeSpans() {
+        let resolver = makeResolver(urls: [hello, world])
+        let body = "`[[Hello]]` then [[World]] then - [[Hello]]"
+        let context = resolver.backlinkContext(in: body, to: hello)
+        XCTAssertEqual(context?.link, "Hello")
+        XCTAssertEqual(context?.before, "`[[Hello]]` then [[World]] then - ")
+        XCTAssertEqual(context?.after, "")
+    }
+
+    func testBacklinkContextDropsLeadingListMarkerAndClipsLongLines() {
+        let resolver = makeResolver(urls: [hello])
+        let listed = resolver.backlinkContext(in: "- [[Hello]]\n", to: hello)
+        XCTAssertEqual(listed, BacklinkContext(before: "", link: "Hello", after: ""))
+
+        let long = String(repeating: "a", count: 100) + " [[Hello]] " + String(repeating: "b", count: 100)
+        let clipped = resolver.backlinkContext(in: long, to: hello, radius: 10)
+        XCTAssertEqual(clipped?.before.first, "…")
+        XCTAssertEqual(clipped?.after.last, "…")
+        XCTAssertEqual(clipped?.link, "Hello")
+    }
+
+    func testBacklinkContextNilWhenNoLinkResolvesToTarget() {
+        let resolver = makeResolver(urls: [hello, world])
+        XCTAssertNil(resolver.backlinkContext(in: "only [[World]] here", to: hello))
+    }
+
+    func testRewritingLinksKeepsPathsAndAliases() {
+        let root = URL(fileURLWithPath: "/vault")
+        let old = root.appendingPathComponent("Projects/Old.md")
+        let other = root.appendingPathComponent("Other.md")
+        let resolver = WikiLinkResolver(noteURLs: [old, other], vaultRoot: root)
+        let body = "See [[Old]], [[Projects/Old|the plan]], [[old.md]], [[Other]] and `[[Old]]`."
+
+        let rewritten = resolver.rewritingLinks(in: body, from: old, toStem: "New")
+
+        XCTAssertEqual(
+            rewritten,
+            "See [[New]], [[Projects/New|the plan]], [[New.md]], [[Other]] and `[[Old]]`."
+        )
+    }
+
+    func testRewritingLinksReturnsNilWhenNothingPointsAtNote() {
+        let root = URL(fileURLWithPath: "/vault")
+        let old = root.appendingPathComponent("Old.md")
+        let resolver = WikiLinkResolver(noteURLs: [old], vaultRoot: root)
+        XCTAssertNil(resolver.rewritingLinks(in: "No links [[Missing]]", from: old, toStem: "New"))
+    }
+
+    func testRewritingLinksKeepsAliasLinks() {
+        let old = root.appendingPathComponent("Old.md")
+        let resolver = makeResolver(urls: [old], aliases: [old: ["Plan"]])
+        let body = "See [[Plan]] and [[Old]]."
+        XCTAssertEqual(
+            resolver.rewritingLinks(in: body, from: old, toStem: "New"),
+            "See [[Plan]] and [[New]]."
+        )
+        XCTAssertNil(resolver.rewritingLinks(in: "Only [[Plan]].", from: old, toStem: "New"))
+    }
 }

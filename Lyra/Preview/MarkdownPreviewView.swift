@@ -6,35 +6,53 @@ struct MarkdownPreviewView: View {
     var noteDirectory: URL?
     var vaultRoot: URL?
     var onWikiLink: ((String) -> Void)?
+    /// Relative link to a Markdown note inside the vault.
+    var onNoteLink: ((URL) -> Void)?
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 12) {
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Nothing to preview")
-                        .font(LyraFonts.body)
+                    Text("Nothing to read yet.")
+                        .font(LyraFonts.prose)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(MarkdownPreviewBlocks.parse(text).enumerated()), id: \.offset) { _, block in
+                    let blocks = MarkdownPreviewBlocks.parse(text)
+                    ForEach(blocks.indices, id: \.self) { index in
+                        let block = blocks[index]
                         MarkdownBlockRow(
                             block: block,
                             noteDirectory: noteDirectory,
                             vaultRoot: vaultRoot
                         )
+                        // Stable per-block identity: inserting or deleting a block
+                        // above must not reuse image loading state for another block.
+                        .id("\(index)-\(String(describing: block))")
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
+            // Same column as the title and Source so ⌘E does not shift the text.
+            .frame(maxWidth: LyraTheme.columnWidth, alignment: .leading)
+            .padding(.horizontal, LyraTheme.columnMargin)
+            .padding(.top, 4)
+            .padding(.bottom, 64)
+            .frame(maxWidth: .infinity)
             .textSelection(.enabled)
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(LyraTheme.paperColor)
         .environment(\.openURL, OpenURLAction { url in
-            if let name = MarkdownPreviewBlocks.wikiLinkName(from: url) {
+            switch MarkdownPreviewBlocks.linkTarget(for: url, noteDirectory: noteDirectory, vaultRoot: vaultRoot) {
+            case .wiki(let name):
                 onWikiLink?(name)
                 return .handled
+            case .note(let note):
+                onNoteLink?(note)
+                return .handled
+            case .external:
+                return .systemAction
+            case .unsupported:
+                return .discarded
             }
-            return .systemAction
         })
     }
 }

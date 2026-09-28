@@ -164,7 +164,17 @@ struct ContentViewDialogs: ViewModifier {
                     store.declineStaleVaultRestore()
                 }
             } message: {
-                Text("Lyra found a vault folder that may have moved. Open it only if this is the folder you expect.")
+                Text("Lyra found \(staleRestoreDisplayPath()). Open it only if this is the folder you expect.")
             }
+    }
+
+    private func staleRestoreDisplayPath() -> String {
+        guard let url = store.staleRestoreURL else {
+            return "a vault folder that may have moved"
+        }
+        let parent = url.deletingLastPathComponent().lastPathComponent
+        let leaf = url.lastPathComponent
+        let display = parent.isEmpty ? leaf : "\(parent)/\(leaf)"
+        return "“\(display)” that may have moved"
     }
 }

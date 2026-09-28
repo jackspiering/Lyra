@@ -1,8 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct SidebarView: View {
     @Bindable var store: VaultStore
-    /// Save editor, `renameSelected`, relocate open note. Returns `true` on success.
+    /// Save editor, `renameItem`, relocate open note. Returns `true` on success.
     var onCommitRename: (VaultNode, String) -> Bool = { _, _ in false }
     var onRequestDelete: () -> Void = {}
     var onNewNote: () -> Void = {}
@@ -21,17 +22,45 @@ struct SidebarView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+            vaultHeader
             searchField
             scanLimitsBanner
-            Divider()
             treeList
+        }
+        .background(LyraTheme.sidebarColor)
+    }
+
+    /// Lyre mark, vault folder name, and note count.
+    @ViewBuilder
+    private var vaultHeader: some View {
+        if let root = store.rootNode {
+            HStack(spacing: 10) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(root.name)
+                        .font(LyraFonts.labelEmphasized)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(root.noteCount == 1 ? "1 note" : "\(root.noteCount) notes")
+                        .font(LyraFonts.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
         }
     }
 
     @ViewBuilder
     private var scanLimitsBanner: some View {
-        if store.scanDidTruncate || store.scanSkippedLargeNotes {
+        if store.scanDidTruncate || store.scanSkippedLargeNotes || store.scanSkippedUnreadableNotes {
             VStack(alignment: .leading, spacing: 2) {
                 if store.scanDidTruncate {
                     Text("Nested folders deeper than 64 levels were skipped.")
@@ -39,23 +68,45 @@ struct SidebarView: View {
                 if store.scanSkippedLargeNotes {
                     Text("Notes larger than 2 MB were left out of search and backlinks.")
                 }
+                if store.scanSkippedUnreadableNotes {
+                    Text("Unreadable notes were left out of search and backlinks.")
+                }
             }
             .font(LyraFonts.caption)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 8)
         }
     }
 
     private var searchField: some View {
         HStack(spacing: 6) {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
             TextField("Filter", text: $query)
                 .textFieldStyle(.plain)
+                .font(LyraFonts.label)
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear Filter")
+                .accessibilityLabel("Clear Filter")
+            }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .frame(height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(LyraTheme.fillColor)
+        )
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
     }
 
     private var treeList: some View {
@@ -68,6 +119,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
         .onKeyPress(.return) {
             handleReturnKey()
         }
@@ -136,6 +188,7 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
+                    .font(LyraFonts.label)
                     .accessibilityLabel("Rename \(node.name)")
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename(node) }
@@ -145,26 +198,34 @@ struct SidebarView: View {
             // macOS List(selection:) often misses hits on Label title text — only padding
             // beside the glyph/text selects. Build an explicit full-row hit target and
             // set selection ourselves (List binding still highlights via .tag).
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 Image(systemName: node.isDirectory ? "folder" : "doc.text")
                     .foregroundStyle(.secondary)
                     .frame(width: 16, alignment: .center)
                 Text(node.name)
+                    .font(LyraFonts.label)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
+                if node.isDirectory {
+                    Text("\(node.noteCount)")
+                        .font(LyraFonts.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
             }
-            .accessibilityLabel(node.isDirectory ? "Folder \(node.name)" : "Note \(node.name)")
-            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+            .accessibilityLabel(node.isDirectory ? "Folder \(node.name), \(node.noteCount) notes" : "Note \(node.name)")
+            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
-            // Register double-tap before single-tap so rename wins on double-click.
-            .onTapGesture(count: 2) {
+            // Select on the first click without waiting out the double-click
+            // interval; a double-click still renames.
+            .onTapGesture {
                 store.selection = node.id
+            }
+            .simultaneousGesture(TapGesture(count: 2).onEnded {
                 beginRename(node)
-            }
-            .onTapGesture(count: 1) {
-                store.selection = node.id
-            }
+            })
         }
     }
 

@@ -28,13 +28,18 @@ final class EditorViewModel {
     /// True while there is an error the UI has not yet flushed.
     var hasError: Bool { lastError != nil }
 
+    /// Source text view (an AppKit `NSScrollView`) kept alive across Reading
+    /// toggles and tab switches so undo, caret, and scroll survive. Dropped
+    /// when a different note opens or the tab empties.
+    @ObservationIgnored var sourceView: AnyObject?
+
     /// File identity observed at the last successful open/save/reload.
     ///
     /// Metadata alone is not enough here: an atomic replacement can retain the
     /// same path, size, and coarse-grained modification date. Keep the bytes
     /// too so conflict detection remains conservative on filesystems with a
     /// low timestamp resolution.
-    private struct DiskSnapshot: Equatable {
+    struct DiskSnapshot: Equatable {
         let path: String
         let date: Date
         let size: Int
@@ -66,24 +71,27 @@ final class EditorViewModel {
     @discardableResult
     func open(url: URL) -> Bool {
         guard saveIfNeeded() else { return false }
-        do {
-            text = try String(contentsOf: url, encoding: .utf8)
-            fileURL = url
-            isDirty = false
-            lastError = nil
-            lastSaveFailed = false
-            hasExternalConflict = false
-            hasMissingFile = false
-            conflictDeferred = false
-            rememberDiskSnapshot(for: url)
-            refreshFileDates(for: url, markSavedNow: false)
-            return true
-        } catch {
+        guard let (readText, snapshot) = Self.readTextAndSnapshot(of: url) else {
             // Do not discard the active note when the requested target cannot
             // be read. The user must still be able to retry or keep editing it.
-            lastError = (.openNote, error)
+            lastError = (.openNote, CocoaError(.fileReadUnknown))
             return false
         }
+        text = readText
+        if fileURL?.path != url.path {
+            // A different note gets a fresh text view (undo, caret, scroll).
+            sourceView = nil
+        }
+        fileURL = url
+        isDirty = false
+        lastError = nil
+        lastSaveFailed = false
+        hasExternalConflict = false
+        hasMissingFile = false
+        conflictDeferred = false
+        diskSnapshot = snapshot
+        refreshFileDates(for: url, markSavedNow: false)
+        return true
     }
 
     /// Point the editor at a new path without saving (e.g. after rename).
@@ -94,8 +102,34 @@ final class EditorViewModel {
         hasMissingFile = false
         hasExternalConflict = false
         conflictDeferred = false
+        lastError = nil
+        lastSaveFailed = false
         rememberDiskSnapshot(for: newURL)
         refreshFileDates(for: newURL, markSavedNow: false)
+    }
+
+    /// Adopt outside edits (git pull, scripts, other editors) for a clean
+    /// buffer on window activation or vault refresh. A dirty buffer is left
+    /// alone: its next save raises Keep Mine / Reload. A deferred conflict
+    /// stays deferred so the dialog does not return on every activation.
+    func syncWithDiskIfClean() {
+        guard !isDirty, !conflictDeferred, !hasExternalConflict, !hasMissingFile,
+              let url = fileURL else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            hasMissingFile = true
+            return
+        }
+        guard hasDiskChanged(relativeTo: url) else { return }
+        reloadFromDisk()
+    }
+
+    /// Lifecycle save (app deactivation). Unlike ⌘S, window close, and quit,
+    /// it respects a deferred conflict or missing file so Cancel is not undone
+    /// by switching apps.
+    @discardableResult
+    func saveUnlessDeferred() -> Bool {
+        if conflictDeferred { return true }
+        return saveIfNeeded()
     }
 
     /// Cancel on the conflict dialog: stop autosaving without treating Cancel as overwrite.
@@ -145,7 +179,9 @@ final class EditorViewModel {
     func saveIfNeeded(force: Bool = false) -> Bool {
         saveTask?.cancel()
         saveTask = nil
-        guard isDirty, let url = fileURL else { return true }
+        // A forced save always writes, so Save Here recreates a vanished
+        // note even when its buffer is clean.
+        guard let url = fileURL, isDirty || force else { return true }
 
         if !FileManager.default.fileExists(atPath: url.path) {
             if force {
@@ -156,12 +192,7 @@ final class EditorViewModel {
             return false
         }
 
-        if !force, hasDiskChanged(relativeTo: url) {
-            hasExternalConflict = true
-            conflictDeferred = false
-            return false
-        }
-
+        // The external-change check runs once, inside the coordinated write.
         return writeToDisk(url, force: force)
     }
 
@@ -171,26 +202,25 @@ final class EditorViewModel {
         guard let url = fileURL else { return false }
         saveTask?.cancel()
         saveTask = nil
-        do {
-            text = try String(contentsOf: url, encoding: .utf8)
-            isDirty = false
-            lastError = nil
-            lastSaveFailed = false
-            hasExternalConflict = false
-            hasMissingFile = false
-            conflictDeferred = false
-            rememberDiskSnapshot(for: url)
-            refreshFileDates(for: url, markSavedNow: false)
-            return true
-        } catch {
+        guard let (readText, snapshot) = Self.readTextAndSnapshot(of: url) else {
             hasExternalConflict = false
             if !FileManager.default.fileExists(atPath: url.path) {
                 hasMissingFile = true
                 lastSaveFailed = true
             }
-            lastError = (.openNote, error)
+            lastError = (.openNote, CocoaError(.fileReadUnknown))
             return false
         }
+        text = readText
+        isDirty = false
+        lastError = nil
+        lastSaveFailed = false
+        hasExternalConflict = false
+        hasMissingFile = false
+        conflictDeferred = false
+        diskSnapshot = snapshot
+        refreshFileDates(for: url, markSavedNow: false)
+        return true
     }
 
     private func writeToDisk(_ url: URL, force: Bool) -> Bool {
@@ -271,11 +301,28 @@ final class EditorViewModel {
                             throw CocoaError(.fileWriteNoPermission)
                         }
                     }
-                    try text.write(to: coordinatedURL, atomically: true, encoding: .utf8)
+                    try Self.replaceContents(of: coordinatedURL, with: Data(text.utf8))
                     if let vaultRoot, !FileSystemVault.isSafePath(coordinatedURL, within: vaultRoot) {
                         writeError = CocoaError(.fileWriteNoPermission)
                         return
                     }
+                    // Verify the bytes just written are still the buffer we wrote.
+                    // Otherwise another writer replaced the file between the write
+                    // and the new clean snapshot.
+                    let expected = text.data(using: .utf8) ?? Data()
+                    guard let current = Self.captureSnapshot(of: coordinatedURL),
+                          current.content == expected else {
+                        if !FileManager.default.fileExists(atPath: coordinatedURL.path) {
+                            hasMissingFile = true
+                            lastSaveFailed = true
+                        } else {
+                            hasExternalConflict = true
+                            conflictDeferred = false
+                        }
+                        detectedConflict = true
+                        return
+                    }
+                    diskSnapshot = current
                     didWrite = true
                 } catch {
                     writeError = error
@@ -298,7 +345,6 @@ final class EditorViewModel {
             hasExternalConflict = false
             hasMissingFile = false
             conflictDeferred = false
-            rememberDiskSnapshot(for: url)
             refreshFileDates(for: url, markSavedNow: true)
             return true
         } catch {
@@ -309,9 +355,39 @@ final class EditorViewModel {
         }
     }
 
+    /// Replace a note's bytes while keeping its identity: creation date,
+    /// permissions, and Finder tags survive (`replaceItemAt` preserves them,
+    /// unlike write-temp-and-rename). A new file must not clobber one that
+    /// appeared since the missing-file check.
+    private nonisolated static func replaceContents(of url: URL, with data: Data) throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else {
+            try data.write(to: url, options: .withoutOverwriting)
+            return
+        }
+        let scratch = try fileManager.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: url,
+            create: true
+        )
+        // Stage in a private subfolder; the scratch folder itself is only
+        // removed when empty, so a shared replacement directory is never swept.
+        let stagingFolder = scratch.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: stagingFolder, withIntermediateDirectories: false)
+        defer {
+            try? fileManager.removeItem(at: stagingFolder)
+            rmdir(scratch.path)
+        }
+        let staged = stagingFolder.appendingPathComponent(url.lastPathComponent)
+        try data.write(to: staged)
+        _ = try fileManager.replaceItemAt(url, withItemAt: staged)
+    }
+
     private func clearBuffer() {
         saveTask?.cancel()
         saveTask = nil
+        sourceView = nil
         fileURL = nil
         text = ""
         isDirty = false
@@ -367,6 +443,30 @@ final class EditorViewModel {
         let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value
         let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
         return FileMetadata(date: date, size: size, device: device, inode: inode)
+    }
+
+    /// Reads UTF-8 text and its snapshot from one coherent byte read, so the
+    /// buffer and conflict identity cannot describe different disk versions.
+    nonisolated static func readTextAndSnapshot(of url: URL) -> (String, DiskSnapshot?)? {
+        for _ in 0..<2 {
+            guard let before = metadata(of: url),
+                  let content = try? Data(contentsOf: url),
+                  let after = metadata(of: url),
+                  before == after,
+                  let text = String(data: content, encoding: .utf8) else {
+                continue
+            }
+            let snapshot = DiskSnapshot(
+                path: url.path,
+                date: after.date,
+                size: after.size,
+                device: after.device,
+                inode: after.inode,
+                content: content
+            )
+            return (text, snapshot)
+        }
+        return nil
     }
 
     private nonisolated static func captureSnapshot(of url: URL) -> DiskSnapshot? {

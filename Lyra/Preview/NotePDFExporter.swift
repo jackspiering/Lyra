@@ -27,15 +27,19 @@ enum NotePDFExporter {
 
     static let defaultMaxPageCount = 2000
 
+    /// `documentTitle` becomes the PDF's Title metadata (Preview, Finder,
+    /// Spotlight); it is not drawn on the page.
     static func pdfData(
         markdown: String,
         noteDirectory: URL,
         vaultRoot: URL,
+        documentTitle: String? = nil,
         maxPages: Int = defaultMaxPageCount
     ) throws -> Data {
         try pdfData(
             notes: [NoteSource(title: "", markdown: markdown, noteDirectory: noteDirectory)],
             vaultRoot: vaultRoot,
+            documentTitle: documentTitle,
             maxPages: maxPages
         )
     }
@@ -44,9 +48,15 @@ enum NotePDFExporter {
     static func pdfData(
         notes: [NoteSource],
         vaultRoot: URL,
+        documentTitle: String? = nil,
         maxPages: Int = defaultMaxPageCount
     ) throws -> Data {
-        try Renderer(notes: notes, vaultRoot: vaultRoot, maxPages: maxPages).run()
+        try Renderer(
+            notes: notes,
+            vaultRoot: vaultRoot,
+            documentTitle: documentTitle,
+            maxPages: maxPages
+        ).run()
     }
 
     // MARK: - Renderer
@@ -54,6 +64,7 @@ enum NotePDFExporter {
     private final class Renderer {
         let notes: [NoteSource]
         let vaultRoot: URL
+        let documentTitle: String?
         let maxPages: Int
 
         private var ctx: CGContext!
@@ -63,9 +74,10 @@ enum NotePDFExporter {
         private var stopped = false
         private let contentBottom = NotePDFExporter.pageHeight - NotePDFExporter.margin
 
-        init(notes: [NoteSource], vaultRoot: URL, maxPages: Int) {
+        init(notes: [NoteSource], vaultRoot: URL, documentTitle: String?, maxPages: Int) {
             self.notes = notes
             self.vaultRoot = vaultRoot
+            self.documentTitle = documentTitle
             self.maxPages = max(1, maxPages)
             self.noteDirectory = notes.first?.noteDirectory ?? vaultRoot
         }
@@ -81,7 +93,11 @@ enum NotePDFExporter {
                 throw CocoaError(.fileWriteUnknown)
             }
             var mediaBox = pageRect
-            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            var info: [CFString: Any] = [kCGPDFContextCreator: "Lyra"]
+            if let documentTitle, !documentTitle.isEmpty {
+                info[kCGPDFContextTitle] = documentTitle
+            }
+            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, info as CFDictionary) else {
                 throw CocoaError(.fileWriteUnknown)
             }
             ctx = context
@@ -452,6 +468,7 @@ enum NotePDFExporter {
         private func drawThematicBreak() {
             let lineHeight: CGFloat = 12
             ensureSpace(lineHeight)
+            guard !stopped else { return }
             let midY = y + lineHeight / 2
             let path = NSBezierPath()
             path.move(to: NSPoint(x: NotePDFExporter.margin, y: midY))
@@ -463,31 +480,43 @@ enum NotePDFExporter {
         }
 
         private func drawImage(alt: String, path: String) {
-            if let url = MarkdownImagePath.resolve(
+            guard let url = MarkdownImagePath.resolve(
                 path: path,
                 noteDirectory: noteDirectory,
                 vaultRoot: vaultRoot
-            ), let image = PreviewImage.decode(contentsOf: url), image.size.width > 0, image.size.height > 0 {
-                let imgSize = image.size
-                let maxH = NotePDFExporter.contentHeight
-                let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)
-                let drawW = imgSize.width * scale
-                let drawH = imgSize.height * scale
-                ensureSpace(drawH)
-                let rect = CGRect(x: NotePDFExporter.margin, y: y, width: drawW, height: drawH)
-                image.draw(
-                    in: rect,
-                    from: .zero,
-                    operation: .sourceOver,
-                    fraction: 1.0,
-                    respectFlipped: true,
-                    hints: nil
-                )
-                y += drawH + NotePDFExporter.blockGap
-            } else {
-                let label = alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
-                drawTextSpanning(label, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+            ) else {
+                drawTextSpanning(missingImageLabel(alt: alt, path: path), font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
             }
+            guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes) else {
+                drawTextSpanning("Couldn't read image: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
+            }
+            guard let image = PreviewImage.decode(data), image.size.width > 0, image.size.height > 0 else {
+                drawTextSpanning("Image is too large or couldn't be decoded: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                return
+            }
+            let imgSize = image.size
+            let maxH = NotePDFExporter.contentHeight
+            let scale = min(1, NotePDFExporter.contentWidth / imgSize.width, maxH / imgSize.height)
+            let drawW = imgSize.width * scale
+            let drawH = imgSize.height * scale
+            ensureSpace(drawH)
+            guard !stopped else { return }
+            let rect = CGRect(x: NotePDFExporter.margin, y: y, width: drawW, height: drawH)
+            image.draw(
+                in: rect,
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: true,
+                hints: nil
+            )
+            y += drawH + NotePDFExporter.blockGap
+        }
+
+        private func missingImageLabel(alt: String, path: String) -> String {
+            alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
         }
 
         // MARK: Typography helpers
@@ -550,9 +579,7 @@ enum NotePDFExporter {
                 if intent.contains(.stronglyEmphasized) {
                     face = LyraFonts.ui(size: font.pointSize, weight: .bold)
                 } else if intent.contains(.emphasized) {
-                    // NSFontDescriptor.withSymbolicTraits is non-optional on macOS (unlike UIKit).
-                    let italic = font.fontDescriptor.withSymbolicTraits(.italic)
-                    face = NSFont(descriptor: italic, size: font.pointSize) ?? font
+                    face = LyraFonts.italic(size: font.pointSize)
                 }
                 if intent.contains(.code) {
                     face = LyraFonts.code(size: font.pointSize)

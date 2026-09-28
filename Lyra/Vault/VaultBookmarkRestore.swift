@@ -15,9 +15,4 @@ enum VaultBookmarkRestore {
         guard didResolve else { return .skip }
         return isStale ? .promptUser : .autoOpen
     }
-
-    /// Stale bookmarks must not be rewritten until the user confirms the folder.
-    static func shouldPersistOnRestore(_ decision: Decision) -> Bool {
-        decision == .autoOpen
-    }
 }

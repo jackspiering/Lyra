@@ -24,18 +24,20 @@ final class VaultStore {
     private(set) var scanDidTruncate = false
     /// True when at least one note was too large to index for search/backlinks.
     private(set) var scanSkippedLargeNotes = false
+    /// True when at least one note could not be read or decoded as UTF-8.
+    private(set) var scanSkippedUnreadableNotes = false
     /// Resolved bookmark that macOS marked stale. Open only after the user confirms.
     private(set) var staleRestoreURL: URL?
+    /// Bumped each time a scan lands, so views can recompute derived data
+    /// (backlinks) when the index changes without comparing trees.
+    private(set) var indexVersion = 0
+    /// Bookmark for the open vault, so the window can remember its own folder.
+    private(set) var rootBookmark: Data?
     /// Drops stale async scan results when a newer refresh was requested.
     private var refreshGeneration = 0
     private var refreshTask: Task<Void, Never>?
 
-    init() {
-        // Multi-window: only the first store restores the last vault bookmark.
-        if AppSession.shared.claimLaunchVaultRestore() {
-            restoreLastVaultIfPossible()
-        }
-    }
+    init() {}
 
     func present(error: Error, context: UserFacingError.Context) {
         let pair = UserFacingError.presentable(for: error, context: context)
@@ -93,8 +95,8 @@ final class VaultStore {
             return
         }
 
-        stopAccessingIfNeeded()
         refreshTask?.cancel()
+        stopAccessingIfNeeded()
         isAccessingSecurityScope = startedAccess
         persistBookmark(for: url)
         rootURL = url
@@ -105,6 +107,7 @@ final class VaultStore {
         rootNode = nil
         scanDidTruncate = false
         scanSkippedLargeNotes = false
+        scanSkippedUnreadableNotes = false
         refresh()
     }
 
@@ -115,7 +118,17 @@ final class VaultStore {
         refreshGeneration += 1
         let generation = refreshGeneration
         let url = rootURL
+        // Retain security-scoped access for this scan. The task is cancelled
+        // before scopes change, but file I/O cannot be cancelled mid-read.
+        let retainedScanAccess = isAccessingSecurityScope
+            ? url.startAccessingSecurityScopedResource()
+            : false
         refreshTask = Task { [weak self] in
+            defer {
+                if retainedScanAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
             do {
                 let scanTask = Task.detached(priority: .userInitiated) {
                     let scanned = try FileSystemVault.scanResult(
@@ -127,32 +140,40 @@ final class VaultStore {
                     var documents: [VaultFullTextSearch.Document] = []
                     var urlBodies: [URL: String] = [:]
                     var skippedLarge = false
+                    var skippedUnreadable = false
                     for noteURL in noteURLs {
                         if Task.isCancelled { throw CancellationError() }
-                        let indexed = FileSystemVault.indexedUTF8Body(at: noteURL)
-                        if indexed == nil { skippedLarge = true }
-                        let body = indexed ?? ""
-                        let relative = WikiLinkSyntax.relativePath(for: noteURL, vaultRoot: url)
-                        notes.append(
-                            WikiNote(
-                                url: noteURL,
-                                relativePath: relative,
-                                aliases: FrontmatterAliases.parse(from: body)
+                        let relative = FileSystemVault.relativePath(for: noteURL, under: url)
+                        switch FileSystemVault.indexedUTF8Body(at: noteURL) {
+                        case .body(let body):
+                            notes.append(
+                                WikiNote(
+                                    url: noteURL,
+                                    relativePath: relative,
+                                    aliases: FrontmatterAliases.parse(from: body)
+                                )
                             )
-                        )
-                        documents.append(
-                            VaultFullTextSearch.Document(
-                                url: noteURL,
-                                relativePath: relative,
-                                body: body
+                            documents.append(
+                                VaultFullTextSearch.Document(
+                                    url: noteURL,
+                                    relativePath: relative,
+                                    body: body
+                                )
                             )
-                        )
-                        urlBodies[noteURL] = body
+                            urlBodies[noteURL] = body
+                        case .oversized:
+                            skippedLarge = true
+                            // Still a note: `[[links]]` to it must resolve, not offer Create.
+                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
+                        case .unreadable:
+                            skippedUnreadable = true
+                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
+                        }
                     }
                     let resolver = WikiLinkResolver(notes: notes, bodies: urlBodies)
-                    return (scanned.node, resolver, documents, scanned.didTruncate, skippedLarge)
+                    return (scanned.node, resolver, documents, scanned.didTruncate, skippedLarge, skippedUnreadable)
                 }
-                let (node, resolver, documents, didTruncate, skippedLarge) = try await withTaskCancellationHandler(
+                let (node, resolver, documents, didTruncate, skippedLarge, skippedUnreadable) = try await withTaskCancellationHandler(
                     operation: { try await scanTask.value },
                     onCancel: { scanTask.cancel() }
                 )
@@ -163,10 +184,19 @@ final class VaultStore {
                 self.searchDocuments = documents
                 self.scanDidTruncate = didTruncate
                 self.scanSkippedLargeNotes = skippedLarge
+                self.scanSkippedUnreadableNotes = skippedUnreadable
+                self.indexVersion += 1
                 // Apply pending selection only after the tree contains the new path.
                 if let pending = self.pendingSelection {
-                    self.selection = pending
+                    if FileSystemVault.findNode(id: pending, in: node) != nil {
+                        self.selection = pending
+                    }
                     self.pendingSelection = nil
+                }
+                // External deletes/renames must not leave a selection pointing nowhere.
+                if let selection = self.selection,
+                   FileSystemVault.findNode(id: selection, in: node) == nil {
+                    self.selection = nil
                 }
             } catch {
                 guard let self, generation == self.refreshGeneration else { return }
@@ -178,6 +208,7 @@ final class VaultStore {
                 self.searchDocuments = []
                 self.scanDidTruncate = false
                 self.scanSkippedLargeNotes = false
+                self.scanSkippedUnreadableNotes = false
                 self.present(error: error, context: .readVault)
             }
         }
@@ -197,14 +228,26 @@ final class VaultStore {
         wikiResolver.resolve(text)
     }
 
-    func backlinks(to url: URL, liveBodies: [String: String]) -> [WikiCandidate] {
+    /// The resolver from the last scan. Captured before a rename so links
+    /// to the old name can still be found afterwards.
+    var linkResolver: WikiLinkResolver { wikiResolver }
+
+    func backlinks(to url: URL, liveBodies: [String: String]) -> [Backlink] {
         var live: [URL: String] = [:]
         for doc in searchDocuments {
             if let body = liveBodies[doc.url.path] {
                 live[doc.url] = body
             }
         }
-        return wikiResolver.backlinks(to: url, liveBodies: live)
+        return wikiResolver.backlinks(to: url, liveBodies: live).map { candidate in
+            let body = live[candidate.url]
+                ?? searchDocuments.first(where: { $0.url == candidate.url })?.body
+            return Backlink(
+                url: candidate.url,
+                relativePath: candidate.relativePath,
+                context: body.flatMap { wikiResolver.backlinkContext(in: $0, to: url) }
+            )
+        }
     }
 
     func searchNoteBodies(query: String, liveBodies: [String: String]) -> [VaultFullTextSearch.Hit] {
@@ -244,6 +287,18 @@ final class VaultStore {
             return false
         }
         if FileManager.default.fileExists(atPath: dest.path) {
+            guard FileSystemVault.isSafePath(dest, within: rootURL),
+                  FileSystemVault.isRegularFile(dest),
+                  dest.pathExtension.lowercased() == "md" else {
+                present(
+                    context: .createNote,
+                    message: UserFacingError.message(
+                        context: .createNote,
+                        detail: "Something at that destination already exists and is not a Markdown note."
+                    )
+                )
+                return false
+            }
             pendingSelection = dest.path
             refresh()
             return true
@@ -265,13 +320,27 @@ final class VaultStore {
             )
             return false
         }
-        let ok = FileManager.default.createFile(atPath: dest.path, contents: Data(), attributes: nil)
-        if !ok {
+        guard FileSystemVault.exclusivelyCreateEmptyFile(at: dest) else {
+            if FileManager.default.fileExists(atPath: dest.path) {
+                return createNote(at: dest)
+            }
             present(
                 context: .createNote,
                 message: UserFacingError.message(
                     context: .createNote,
                     detail: "Lyra couldn't create a new Markdown file in this folder."
+                )
+            )
+            return false
+        }
+        // Post-create boundary check. Do not remove the file here: if the
+        // parent was swapped off-vault, removal could delete outside the vault.
+        guard FileSystemVault.isSafePath(dest, within: rootURL) else {
+            present(
+                context: .createNote,
+                message: UserFacingError.message(
+                    context: .createNote,
+                    detail: "The destination is no longer available inside this vault."
                 )
             )
             return false
@@ -298,7 +367,9 @@ final class VaultStore {
             )
             return false
         }
-        let fileName: String
+        var fileName = ""
+        // The untitled loop creates its file exclusively; a named note is created below.
+        var alreadyCreated = false
         if let rawName {
             switch FilenameValidation.validate(rawName, isDirectory: false) {
             case .invalid(let detail):
@@ -323,10 +394,42 @@ final class VaultStore {
             }
         } else {
             let stem = GeneralPreferences.defaultNoteStem
-            fileName = UntitledName.next(base: stem, ext: "md", in: parent)
+            for _ in 0..<100 {
+                let candidate = parent.appendingPathComponent(
+                    UntitledName.next(base: stem, ext: "md", in: parent)
+                )
+                guard FileSystemVault.isSafePath(candidate, within: rootURL) else {
+                    continue
+                }
+                if FileSystemVault.exclusivelyCreateEmptyFile(at: candidate) {
+                    fileName = candidate.lastPathComponent
+                    alreadyCreated = true
+                    break
+                }
+                if !FileManager.default.fileExists(atPath: candidate.path) {
+                    present(
+                        context: .createNote,
+                        message: UserFacingError.message(
+                            context: .createNote,
+                            detail: "Lyra couldn't create a new Markdown file in this folder."
+                        )
+                    )
+                    return false
+                }
+            }
+            guard fileName != "" else {
+                present(
+                    context: .createNote,
+                    message: UserFacingError.message(
+                        context: .createNote,
+                        detail: "Lyra couldn't create a new Markdown file in this folder."
+                    )
+                )
+                return false
+            }
         }
         let url = parent.appendingPathComponent(fileName)
-        guard FileSystemVault.isSafePath(url, within: rootURL) else {
+        guard alreadyCreated || FileSystemVault.isSafePath(url, within: rootURL) else {
             present(
                 context: .createNote,
                 message: UserFacingError.message(
@@ -336,21 +439,32 @@ final class VaultStore {
             )
             return false
         }
-        let ok = FileManager.default.createFile(atPath: url.path, contents: Data(), attributes: nil)
-        if !ok {
-            present(
-                context: .createNote,
-                message: UserFacingError.message(
+        // Named creation already rejected collisions. Exclusive creation closes
+        // the remaining check-then-create race; a failure with an existing file
+        // is reported as a collision.
+        guard alreadyCreated || FileSystemVault.exclusivelyCreateEmptyFile(at: url) else {
+            if FileManager.default.fileExists(atPath: url.path) {
+                present(
                     context: .createNote,
-                    detail: "Lyra couldn't create a new Markdown file in this folder."
+                    message: UserFacingError.message(
+                        context: .createNote,
+                        detail: "A file with that name already exists."
+                    )
                 )
-            )
+            } else {
+                present(
+                    context: .createNote,
+                    message: UserFacingError.message(
+                        context: .createNote,
+                        detail: "Lyra couldn't create a new Markdown file in this folder."
+                    )
+                )
+            }
             return false
         }
-        // Post-create vault-boundary check: parent may have been swapped for a symlink
-        // between the pre-check and createFile.
+        // Post-create vault-boundary check. Do not remove the file here: if the
+        // parent moved off-vault, removal could delete outside the vault.
         guard FileSystemVault.isSafePath(url, within: rootURL) else {
-            try? FileManager.default.removeItem(at: url)
             present(
                 context: .createNote,
                 message: UserFacingError.message(
@@ -383,9 +497,12 @@ final class VaultStore {
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
             // Post-create check for TOCTOU on the new folder and its parent.
+            // Only clean up when the resolved path is still inside the vault.
             guard FileSystemVault.isSafePath(url, within: rootURL),
                   FileSystemVault.isSafeDirectory(parent, within: rootURL) else {
-                try? FileManager.default.removeItem(at: url)
+                if FileSystemVault.isWithin(url, root: rootURL) {
+                    try? FileManager.default.removeItem(at: url)
+                }
                 present(
                     context: .createFolder,
                     message: UserFacingError.message(
@@ -402,7 +519,6 @@ final class VaultStore {
             present(error: error, context: .createFolder)
         }
     }
-
 
     /// Parent for new notes/folders. A current selection always wins; the
     /// remembered path is only a fallback while a refresh is still landing.
@@ -426,8 +542,19 @@ final class VaultStore {
     /// the async tree refresh lands).
     @discardableResult
     func renameSelected(to newName: String) -> URL? {
-        guard let rootURL, let node = selectedNode(),
-              FileSystemVault.isSafePath(node.url, within: rootURL) else {
+        rename(selectedNode(), to: newName)
+    }
+
+    /// Renames the tree item at `url` without touching the sidebar selection first,
+    /// so callers do not trigger a selection-driven open of the old path.
+    @discardableResult
+    func renameItem(at url: URL, to newName: String) -> URL? {
+        rename(rootNode.flatMap { FileSystemVault.findNode(id: url.path, in: $0) }, to: newName)
+    }
+
+    private func rename(_ node: VaultNode?, to newName: String) -> URL? {
+        guard let rootURL, let node,
+              FileSystemVault.isStrictDescendant(node.url, root: rootURL) else {
             present(
                 context: .rename,
                 message: "The selected item is no longer available inside this vault. Refresh and try again."
@@ -443,6 +570,10 @@ final class VaultStore {
             return nil
         case .ok(let name):
             let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
+            // `Note` for `Note.md` validates back to the same name; moving onto itself fails.
+            if dest.path == node.url.path {
+                return dest
+            }
             guard FileSystemVault.isSafeDirectory(
                 node.url.deletingLastPathComponent(),
                 within: rootURL
@@ -454,7 +585,7 @@ final class VaultStore {
                 return nil
             }
             do {
-                try FileManager.default.moveItem(at: node.url, to: dest)
+                try FileSystemVault.move(node.url, to: dest)
                 // Keep create-parent coherent if we renamed the folder we last created into.
                 if let last = lastCreateParentPath {
                     if last == node.url.path {
@@ -478,14 +609,15 @@ final class VaultStore {
         FilenameValidation.validate(newName, isDirectory: isDirectory)
     }
 
-    func deleteSelected() {
-        guard let rootURL, let node = selectedNode() else { return }
-        guard FileSystemVault.isSafePath(node.url, within: rootURL) else {
+    @discardableResult
+    func deleteSelected() -> Bool {
+        guard let rootURL, let node = selectedNode() else { return false }
+        guard FileSystemVault.isStrictDescendant(node.url, root: rootURL) else {
             present(
                 context: .delete,
                 message: "The selected item is no longer available inside this vault. Refresh and try again."
             )
-            return
+            return false
         }
         do {
             try FileManager.default.trashItem(at: node.url, resultingItemURL: nil)
@@ -496,8 +628,10 @@ final class VaultStore {
             selection = nil
             pendingSelection = nil
             refresh()
+            return true
         } catch {
             present(error: error, context: .delete)
+            return false
         }
     }
 
@@ -507,8 +641,16 @@ final class VaultStore {
         stopAccessingIfNeeded()
     }
 
-    private func restoreLastVaultIfPossible() {
+    /// Launch restore for a window with no remembered folder of its own:
+    /// reopen the most recently opened vault.
+    func restoreLastVault() {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
+        restoreVault(fromBookmark: data)
+    }
+
+    /// Reopen a vault from a security-scoped bookmark (the window's own, or
+    /// the last-opened one). A stale bookmark asks the user first.
+    func restoreVault(fromBookmark data: Data) {
         var isStale = false
         let url = try? URL(
             resolvingBookmarkData: data,
@@ -537,6 +679,7 @@ final class VaultStore {
                 relativeTo: nil
             )
             UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+            rootBookmark = bookmark
         } catch {
             present(error: error, context: .rememberVault)
         }

@@ -2,13 +2,13 @@
 
 Lyra is a single macOS app target with module-shaped folders. This doc is the decision log that keeps the product local-first.
 
-## Product (v0.10)
+## Product (v0.11)
 
 **Choice:** Native Mac PKM over a folder of Markdown. Writing is first. Wiki links, backlinks, and in-memory full-text search exist so a person can leave Obsidian. The app is public and small.
 
 **Why:** The old “focused writer only” sentence fought the vault features. A full Obsidian clone (graph, plugins, sync) fights the invariants. Writing-first PKM is the middle that matches the user.
 
-**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. PDF export stops at 2,000 pages.
+**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. Notes that cannot be read or decoded as UTF-8 are also left out of those indexes. Both still resolve as `[[wiki]]` targets by path and filename. PDF export stops at 2,000 pages.
 
 ## Invariants
 
@@ -64,6 +64,8 @@ One primary type per file when practical.
 
 **Why:** Avoid embedding a browser for the default experience.
 
+**Supported subset:** ATX and Setext headings, fenced code blocks, bullet/ordered/task lists with continuation lines, blockquotes, thematic breaks, inline code/emphasis/links/images, and wiki links. Four-space-indented code blocks, complex nested Markdown, embeds, and heading fragments remain outside the supported Reading subset.
+
 ### Two note view modes (v0.5+)
 
 **Choice:** One detail surface: **Source** | **Reading**. Persisted as `lyra.noteViewMode`; **⌘E** toggles. (An earlier no-op “Live” mode was removed. Editable Reading / WYSIWYG was considered again and rejected.)
@@ -76,7 +78,7 @@ One primary type per file when practical.
 
 **Why:** Users need two folders open at once without a multi-vault tab bar. Menu commands target the key window only; quit flushes every open editor via `AppSession`.
 
-**Consequence:** Opening a vault while one is already open creates a new window for the chosen folder. That window is bound to the pick with a UUID handoff so a later Open Vault cannot consume the earlier folder.
+**Consequence:** Opening a vault while one is already open creates a new window for the chosen folder. That window is bound to the pick with a UUID handoff so a later Open Vault cannot consume the earlier folder. Each window keeps its vault's security-scoped bookmark in `@SceneStorage`, so a relaunch reopens every vault window. Only a window with no bookmark of its own reopens the last-opened vault, once per launch.
 
 ### In-window note tabs (v0.9+)
 
@@ -84,15 +86,15 @@ One primary type per file when practical.
 
 **Why:** Open several notes without losing the vault tree; empty tabs can create a note, focus search, or close without dropping the vault.
 
-**Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open). From 0.9.1, selecting a note from the sidebar opens a new tab when the active tab already has a different note (reuses if already open); File → Open in New Tab is explicit.
+**Consequence:** Quit and window teardown register/unregister every tab editor with `AppSession`. Last tab close leaves one empty tab (vault stays open). From 0.9.1, selecting a note from the sidebar opens a new tab when the active tab already has a different note (reuses if already open); File → Open in New Tab is explicit. If a closed window's note still fails to save at quit, Lyra asks before discarding it instead of cancelling quit silently. Each editor keeps its Source text view (with its own undo stack) alive, so undo, caret, and scroll survive tab switches and ⌘E.
 
 ### Window chrome decomposition (v0.9.3)
 
-**Choice:** `ContentView` was split so the window shell, dialogs/sheets, command routing, and AppKit bridge helpers live in separate files (`ContentViewChrome`, `ContentViewCommands`, `WindowStateReaders`, `NewNoteNameField`) instead of one 1000+ line file.
+**Choice:** `ContentView` was split so the window shell, dialogs/sheets, command routing, and AppKit bridge helpers live in separate files (`ContentViewChrome`, `VaultCommands`, `WindowStateReaders`, `NewNoteNameField`) instead of one 1000+ line file.
 
 **Why:** The monolith had outgrown “one primary type per file”; the split keeps the module map honest without changing behavior.
 
-**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window (`ContentViewCommands`); from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
+**Consequence:** The old `VaultStore.ValidatedRename` type moved into `FilenameValidation.Result` so `App/` no longer depends on a `Vault/` type. File-menu commands were originally routed via notifications gated by the key window; from 0.10.2 each vault window publishes a scene-scoped `VaultCommands` value (`focusedSceneValue`) and the menu buttons call it directly, so only the key vault window answers. Quit-save failure remains an app-global notification observed by every window because the failing editor may belong to a background window.
 
 From 0.10.2 the decomposition continued along the same seams: wiki-link
 resolution, the pick-or-create sheet, and shared tab activation live in
@@ -102,9 +104,17 @@ helper so presentation policy cannot fork.
 
 ### Inter typeface (v0.5)
 
-**Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced. Appearance is System / Light / Dark only. No theme marketplace.
+**Choice:** Bundle Inter (SIL OFL) for UI, editor, and preview. Code fences use system monospaced. Appearance is System / Light / Dark only. No theme marketplace. Regular, Italic, SemiBold, and Bold are bundled. View → Bigger / Smaller magnifies the Source scroll view (`NSScrollView.magnification`, 0.7×–2×) rather than changing font sizes, so the type scale and writing column keep their proportions.
 
 **Why:** Readable open-source screen font; registered at launch with `CTFontManagerRegisterFontsForURL`.
+
+### Visual system (v0.11)
+
+**Choice:** One palette in `LyraTheme` with two looks that follow the system appearance. *Night* (dark) uses navy surfaces with the logo gold as accent. *Parchment* (light) uses warm paper with a deeper bronze-gold. Surfaces, ink, markup, and accent are named tokens; views do not use system gray backgrounds (`.bar`, `windowBackgroundColor`) in the vault window. Title, Source, and Reading share one centered writing column (`LyraTheme.columnWidth`, 680pt). Source sets it through a width-dependent `textContainerInset` with zero line-fragment padding, so the text lines up with the SwiftUI title. Prose is Inter 16pt with 7pt line spacing. The word-count status bar became a floating pill. Mockups live in `docs/design/`.
+
+**Why:** Lyra looked like a stock SwiftUI sample. The brand only showed up in syntax colors, and full-width 14pt text made long lines. A single column and a calmer page make writing, the first job, feel better. It uses no new dependencies and adds no theme picker.
+
+**Consequence:** Source styling is still plain text. `MarkdownHighlighter` sizes headings by level, draws syntax markers (`#`, `**`, `_`, backticks, `[[ ]]`, link URLs) in the quiet `markup` color, uses a monospaced face for code, and adds paragraph spacing. It never hides characters, so this is not WYSIWYG. Only the attributes of the edited paragraph are restyled, as before. PDF export keeps its own print colors.
 
 ### Plain-language errors (v0.5)
 
@@ -123,6 +133,8 @@ helper so presentation policy cannot fork.
 - If more than one note still matches, do not guess. Show a picker with vault-relative paths.
 - A real path or stem beats a YAML alias. If still tied, show the picker.
 - Unresolved links do not navigate. Offer **Create**. Do not create the file until the user confirms.
+- Unresolved links to attachment files (`[[image.png]]`) never offer Create; Lyra says it does not follow them.
+- Renaming a note offers to point `[[links]]` that uniquely resolved to it at the new name. Open notes change in their tab; closed notes go through the normal save path. Nothing is rewritten without confirmation.
 - Create uses the path when the link has one. A bare name creates a `.md` file in the same folder as the linking note. Then open the new note with the existing tab rules.
 - Command-click a wiki link in Source to follow it. The same resolve rules apply.
 
@@ -130,20 +142,22 @@ helper so presentation policy cannot fork.
 
 Reading click and Source Command-click use the same rules. Preview still rewrites `[[path|alias]]` to a `lyra-wiki:` link for display.
 
+Other Reading links: `http`, `https`, and `mailto` open in the system handler. A `file:` link opens only for a plain, non-executable file inside the vault. A relative link to a `.md` note inside the vault opens as a note. Every other scheme is ignored, so a note from a shared vault cannot launch apps. A leading YAML block renders as a code block in Reading and PDF.
+
 ### Backlinks
 
 **Choice:** A trailing inspector lists notes that link here through `[[wiki]]` only. Ordinary Markdown file links do not count. No outgoing list, no outline, no graph canvas.
 
 **Why:** Backlinks are what a person leaving Obsidian looks for. A graph view is a second product.
 
-**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading. The backlink index is rebuilt on each vault scan. Open editors overlay their live text onto that index.
+**Consequence:** The pane is hidden until the user opens it (toolbar or View → Backlinks). It is available in Source and in Reading. The backlink index is rebuilt on each vault scan. Open editors overlay their live text onto that index. From 0.11 each card also shows the line around the first link that resolves here (`WikiLinkResolver.backlinkContext`). It is computed from the in-memory bodies when the inspector renders and is not stored. The list updates after a short typing pause, not on every keystroke.
 
 ### Search and Find
 
 **Choice:**
 
 - **⌘F** — system find bar on the Source `NSTextView`.
-- **⇧⌘F** — vault full-text search. In-memory index, rebuilt on each vault scan. Results show note, path, and one snippet. This is a lightweight palette, not a third workspace.
+- **⇧⌘F** — vault full-text search. In-memory index, rebuilt on each vault scan. Results show note, path, and one snippet, capped at 200; ↑/↓ and Return work from the query field. This is a lightweight palette, not a third workspace.
 - The sidebar name/path filter stays. It is not Find.
 
 **Why:** A writer expects ⌘F to search this note. Body search is how they leave Obsidian without a disk index.
@@ -152,7 +166,7 @@ The sidebar name filter is labeled Filter. It is not bound to ⌘F.
 
 ### Refresh
 
-**Choice:** Rescan the tree on window activation and on **⌘R**. Rebuild wiki, backlinks, and the in-memory search map from that scan. No FSEvents watcher unless a human asks after this hurts.
+**Choice:** Rescan the tree on window activation and on **⌘R**. Rebuild wiki, backlinks, and the in-memory search map from that scan. No FSEvents watcher unless a human asks after this hurts. At the same moments, an open note with no unsaved edits reloads if its file changed on disk (or shows the moved-or-deleted dialog if it vanished).
 
 **Why:** Hundreds of notes can pay for a full scan. A watcher is extra sandbox surface.
 
@@ -160,16 +174,16 @@ The sidebar name filter is labeled Filter. It is not bound to ⌘F.
 
 - UI / stores: `@MainActor`
 - Vault tree scan: `Task.detached` from `VaultStore.refresh` so large trees do not block the first frame
-- Autosave: ~500ms debounce; also save on note switch, background, and quit
-- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently
-- Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root
+- Autosave: ~500ms debounce; also save on note switch, background, and quit A conflict the user deferred stays deferred when the app goes to the background; ⌘S, window close, and quit still surface it.
+- External edits: file metadata plus content identity is captured at open/save; a coordinated dirty write against a changed file prompts Keep Mine / Reload. Editor saves always go through `NSFileCoordinator` so a file that appears between the missing-file check and the write cannot be clobbered silently. Open/reload and post-write snapshots use one coherent byte read so the buffer and conflict identity cannot describe different disk versions Existing notes are replaced with `FileManager.replaceItemAt`, which keeps creation date, permissions, and Finder tags.
+- Vault mutations reject symlinked paths and keep scanned notes and attachments inside the selected vault root. Note and attachment creation uses exclusive file creation where practical; reads avoid following symlinks and require regular files
 - PDF export: rendering and file I/O run in a detached task; UI panels and error state return to the main actor. Export stops at 2,000 pages and writes a truncation line in the PDF
 - Reading and PDF image decode use ImageIO metadata and a 50-megapixel / 16,384-px budget before materializing a bitmap
 - A stale security-scoped bookmark does not auto-open or re-persist. The first window asks before binding to the resolved folder
 
 ## Attachments
 
-**Choice:** Clipboard image paste writes under `{vaultRoot}/_attachments/` and inserts a relative `![](…)` path at the caret (`AttachmentStore`). Hide `_attachments` from the sidebar tree. Generated names are timestamp-based (`pasted-image-yyyyMMdd-HHmmss.png`) with a numeric suffix on collision. Occupancy checks are case-insensitive; Unicode-normalization aliases are not treated as a practical risk for same-second generated names.
+**Choice:** Clipboard image paste writes under `{vaultRoot}/_attachments/` and inserts a relative `![](…)` path at the caret (`AttachmentStore`). Hide `_attachments` from the sidebar tree. Generated names are timestamp-based (`pasted-image-yyyyMMdd-HHmmss.png`) with a numeric suffix on collision. Occupancy checks are case-insensitive; Unicode-normalization aliases are not treated as a practical risk for same-second generated names. A copied image *file* keeps its bytes and extension. A clipboard picture is only stored when no text type is listed before it, because Office, Numbers, and Pages put a picture of copied text after the text. PDF is never pasted as an image.
 
 **Why:** Plain files next to notes; other Markdown tools can open the vault without Lyra.
 

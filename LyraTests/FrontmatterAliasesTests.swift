@@ -52,4 +52,29 @@ final class FrontmatterAliasesTests: XCTestCase {
     func testUnclosedFenceIsIgnored() {
         XCTAssertEqual(FrontmatterAliases.parse(from: "---\naliases: X\n"), [])
     }
+
+    func testIgnoresNestedAliasesAndInlineComments() {
+        let md = """
+        ---
+        outer:
+          aliases: [Nested]
+        aliases: [Plan, Map] # primary names
+        ---
+        Body
+        """
+        XCTAssertEqual(FrontmatterAliases.parse(from: md), ["Plan", "Map"])
+    }
+
+    func testInlineListSupportsQuotedCommas() {
+        let md = """
+        ---
+        aliases: ["Last, First", 'O''Brien', Plan]
+        ---
+        Body
+        """
+        XCTAssertEqual(
+            FrontmatterAliases.parse(from: md),
+            ["Last, First", "O'Brien", "Plan"]
+        )
+    }
 }

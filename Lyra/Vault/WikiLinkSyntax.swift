@@ -2,6 +2,8 @@ import Foundation
 
 /// Parse, extract, and locate `[[wiki]]` destinations. Shared by resolve, backlinks, and Source click.
 enum WikiLinkSyntax {
+    private static let linkPattern = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#)
+
     struct Match: Equatable {
         var range: NSRange
         var inner: String
@@ -38,14 +40,7 @@ enum WikiLinkSyntax {
 
     /// Vault-relative path including `.md` (`Projects/Roadmap.md`).
     static func relativePath(for url: URL, vaultRoot: URL) -> String {
-        let rootPath = vaultRoot.standardizedFileURL.path
-        let filePath = url.standardizedFileURL.path
-        guard filePath.hasPrefix(rootPath) else { return url.lastPathComponent }
-        var rest = String(filePath.dropFirst(rootPath.count))
-        if rest.hasPrefix("/") {
-            rest.removeFirst()
-        }
-        return rest.isEmpty ? url.lastPathComponent : rest
+        FileSystemVault.relativePath(for: url, under: vaultRoot)
     }
 
     /// Lowercased relative path without `.md`.
@@ -57,6 +52,35 @@ enum WikiLinkSyntax {
     static func stemKey(forRelativePath path: String) -> String {
         let name = (path as NSString).lastPathComponent
         return normalizeTarget(name).lowercased()
+    }
+
+    /// Whether an unresolved link may offer Create. Obsidian heading links
+    /// (`[[Note#Heading]]`) and embeds of non-note files (`[[diagram.png]]`)
+    /// are not supported, so they must not create `Note#Heading.md` or
+    /// `diagram.png.md` in a migrated vault.
+    static func canCreate(target: String) -> Bool {
+        let normalized = normalizeTarget(target)
+        guard !normalized.isEmpty, !normalized.contains("#"), !normalized.contains("^") else {
+            return false
+        }
+        let ext = (normalized as NSString).pathExtension.lowercased()
+        return !attachmentExtensions.contains(ext)
+    }
+
+    /// File types Obsidian embeds. `[[Node.js]]` is still a note name.
+    private static let attachmentExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif", "heic", "tif", "tiff",
+        "mp3", "wav", "m4a", "ogg", "flac", "mp4", "webm", "ogv", "mov", "mkv",
+        "pdf", "canvas",
+    ]
+
+    /// Link target text after its note was renamed to `newStem`: keeps any
+    /// folder prefix and a trailing `.md` (`Projects/Old.md` → `Projects/New.md`).
+    static func retarget(_ rawTarget: String, toStem newStem: String) -> String {
+        let trimmed = rawTarget.trimmingCharacters(in: .whitespaces)
+        let name = trimmed.lowercased().hasSuffix(".md") ? newStem + ".md" : newStem
+        guard let slash = trimmed.lastIndex(where: { $0 == "/" || $0 == "\\" }) else { return name }
+        return String(trimmed[...slash]) + name
     }
 
     /// Where Create should write the file. `nil` if the target is empty or unsafe.
@@ -98,16 +122,22 @@ enum WikiLinkSyntax {
         let ns = markdown as NSString
         let full = NSRange(location: 0, length: ns.length)
         let skipped = skippedRanges(in: ns)
-        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]]+)\]\]"#) else { return [] }
+        guard let regex = linkPattern else { return [] }
         return regex.matches(in: markdown, range: full).compactMap { match in
             guard match.numberOfRanges > 1 else { return nil }
             let outer = match.range
             if skipped.contains(where: { NSIntersectionRange($0, outer).length > 0 }) {
                 return nil
             }
+            // `![[...]]` embeds are explicitly unsupported: do not treat the
+            // inner brackets as a normal wiki link.
+            if outer.location > 0, ns.character(at: outer.location - 1) == 0x21 {
+                return nil
+            }
             let inner = ns.substring(with: match.range(at: 1))
             let target = parseInner(inner).target
-            guard !target.isEmpty else { return nil }
+            // `[[Note#heading]]` fragments are explicitly unsupported.
+            guard !target.isEmpty, !target.contains("#") else { return nil }
             return Match(range: outer, inner: inner, target: target)
         }
     }
@@ -125,7 +155,14 @@ enum WikiLinkSyntax {
         return ranges
     }
 
-    private static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
+    /// Fenced code ranges for callers such as Source highlighting. Heading
+    /// fragments are not supported, so links containing `#` are left alone.
+    static func fencedCodeRanges(in markdown: String) -> [NSRange] {
+        fencedCodeRanges(in: markdown as NSString)
+    }
+
+    /// Fenced code blocks (``` or ~~~), including an unclosed trailing fence.
+    static func fencedCodeRanges(in ns: NSString) -> [NSRange] {
         var ranges: [NSRange] = []
         var i = 0
         let length = ns.length
@@ -219,8 +256,25 @@ enum WikiLinkSyntax {
         return raw[index...].allSatisfy { $0 == " " || $0 == "\t" }
     }
 
+    /// Code spans between fenced blocks. A backtick inside a fence must not pair
+    /// with one after it and hide the real code span or link that follows.
     private static func inlineCodeRanges(in ns: NSString, excluding fences: [NSRange]) -> [NSRange] {
-        let source = ns as String
+        var ranges: [NSRange] = []
+        var start = 0
+        let end = NSRange(location: ns.length, length: 0)
+        for fence in fences.sorted(by: { $0.location < $1.location }) + [end] {
+            if fence.location > start {
+                let segment = NSRange(location: start, length: fence.location - start)
+                ranges += inlineCodeRanges(in: ns.substring(with: segment)).map { range in
+                    NSRange(location: range.location + segment.location, length: range.length)
+                }
+            }
+            start = max(start, NSMaxRange(fence))
+        }
+        return ranges
+    }
+
+    private static func inlineCodeRanges(in source: String) -> [NSRange] {
         var ranges: [NSRange] = []
         var cursor = source.startIndex
         while cursor < source.endIndex {
@@ -238,10 +292,7 @@ enum WikiLinkSyntax {
                 cursor = openingEnd
                 continue
             }
-            let nsRange = NSRange(openingStart..<closing.upperBound, in: source)
-            if !fences.contains(where: { NSIntersectionRange($0, nsRange).length > 0 }) {
-                ranges.append(nsRange)
-            }
+            ranges.append(NSRange(openingStart..<closing.upperBound, in: source))
             cursor = closing.upperBound
         }
         return ranges
@@ -255,6 +306,9 @@ enum WikiLinkSyntax {
         var index = start
         while index < source.endIndex {
             guard source[index] == "`" else {
+                if source[index].isNewline, startsBlankLine(in: source, after: index) {
+                    return nil
+                }
                 index = source.index(after: index)
                 continue
             }
@@ -269,5 +323,16 @@ enum WikiLinkSyntax {
             index = runEnd
         }
         return nil
+    }
+
+    /// True when the line after the newline at `index` is blank. Code spans
+    /// end at a paragraph break, so a stray backtick cannot pair across one
+    /// and hide every link in between.
+    private static func startsBlankLine(in source: String, after index: String.Index) -> Bool {
+        var cursor = source.index(after: index)
+        while cursor < source.endIndex, source[cursor] == " " || source[cursor] == "\t" {
+            cursor = source.index(after: cursor)
+        }
+        return cursor < source.endIndex && source[cursor].isNewline
     }
 }

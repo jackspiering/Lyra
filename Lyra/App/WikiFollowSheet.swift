@@ -3,14 +3,14 @@ import SwiftUI
 /// Ambiguous-match picker or Create confirmation after following a wiki link.
 enum WikiFollowPrompt: Identifiable, Equatable {
     case pick(query: String, candidates: [WikiCandidate])
-    case create(query: String, destination: URL)
+    case create(query: String, destination: URL, relativePath: String)
 
     var id: String {
         switch self {
         case .pick(let query, let candidates):
             return "pick:\(query):\(candidates.map(\.id).joined(separator: ","))"
-        case .create(let query, let destination):
-            return "create:\(query):\(destination.path)"
+        case .create(let query, let destination, let relativePath):
+            return "create:\(query):\(destination.path):\(relativePath)"
         }
     }
 }
@@ -42,11 +42,11 @@ struct WikiFollowSheet: View {
             }
             .padding()
             .frame(width: 400)
-        case .create(let query, let destination):
+        case .create(let query, let destination, let relativePath):
             VStack(alignment: .leading, spacing: 12) {
                 Text("Create note")
                     .font(LyraFonts.headline)
-                Text("No note matches “\(query)”. Create \(destination.lastPathComponent) at \(displayPath(destination))?")
+                Text("No note matches “\(query)”. Create \(relativePath)?")
                 HStack {
                     Spacer()
                     Button("Cancel", action: onCancel)
@@ -59,10 +59,5 @@ struct WikiFollowSheet: View {
             .padding()
             .frame(width: 400)
         }
-    }
-
-    private func displayPath(_ url: URL) -> String {
-        let parent = url.deletingLastPathComponent()
-        return parent.lastPathComponent + "/" + url.lastPathComponent
     }
 }
