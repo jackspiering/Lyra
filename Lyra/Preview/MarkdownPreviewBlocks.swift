@@ -194,14 +194,13 @@ enum MarkdownPreviewBlocks {
                 continue
             }
             let target: String
-            let display: String
             if let pipe = body.firstIndex(of: "|") {
                 target = String(body[..<pipe]).trimmingCharacters(in: .whitespacesAndNewlines)
-                display = String(body[body.index(after: pipe)...]).trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
                 target = body.trimmingCharacters(in: .whitespacesAndNewlines)
-                display = target
             }
+            // `[[Note|]]` has an empty alias; show the target instead of an invisible link.
+            let display = WikiLinkSyntax.parseInner(body).display ?? target
             let encoded = target.addingPercentEncoding(withAllowedCharacters: wikiDestinationAllowed) ?? target
             // Escape brackets in the link label so nested markdown stays stable.
             let label = display

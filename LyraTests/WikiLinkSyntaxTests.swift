@@ -92,4 +92,9 @@ final class WikiLinkSyntaxTests: XCTestCase {
         XCTAssertFalse(WikiLinkSyntax.canCreate(target: "diagram.png"))
         XCTAssertFalse(WikiLinkSyntax.canCreate(target: "Files/Spec.PDF"))
     }
+
+    func testBacktickInsideFenceDoesNotPairWithCodeSpanAfterIt() {
+        let markdown = "~~~\na ` b\n~~~\n`[[Code]]` and [[Link]]"
+        XCTAssertEqual(WikiLinkSyntax.extractLinks(in: markdown).map(\.target), ["Link"])
+    }
 }

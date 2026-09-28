@@ -8,7 +8,7 @@ Lyra is a single macOS app target with module-shaped folders. This doc is the de
 
 **Why:** The old “focused writer only” sentence fought the vault features. A full Obsidian clone (graph, plugins, sync) fights the invariants. Writing-first PKM is the middle that matches the user.
 
-**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. Notes that cannot be read or decoded as UTF-8 are also left out of those indexes. PDF export stops at 2,000 pages.
+**Honesty limit:** In-memory maps are for hundreds of notes, not tens of thousands. Lyra does not owe a disk index. Scan walks at most 64 directory levels. Note bodies larger than 2 MB stay openable but are left out of search, aliases, and backlinks. Notes that cannot be read or decoded as UTF-8 are also left out of those indexes. Both still resolve as `[[wiki]]` targets by path and filename. PDF export stops at 2,000 pages.
 
 ## Invariants
 

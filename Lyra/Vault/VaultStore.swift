@@ -143,9 +143,9 @@ final class VaultStore {
                     var skippedUnreadable = false
                     for noteURL in noteURLs {
                         if Task.isCancelled { throw CancellationError() }
+                        let relative = FileSystemVault.relativePath(for: noteURL, under: url)
                         switch FileSystemVault.indexedUTF8Body(at: noteURL) {
                         case .body(let body):
-                            let relative = FileSystemVault.relativePath(for: noteURL, under: url)
                             notes.append(
                                 WikiNote(
                                     url: noteURL,
@@ -163,8 +163,11 @@ final class VaultStore {
                             urlBodies[noteURL] = body
                         case .oversized:
                             skippedLarge = true
+                            // Still a note: `[[links]]` to it must resolve, not offer Create.
+                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
                         case .unreadable:
                             skippedUnreadable = true
+                            notes.append(WikiNote(url: noteURL, relativePath: relative, aliases: []))
                         }
                     }
                     let resolver = WikiLinkResolver(notes: notes, bodies: urlBodies)
@@ -365,6 +368,8 @@ final class VaultStore {
             return false
         }
         var fileName = ""
+        // The untitled loop creates its file exclusively; a named note is created below.
+        var alreadyCreated = false
         if let rawName {
             switch FilenameValidation.validate(rawName, isDirectory: false) {
             case .invalid(let detail):
@@ -398,6 +403,7 @@ final class VaultStore {
                 }
                 if FileSystemVault.exclusivelyCreateEmptyFile(at: candidate) {
                     fileName = candidate.lastPathComponent
+                    alreadyCreated = true
                     break
                 }
                 if !FileManager.default.fileExists(atPath: candidate.path) {
@@ -423,7 +429,7 @@ final class VaultStore {
             }
         }
         let url = parent.appendingPathComponent(fileName)
-        guard FileSystemVault.isSafePath(url, within: rootURL) else {
+        guard alreadyCreated || FileSystemVault.isSafePath(url, within: rootURL) else {
             present(
                 context: .createNote,
                 message: UserFacingError.message(
@@ -436,7 +442,7 @@ final class VaultStore {
         // Named creation already rejected collisions. Exclusive creation closes
         // the remaining check-then-create race; a failure with an existing file
         // is reported as a collision.
-        guard FileSystemVault.exclusivelyCreateEmptyFile(at: url) else {
+        guard alreadyCreated || FileSystemVault.exclusivelyCreateEmptyFile(at: url) else {
             if FileManager.default.fileExists(atPath: url.path) {
                 present(
                     context: .createNote,
@@ -514,7 +520,6 @@ final class VaultStore {
         }
     }
 
-
     /// Parent for new notes/folders. A current selection always wins; the
     /// remembered path is only a fallback while a refresh is still landing.
     private func createParentDirectory(vaultRoot: URL) -> URL {
@@ -537,7 +542,18 @@ final class VaultStore {
     /// the async tree refresh lands).
     @discardableResult
     func renameSelected(to newName: String) -> URL? {
-        guard let rootURL, let node = selectedNode(),
+        rename(selectedNode(), to: newName)
+    }
+
+    /// Renames the tree item at `url` without touching the sidebar selection first,
+    /// so callers do not trigger a selection-driven open of the old path.
+    @discardableResult
+    func renameItem(at url: URL, to newName: String) -> URL? {
+        rename(rootNode.flatMap { FileSystemVault.findNode(id: url.path, in: $0) }, to: newName)
+    }
+
+    private func rename(_ node: VaultNode?, to newName: String) -> URL? {
+        guard let rootURL, let node,
               FileSystemVault.isStrictDescendant(node.url, root: rootURL) else {
             present(
                 context: .rename,
@@ -554,6 +570,10 @@ final class VaultStore {
             return nil
         case .ok(let name):
             let dest = node.url.deletingLastPathComponent().appendingPathComponent(name)
+            // `Note` for `Note.md` validates back to the same name; moving onto itself fails.
+            if dest.path == node.url.path {
+                return dest
+            }
             guard FileSystemVault.isSafeDirectory(
                 node.url.deletingLastPathComponent(),
                 within: rootURL

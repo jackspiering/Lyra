@@ -695,8 +695,9 @@ struct ContentView: View {
         // Capture links to the old name before the rescan forgets it.
         let resolver = store.linkResolver
         let linkSources = isDirectory ? [] : store.backlinks(to: url, liveBodies: liveBodies())
-        store.selection = url.path
-        guard let newURL = store.renameSelected(to: newName) else {
+        // Rename by path, not by moving the sidebar selection: a selection change
+        // would try to open the old path after the file has moved.
+        guard let newURL = store.renameItem(at: url, to: newName) else {
             return false
         }
         tabs.relocateOpenNotes(oldPath: url.path, newURL: newURL)

@@ -115,8 +115,8 @@ struct MarkdownTextView: NSViewRepresentable {
         weak var textView: LyraTextView?
         var lastFindBarToken = 0
         private var isApplying = false
-        /// Set when an edit removes fence characters, so the next pass
-        /// restyles the whole note instead of one paragraph.
+        /// Set when an edit replaces text on a fence line. The post-edit paragraph
+        /// may no longer contain the marker, so the next pass restyles the whole note.
         private var needsFullHighlight = false
 
         init(_ parent: MarkdownTextView) {
@@ -152,12 +152,11 @@ struct MarkdownTextView: NSViewRepresentable {
             shouldChangeTextIn affectedCharRange: NSRange,
             replacementString: String?
         ) -> Bool {
-            let current = textView.string as NSString
-            if NSMaxRange(affectedCharRange) <= current.length {
-                let removed = current.substring(with: affectedCharRange)
-                if removed.contains("``") || removed.contains("~~") {
-                    needsFullHighlight = true
-                }
+            // Check the whole pre-edit paragraph: deleting one backtick from a
+            // ``` line breaks the fence even though the removed text is a single `.
+            if !needsFullHighlight,
+               MarkdownHighlighter.touchesFence(in: textView.string, range: affectedCharRange) {
+                needsFullHighlight = true
             }
             return true
         }
