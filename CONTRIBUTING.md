@@ -28,6 +28,7 @@ PRs run smoke on Ubuntu in parallel with build/test on `macos-15`. Details: [doc
 
 - Prefer small commits: `feat:`, `fix:`, `docs:`, `test:`, `chore:`
 - PR: what / why / how verified
+- **Consider a version bump** (semantic versioning) when the PR changes what ships in the app: PATCH for fixes, MINOR for new features, MAJOR for breaking changes (MINOR before 1.0). Docs, tests, and CI alone need no bump. A bump updates `MARKETING_VERSION` (all four configs), raises `CURRENT_PROJECT_VERSION` by one, and updates the README badge and release link. See [AGENTS.md](AGENTS.md#shipping-a-change).
 - **Update `README.md`** for user-facing changes (features, install, version, shortcuts)
 - Update `docs/architecture.md` when structure or invariants change
 - Do not expand into plugins, sync, or non-macOS ports unless agreed
