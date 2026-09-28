@@ -111,7 +111,8 @@ Views are verified by hand on a Mac — note what you could not check in the PR.
    `Lyra.xcodeproj/project.pbxproj`, raises `CURRENT_PROJECT_VERSION` by one,
    and points the README version badge and release link at the new version
    (smoke checks the link). If another PR bumped first, merge `main` and
-   bump from its version.
+   bump from its version. Merging a bump to `main` publishes that release
+   automatically (`docs/ci.md`), so bump only when the change should ship.
 5. Run `bash Scripts/smoke.sh`; on a Mac also `bash Scripts/xcode-test.sh`.
 6. PR description: what, why, how verified, the version bump (or why none),
    and what still needs a manual look.
