@@ -700,6 +700,8 @@ struct ContentView: View {
         guard let newURL = store.renameItem(at: url, to: newName) else {
             return false
         }
+        // Same name (`Note` for `Note.md`): nothing moved, so no link update.
+        guard newURL.path != url.path else { return true }
         tabs.relocateOpenNotes(oldPath: url.path, newURL: newURL)
         if !linkSources.isEmpty {
             pendingLinkUpdate = PendingLinkUpdate(

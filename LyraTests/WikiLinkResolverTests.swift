@@ -192,4 +192,15 @@ final class WikiLinkResolverTests: XCTestCase {
         let resolver = WikiLinkResolver(noteURLs: [old], vaultRoot: root)
         XCTAssertNil(resolver.rewritingLinks(in: "No links [[Missing]]", from: old, toStem: "New"))
     }
+
+    func testRewritingLinksKeepsAliasLinks() {
+        let old = root.appendingPathComponent("Old.md")
+        let resolver = makeResolver(urls: [old], aliases: [old: ["Plan"]])
+        let body = "See [[Plan]] and [[Old]]."
+        XCTAssertEqual(
+            resolver.rewritingLinks(in: body, from: old, toStem: "New"),
+            "See [[Plan]] and [[New]]."
+        )
+        XCTAssertNil(resolver.rewritingLinks(in: "Only [[Plan]].", from: old, toStem: "New"))
+    }
 }

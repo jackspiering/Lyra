@@ -115,10 +115,13 @@ struct WikiLinkResolver: Sendable {
 
     /// `body` with every `[[link]]` that uniquely resolves to `oldURL`
     /// pointed at `newStem`, or `nil` when nothing changed. Folder paths, a
-    /// trailing `.md`, and `|alias` text are kept. Resolve with the resolver
-    /// from before the rename.
+    /// trailing `.md`, and `|alias` text are kept. Links that reach the note
+    /// through a frontmatter alias still resolve after a rename, so they stay
+    /// as the user wrote them. Resolve with the resolver from before the rename.
     func rewritingLinks(in body: String, from oldURL: URL, toStem newStem: String) -> String? {
+        let oldStem = WikiLinkSyntax.stemKey(forRelativePath: oldURL.lastPathComponent)
         let matches = WikiLinkSyntax.extractLinks(in: body).filter { match in
+            guard WikiLinkSyntax.stemKey(forRelativePath: match.target) == oldStem else { return false }
             if case .unique(let url) = resolve(match.target) { return url == oldURL }
             return false
         }
