@@ -84,11 +84,7 @@ final class EditorViewModel {
         }
         fileURL = url
         isDirty = false
-        lastError = nil
-        lastSaveFailed = false
-        hasExternalConflict = false
-        hasMissingFile = false
-        conflictDeferred = false
+        clearProblems()
         diskSnapshot = snapshot
         refreshFileDates(for: url, markSavedNow: false)
         return true
@@ -96,15 +92,10 @@ final class EditorViewModel {
 
     /// Point the editor at a new path without saving (e.g. after rename).
     func relocate(to newURL: URL) {
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
         fileURL = newURL
-        hasMissingFile = false
-        hasExternalConflict = false
-        conflictDeferred = false
-        lastError = nil
-        lastSaveFailed = false
-        rememberDiskSnapshot(for: newURL)
+        clearProblems()
+        diskSnapshot = Self.captureSnapshot(of: newURL)
         refreshFileDates(for: newURL, markSavedNow: false)
     }
 
@@ -137,8 +128,7 @@ final class EditorViewModel {
         guard hasExternalConflict || hasMissingFile else { return }
         hasExternalConflict = false
         conflictDeferred = true
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
     }
 
     /// Closes the current note after flushing dirty state. Returns `false` if
@@ -182,8 +172,7 @@ final class EditorViewModel {
     /// dialog can reappear. Autosave is gated separately in `scheduleAutosave`.
     @discardableResult
     func saveIfNeeded(force: Bool = false) -> Bool {
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
         // A forced save always writes, so Save Here recreates a vanished
         // note even when its buffer is clean.
         guard let url = fileURL, isDirty || force else { return true }
@@ -205,8 +194,7 @@ final class EditorViewModel {
     @discardableResult
     func reloadFromDisk() -> Bool {
         guard let url = fileURL else { return false }
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
         guard let (readText, snapshot) = Self.readTextAndSnapshot(of: url) else {
             hasExternalConflict = false
             if !FileManager.default.fileExists(atPath: url.path) {
@@ -218,11 +206,7 @@ final class EditorViewModel {
         }
         text = readText
         isDirty = false
-        lastError = nil
-        lastSaveFailed = false
-        hasExternalConflict = false
-        hasMissingFile = false
-        conflictDeferred = false
+        clearProblems()
         diskSnapshot = snapshot
         refreshFileDates(for: url, markSavedNow: false)
         return true
@@ -345,11 +329,7 @@ final class EditorViewModel {
                 throw coordinationError ?? writeError ?? CocoaError(.fileWriteUnknown)
             }
             isDirty = false
-            lastError = nil
-            lastSaveFailed = false
-            hasExternalConflict = false
-            hasMissingFile = false
-            conflictDeferred = false
+            clearProblems()
             refreshFileDates(for: url, markSavedNow: true)
             return true
         } catch {
@@ -390,20 +370,30 @@ final class EditorViewModel {
     }
 
     private func clearBuffer() {
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
         sourceView = nil
         fileURL = nil
         text = ""
         isDirty = false
         diskSnapshot = nil
+        clearProblems()
+        createdAt = nil
+        lastSavedAt = nil
+    }
+
+    /// Every error and conflict flag back to clean, after a successful open,
+    /// save, reload, or relocate.
+    private func clearProblems() {
+        lastError = nil
+        lastSaveFailed = false
         hasExternalConflict = false
         hasMissingFile = false
         conflictDeferred = false
-        lastError = nil
-        lastSaveFailed = false
-        createdAt = nil
-        lastSavedAt = nil
+    }
+
+    private func cancelAutosave() {
+        saveTask?.cancel()
+        saveTask = nil
     }
 
     /// Reads creation date; sets `lastSavedAt` to now after a write, else disk mtime.
@@ -426,19 +416,6 @@ final class EditorViewModel {
         return !current.hasSameFileIdentity(as: known)
     }
 
-    private func rememberDiskSnapshot(for url: URL) {
-        diskSnapshot = Self.captureSnapshot(of: url)
-    }
-
-    nonisolated static func modificationDate(of url: URL) -> Date? {
-        fileIdentity(of: url)?.date
-    }
-
-    nonisolated static func fileIdentity(of url: URL) -> (date: Date, size: Int)? {
-        guard let metadata = metadata(of: url) else { return nil }
-        return (metadata.date, metadata.size)
-    }
-
     private nonisolated static func metadata(of url: URL) -> FileMetadata? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let date = attributes[.modificationDate] as? Date,
@@ -452,26 +429,12 @@ final class EditorViewModel {
 
     /// Reads UTF-8 text and its snapshot from one coherent byte read, so the
     /// buffer and conflict identity cannot describe different disk versions.
-    nonisolated static func readTextAndSnapshot(of url: URL) -> (String, DiskSnapshot?)? {
-        for _ in 0..<2 {
-            guard let before = metadata(of: url),
-                  let content = try? Data(contentsOf: url),
-                  let after = metadata(of: url),
-                  before == after,
-                  let text = String(data: content, encoding: .utf8) else {
-                continue
-            }
-            let snapshot = DiskSnapshot(
-                path: url.path,
-                date: after.date,
-                size: after.size,
-                device: after.device,
-                inode: after.inode,
-                content: content
-            )
-            return (text, snapshot)
+    nonisolated static func readTextAndSnapshot(of url: URL) -> (text: String, snapshot: DiskSnapshot)? {
+        guard let snapshot = captureSnapshot(of: url),
+              let text = String(data: snapshot.content, encoding: .utf8) else {
+            return nil
         }
-        return nil
+        return (text, snapshot)
     }
 
     private nonisolated static func captureSnapshot(of url: URL) -> DiskSnapshot? {
@@ -500,8 +463,7 @@ final class EditorViewModel {
     }
 
     private func scheduleAutosave() {
-        saveTask?.cancel()
-        saveTask = nil
+        cancelAutosave()
         // Suspend while the user has deferred a conflict; explicit ⌘S still saves.
         guard !conflictDeferred else { return }
         saveTask = Task { [weak self] in

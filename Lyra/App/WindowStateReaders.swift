@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 
-
 /// Drives the standard macOS dirty indicator on the window close button.
 struct DocumentEditedReader: NSViewRepresentable {
     var isEdited: Bool

@@ -21,6 +21,11 @@ final class EditorViewModelTests: XCTestCase {
         tempRoot = nil
     }
 
+    private func modificationDate(of url: URL) throws -> Date {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return try XCTUnwrap(attributes[.modificationDate] as? Date)
+    }
+
     func testOpenPreservesBufferWhenSaveFails() throws {
         // Parent directory becomes non-writable so atomic write fails without
         // reassigning fileURL (which would trip the external-mtime check).
@@ -121,7 +126,7 @@ final class EditorViewModelTests: XCTestCase {
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
-        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let known = try modificationDate(of: a)
 
         editor.text = "local edits"
         editor.isDirty = true
@@ -130,7 +135,7 @@ final class EditorViewModelTests: XCTestCase {
         // Force mtime strictly after the value recorded at open (1s FS resolution).
         let future = known.addingTimeInterval(5)
         try FileManager.default.setAttributes([.modificationDate: future], ofItemAtPath: a.path)
-        let current = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let current = try modificationDate(of: a)
         XCTAssertGreaterThan(current.timeIntervalSince(known), 0.001)
 
         XCTAssertFalse(editor.saveIfNeeded())
@@ -226,7 +231,7 @@ final class EditorViewModelTests: XCTestCase {
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
-        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let known = try modificationDate(of: a)
 
         editor.text = "local"
         editor.isDirty = true
@@ -246,7 +251,7 @@ final class EditorViewModelTests: XCTestCase {
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
-        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let known = try modificationDate(of: a)
 
         editor.text = "local"
         editor.isDirty = true
@@ -305,7 +310,7 @@ final class EditorViewModelTests: XCTestCase {
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
-        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let known = try modificationDate(of: a)
         editor.text = "local"
         editor.isDirty = true
         try "theirs".write(to: a, atomically: true, encoding: .utf8)
@@ -355,7 +360,7 @@ final class EditorViewModelTests: XCTestCase {
 
         let editor = EditorViewModel()
         XCTAssertTrue(editor.open(url: a))
-        let known = try XCTUnwrap(EditorViewModel.modificationDate(of: a))
+        let known = try modificationDate(of: a)
         editor.text = "local"
         editor.isDirty = true
         try "theirs".write(to: a, atomically: true, encoding: .utf8)
@@ -558,8 +563,8 @@ final class EditorViewModelTests: XCTestCase {
         try "coherent body".write(to: a, atomically: true, encoding: .utf8)
 
         let read = try XCTUnwrap(EditorViewModel.readTextAndSnapshot(of: a))
-        XCTAssertEqual(read.0, "coherent body")
-        XCTAssertEqual(read.1?.content, "coherent body".data(using: .utf8))
+        XCTAssertEqual(read.text, "coherent body")
+        XCTAssertEqual(read.snapshot.content, "coherent body".data(using: .utf8))
 
         let invalid = tempRoot.appendingPathComponent("invalid.md")
         try Data([0xFF, 0xFE]).write(to: invalid)

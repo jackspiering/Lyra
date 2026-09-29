@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import UniformTypeIdentifiers
 
@@ -12,19 +11,17 @@ enum AttachmentStore {
         return formatter
     }()
 
-    static func uniquePNGFilename(now: Date = Date(), existing: Set<String>) -> String {
-        uniqueFilename(fileExtension: "png", now: now, existing: existing)
-    }
-
+    /// `pasted-image-<timestamp>.<ext>`, with `-2`, `-3`, … when a name (in any case) is taken.
     static func uniqueFilename(fileExtension: String, now: Date = Date(), existing: Set<String>) -> String {
         let stamp = stampFormatter.string(from: now)
         // Hyphenated name: CommonMark link destinations cannot contain unescaped spaces.
-        let base = "pasted-image-\(stamp).\(fileExtension)"
+        func name(_ n: Int) -> String {
+            n == 1 ? "pasted-image-\(stamp).\(fileExtension)" : "pasted-image-\(stamp)-\(n).\(fileExtension)"
+        }
         let occupied = Set(existing.map { $0.lowercased() })
-        if !occupied.contains(base.lowercased()) { return base }
-        var n = 2
-        while occupied.contains("pasted-image-\(stamp)-\(n).\(fileExtension)".lowercased()) { n += 1 }
-        return "pasted-image-\(stamp)-\(n).\(fileExtension)"
+        var n = 1
+        while occupied.contains(name(n).lowercased()) { n += 1 }
+        return name(n)
     }
 
     /// Whether a paste should become an attachment rather than text. Apps
@@ -57,19 +54,9 @@ enum AttachmentStore {
         UTType(identifier)?.conforms(to: .text) == true
     }
 
-    /// Writes a PNG under `vaultRoot/_attachments/` and returns a path suitable for Markdown
-    /// image destinations. When `noteURL` is set, the path is relative to the note's directory
-    /// so other renderers resolve it correctly; otherwise vault-root style (`_attachments/…`).
-    static func savePNG(
-        data: Data,
-        vaultRoot: URL,
-        noteURL: URL? = nil,
-        now: Date = Date()
-    ) throws -> String {
-        try save(data: data, fileExtension: "png", vaultRoot: vaultRoot, noteURL: noteURL, now: now)
-    }
-
-    /// Same as `savePNG`, for any image extension (a pasted JPEG stays JPEG).
+    /// Writes an image under `vaultRoot/_attachments/` (a pasted JPEG stays JPEG) and returns a
+    /// path for its Markdown image link. When `noteURL` is set, the path is relative to the
+    /// note's folder so other renderers resolve it; otherwise vault-root style (`_attachments/…`).
     static func save(
         data: Data,
         fileExtension: String,
@@ -139,12 +126,5 @@ enum AttachmentStore {
         let downs = Array(dest[i...])
         let parts = ups + downs
         return parts.isEmpty ? target.lastPathComponent : parts.joined(separator: "/")
-    }
-
-    /// PNG bytes from pasteboard image representations.
-    static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
     }
 }

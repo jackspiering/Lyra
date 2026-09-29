@@ -44,13 +44,7 @@ enum FilenameValidation {
         if stem.lowercased().hasSuffix(".md") {
             stem = String(stem.dropLast(3)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard !stem.isEmpty else { return "Untitled" }
-        if stem.contains("/") || stem.contains(":") { return "Untitled" }
-        if stem.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
-            return "Untitled"
-        }
-        if stem.hasPrefix(".") { return "Untitled" }
-        if stem == ".." || stem == "." { return "Untitled" }
+        guard case .ok = validate(stem, isDirectory: false) else { return "Untitled" }
         return stem
     }
 }

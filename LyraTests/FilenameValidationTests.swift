@@ -53,17 +53,6 @@ final class FilenameValidationTests: XCTestCase {
         }
     }
 
-    func testVaultStoreValidatedRenameDelegates() {
-        XCTAssertEqual(
-            VaultStore.validatedRename("Note", isDirectory: false),
-            FilenameValidation.validate("Note", isDirectory: false)
-        )
-        XCTAssertEqual(
-            VaultStore.validatedRename("a/b", isDirectory: false),
-            FilenameValidation.validate("a/b", isDirectory: false)
-        )
-    }
-
     func testSanitizeNoteStem() {
         XCTAssertEqual(FilenameValidation.sanitizeNoteStem("Note"), "Note")
         XCTAssertEqual(FilenameValidation.sanitizeNoteStem("  Note  "), "Note")

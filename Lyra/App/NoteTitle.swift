@@ -18,15 +18,14 @@ enum NoteTitle {
         return [vaultRoot.lastPathComponent] + folder.dropFirst(root.count)
     }
 
-    /// Title-field commit always requests a rename. Markdown is unchanged.
-    /// Invalid titles return an error instead of silently falling back.
-    static func applyingTitle(_ newTitle: String, to markdown: String) -> (markdown: String, renamedStem: String?, error: String?) {
-        switch FilenameValidation.validate(newTitle, isDirectory: false) {
+    /// The filename stem a title edit renames the note to, or why the title
+    /// can't be a filename. The note's text is never touched.
+    static func stem(forTitle title: String) -> FilenameValidation.Result {
+        switch FilenameValidation.validate(title, isDirectory: false) {
         case .invalid(let detail):
-            return (markdown, nil, detail)
+            return .invalid(detail)
         case .ok(let name):
-            let stem = (name as NSString).deletingPathExtension
-            return (markdown, stem, nil)
+            return .ok((name as NSString).deletingPathExtension)
         }
     }
 }

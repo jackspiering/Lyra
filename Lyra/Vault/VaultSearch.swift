@@ -77,7 +77,7 @@ enum VaultSearch {
     }
 
     /// Higher is better; `nil` when the note does not match.
-    static func matchScore(name: String, path: String, query: String, words: [String]) -> Int? {
+    private static func matchScore(name: String, path: String, query: String, words: [String]) -> Int? {
         if name == query { return 1000 }
         if name.hasPrefix(query) { return 900 }
         if let range = name.range(of: query) {
@@ -107,7 +107,7 @@ enum VaultSearch {
     // MARK: - Private
 
     private static func filterNode(_ node: VaultNode, query: String, vaultRoot: URL) -> VaultNode? {
-        let path = relativePath(for: node, vaultRoot: vaultRoot)
+        let path = FileSystemVault.relativePath(for: node.url, under: vaultRoot)
         let selfMatches = matches(nodeName: node.name, path: path, query: query)
 
         if !node.isDirectory {
@@ -127,9 +127,5 @@ enum VaultSearch {
             isDirectory: true,
             children: filteredChildren
         )
-    }
-
-    private static func relativePath(for node: VaultNode, vaultRoot: URL) -> String {
-        FileSystemVault.relativePath(for: node.url, under: vaultRoot)
     }
 }

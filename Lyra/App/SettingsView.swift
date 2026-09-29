@@ -14,7 +14,7 @@ struct SettingsView: View {
 
     private var appearance: Binding<AppearancePreference> {
         Binding(
-            get: { AppearancePreference(rawValue: appearanceRaw) ?? .system },
+            get: { appearancePreference },
             set: {
                 appearanceRaw = $0.rawValue
                 // Apply after storage write so System clears window-level sticky light/dark.
@@ -42,7 +42,6 @@ struct SettingsView: View {
         // Belt-and-suspenders: force resizable + min size if the Settings scene is sticky.
         .background(SettingsWindowConfigurer())
         .onAppear {
-            GeneralPreferences.migrateConfirmDeleteIfNeeded()
             AppearanceController.apply(rawValue: appearanceRaw)
         }
         .onChange(of: appearanceRaw) { _, new in

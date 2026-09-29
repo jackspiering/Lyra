@@ -195,7 +195,7 @@ struct SidebarView: View {
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
                     .font(LyraFonts.label)
-                    .accessibilityLabel("Rename \(Self.displayName(node))")
+                    .accessibilityLabel("Rename \(node.displayName)")
                     .focused($renameFieldFocused)
                     .onSubmit { commitRename(node) }
                     .onExitCommand { cancelRename() }
@@ -208,7 +208,7 @@ struct SidebarView: View {
                 Image(systemName: node.isDirectory ? "folder" : "doc.text")
                     .foregroundStyle(.secondary)
                     .frame(width: 16, alignment: .center)
-                Text(Self.displayName(node))
+                Text(node.displayName)
                     .font(LyraFonts.label)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -224,7 +224,7 @@ struct SidebarView: View {
             .accessibilityLabel(
                 node.isDirectory
                     ? "Folder \(node.name), \(node.noteCount) notes"
-                    : "Note \(Self.displayName(node))"
+                    : "Note \(node.displayName)"
             )
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(Rectangle())
@@ -237,12 +237,6 @@ struct SidebarView: View {
                 beginRename(node)
             })
         }
-    }
-
-    /// Notes show their name (the filename stem), as the tab and title do;
-    /// `.md` is implied. Folders show their full name.
-    static func displayName(_ node: VaultNode) -> String {
-        node.isDirectory ? node.name : (node.name as NSString).deletingPathExtension
     }
 
     private func handleReturnKey() -> KeyPress.Result {
@@ -261,7 +255,7 @@ struct SidebarView: View {
     private func beginRename(_ node: VaultNode) {
         suppressFocusCommit = false
         store.selection = node.id
-        renameDraft = Self.displayName(node)
+        renameDraft = node.displayName
         renamingID = node.id
         DispatchQueue.main.async {
             renameFieldFocused = true
@@ -286,7 +280,7 @@ struct SidebarView: View {
             }
             return
         }
-        if trimmed == Self.displayName(node) || trimmed == node.name {
+        if trimmed == node.displayName || trimmed == node.name {
             cancelRename()
             return
         }

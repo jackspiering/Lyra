@@ -18,41 +18,19 @@ enum NotePDFExporter {
     /// Print-safe link colour (wiki + http) so PDF matches Reading intent.
     private static let linkColor = NSColor(calibratedRed: 0.15, green: 0.25, blue: 0.65, alpha: 1)
 
-    /// One note (or section) to place into a PDF.
-    struct NoteSource: Equatable {
-        var title: String
-        var markdown: String
-        var noteDirectory: URL
-    }
-
-    static let defaultMaxPageCount = 2000
-
     /// `documentTitle` becomes the PDF's Title metadata (Preview, Finder,
-    /// Spotlight); it is not drawn on the page.
+    /// Spotlight); it is not drawn on the page. Output stops at `maxPages`
+    /// with a notice.
     static func pdfData(
         markdown: String,
         noteDirectory: URL,
         vaultRoot: URL,
         documentTitle: String? = nil,
-        maxPages: Int = defaultMaxPageCount
-    ) throws -> Data {
-        try pdfData(
-            notes: [NoteSource(title: "", markdown: markdown, noteDirectory: noteDirectory)],
-            vaultRoot: vaultRoot,
-            documentTitle: documentTitle,
-            maxPages: maxPages
-        )
-    }
-
-    /// Multiple notes in one PDF (each optional title as H1; page break between notes).
-    static func pdfData(
-        notes: [NoteSource],
-        vaultRoot: URL,
-        documentTitle: String? = nil,
-        maxPages: Int = defaultMaxPageCount
+        maxPages: Int = 2000
     ) throws -> Data {
         try Renderer(
-            notes: notes,
+            markdown: markdown,
+            noteDirectory: noteDirectory,
             vaultRoot: vaultRoot,
             documentTitle: documentTitle,
             maxPages: maxPages
@@ -62,7 +40,8 @@ enum NotePDFExporter {
     // MARK: - Renderer
 
     private final class Renderer {
-        let notes: [NoteSource]
+        let markdown: String
+        let noteDirectory: URL
         let vaultRoot: URL
         let documentTitle: String?
         let maxPages: Int
@@ -70,16 +49,15 @@ enum NotePDFExporter {
         private var ctx: CGContext!
         private var y: CGFloat = 0
         private var pageNumber = 1
-        private var noteDirectory: URL
         private var stopped = false
         private let contentBottom = NotePDFExporter.pageHeight - NotePDFExporter.margin
 
-        init(notes: [NoteSource], vaultRoot: URL, documentTitle: String?, maxPages: Int) {
-            self.notes = notes
+        init(markdown: String, noteDirectory: URL, vaultRoot: URL, documentTitle: String?, maxPages: Int) {
+            self.markdown = markdown
+            self.noteDirectory = noteDirectory
             self.vaultRoot = vaultRoot
             self.documentTitle = documentTitle
             self.maxPages = max(1, maxPages)
-            self.noteDirectory = notes.first?.noteDirectory ?? vaultRoot
         }
 
         func run() throws -> Data {
@@ -103,30 +81,11 @@ enum NotePDFExporter {
             ctx = context
 
             beginPage()
-            for (index, note) in notes.enumerated() {
+            for block in MarkdownPreviewBlocks.parse(markdown) {
                 if stopped { break }
-                if index > 0 {
-                    if pageNumber >= maxPages {
-                        stopWithNotice()
-                        break
-                    }
-                    endPage()
-                    beginPage()
-                }
-                noteDirectory = note.noteDirectory
-                if !note.title.isEmpty {
-                    drawTextSpanning(note.title, font: headingFont(1), color: NotePDFExporter.bodyColor)
-                }
-                for block in MarkdownPreviewBlocks.parse(note.markdown) {
-                    if stopped { break }
-                    draw(block)
-                }
+                draw(block)
             }
-            if !stopped {
-                endPage()
-            } else {
-                finishStoppedPage()
-            }
+            endPage()
             ctx.closePDF()
             return data as Data
         }
@@ -204,13 +163,6 @@ enum NotePDFExporter {
             stopped = true
         }
 
-        private func finishStoppedPage() {
-            drawPageNumber()
-            NSGraphicsContext.current = nil
-            ctx.restoreGState()
-            ctx.endPDFPage()
-        }
-
         // MARK: Blocks
 
         private func draw(_ block: MarkdownPreviewBlocks.Block) {
@@ -252,7 +204,7 @@ enum NotePDFExporter {
                 full,
                 x: x,
                 width: width,
-                minimumHeight: max(font.ascender - font.descender, 1)
+                minimumHeight: lineHeight(font)
             )
         }
 
@@ -407,7 +359,7 @@ enum NotePDFExporter {
                 body,
                 x: x + bulletWidth,
                 width: bodyWidth,
-                minimumHeight: max(bodyFont.ascender - bodyFont.descender, 1)
+                minimumHeight: lineHeight(bodyFont)
             ) { rect, isFirst in
                 if isFirst {
                     bullet.draw(at: CGPoint(x: x, y: rect.minY))
@@ -424,7 +376,7 @@ enum NotePDFExporter {
                 body,
                 x: NotePDFExporter.margin + barWidth + pad,
                 width: textWidth,
-                minimumHeight: max(bodyFont.ascender - bodyFont.descender, 1)
+                minimumHeight: lineHeight(bodyFont)
             ) { rect, _ in
                 let bar = CGRect(
                     x: NotePDFExporter.margin,
@@ -454,7 +406,7 @@ enum NotePDFExporter {
                 attr,
                 x: NotePDFExporter.margin + padding,
                 width: textWidth,
-                minimumHeight: max(font.ascender - font.descender, 1),
+                minimumHeight: lineHeight(font),
                 horizontalPadding: padding,
                 topPadding: padding,
                 bottomPadding: padding
@@ -485,15 +437,15 @@ enum NotePDFExporter {
                 noteDirectory: noteDirectory,
                 vaultRoot: vaultRoot
             ) else {
-                drawTextSpanning(missingImageLabel(alt: alt, path: path), font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                drawNotice(alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))")
                 return
             }
             guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: PreviewImage.maxEncodedBytes) else {
-                drawTextSpanning("Couldn't read image: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                drawNotice("Couldn't read image: \(path)")
                 return
             }
             guard let image = PreviewImage.decode(data), image.size.width > 0, image.size.height > 0 else {
-                drawTextSpanning("Image is too large or couldn't be decoded: \(path)", font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
+                drawNotice("Image is too large or couldn't be decoded: \(path)")
                 return
             }
             let imgSize = image.size
@@ -515,13 +467,18 @@ enum NotePDFExporter {
             y += drawH + NotePDFExporter.blockGap
         }
 
-        private func missingImageLabel(alt: String, path: String) -> String {
-            alt.isEmpty ? "Missing image: \(path)" : "Missing image: \(path) (\(alt))"
+        /// A small grey line in place of something that could not be drawn.
+        private func drawNotice(_ text: String) {
+            drawTextSpanning(text, font: LyraFonts.ui(size: 11), color: NotePDFExporter.secondaryColor)
         }
 
         // MARK: Typography helpers
 
         private var bodyFont: NSFont { LyraFonts.ui(size: 12) }
+
+        private func lineHeight(_ font: NSFont) -> CGFloat {
+            max(font.ascender - font.descender, 1)
+        }
 
         private func headingFont(_ level: Int) -> NSFont {
             let size: CGFloat
@@ -552,13 +509,8 @@ enum NotePDFExporter {
                 ])
             }
 
-            let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown(text)
-            var options = AttributedString.MarkdownParsingOptions()
-            options.interpretedSyntax = .inlineOnlyPreservingWhitespace
-            options.failurePolicy = .returnPartiallyParsedIfPossible
-
             let bridged: NSAttributedString
-            if let attributed = try? AttributedString(markdown: prepared, options: options) {
+            if let attributed = MarkdownPreviewBlocks.inlineAttributedString(text) {
                 bridged = NSAttributedString(attributed)
             } else {
                 bridged = NSAttributedString(string: text)

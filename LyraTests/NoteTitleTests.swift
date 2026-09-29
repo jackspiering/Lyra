@@ -11,8 +11,8 @@ final class NoteTitleTests: XCTestCase {
     func testSidebarShowsNoteStemAndFullFolderName() {
         let note = VaultNode(name: "Node.js.md", url: URL(fileURLWithPath: "/v/Node.js.md"), isDirectory: false, children: nil)
         let folder = VaultNode(name: "Archive.md", url: URL(fileURLWithPath: "/v/Archive.md"), isDirectory: true, children: [])
-        XCTAssertEqual(SidebarView.displayName(note), "Node.js")
-        XCTAssertEqual(SidebarView.displayName(folder), "Archive.md")
+        XCTAssertEqual(note.displayName, "Node.js")
+        XCTAssertEqual(folder.displayName, "Archive.md")
     }
 
     func testDisplayTitleKeepsInnerDots() {
@@ -24,27 +24,18 @@ final class NoteTitleTests: XCTestCase {
         XCTAssertEqual(NoteTitle.displayTitle(fileURL: nil), "")
     }
 
-    func testApplyingTitleAlwaysRequestsRenameAndLeavesMarkdown() {
-        let md = "# Old\n\nBody stays."
-        let result = NoteTitle.applyingTitle("New Title", to: md)
-        XCTAssertEqual(result.markdown, md)
-        XCTAssertEqual(result.renamedStem, "New Title")
-        XCTAssertNil(result.error)
+    func testTitleBecomesStem() {
+        XCTAssertEqual(NoteTitle.stem(forTitle: "New Title"), .ok("New Title"))
     }
 
-    func testApplyingTitleRejectsInvalidStem() {
-        let md = "body"
-        let result = NoteTitle.applyingTitle("  Bad/Name  ", to: md)
-        XCTAssertNil(result.renamedStem)
-        XCTAssertNotNil(result.error)
-        XCTAssertEqual(result.markdown, md)
+    func testTitleRejectsInvalidStem() {
+        guard case .invalid = NoteTitle.stem(forTitle: "  Bad/Name  ") else {
+            return XCTFail("expected an invalid title")
+        }
     }
 
-    func testApplyingTitleStripsMdSuffixForRename() {
-        let md = "body"
-        let result = NoteTitle.applyingTitle("Note.md", to: md)
-        XCTAssertEqual(result.renamedStem, "Note")
-        XCTAssertEqual(result.markdown, md)
+    func testTitleStripsMdSuffix() {
+        XCTAssertEqual(NoteTitle.stem(forTitle: "Note.md"), .ok("Note"))
     }
 
     func testBreadcrumbListsVaultThenFolders() {

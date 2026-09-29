@@ -92,11 +92,7 @@ struct MarkdownBlockRow: View {
     }
 
     private func inline(_ source: String) -> AttributedString {
-        let prepared = MarkdownPreviewBlocks.prepareInlineMarkdown(source)
-        var options = AttributedString.MarkdownParsingOptions()
-        options.interpretedSyntax = .inlineOnlyPreservingWhitespace
-        options.failurePolicy = .returnPartiallyParsedIfPossible
-        guard var attributed = try? AttributedString(markdown: prepared, options: options) else {
+        guard var attributed = MarkdownPreviewBlocks.inlineAttributedString(source) else {
             return AttributedString(source)
         }
         for run in attributed.runs {

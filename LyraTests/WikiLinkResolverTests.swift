@@ -14,7 +14,14 @@ final class WikiLinkResolverTests: XCTestCase {
         aliases: [URL: [String]] = [:],
         bodies: [URL: String] = [:]
     ) -> WikiLinkResolver {
-        WikiLinkResolver(noteURLs: urls, vaultRoot: root, aliases: aliases, bodies: bodies)
+        let notes = urls.map { url in
+            WikiNote(
+                url: url,
+                relativePath: FileSystemVault.relativePath(for: url, under: root),
+                aliases: aliases[url] ?? []
+            )
+        }
+        return WikiLinkResolver(notes: notes, bodies: bodies)
     }
 
     func testResolvesPlainName() {
@@ -175,7 +182,7 @@ final class WikiLinkResolverTests: XCTestCase {
         let root = URL(fileURLWithPath: "/vault")
         let old = root.appendingPathComponent("Projects/Old.md")
         let other = root.appendingPathComponent("Other.md")
-        let resolver = WikiLinkResolver(noteURLs: [old, other], vaultRoot: root)
+        let resolver = makeResolver(urls: [old, other])
         let body = "See [[Old]], [[Projects/Old|the plan]], [[old.md]], [[Other]] and `[[Old]]`."
 
         let rewritten = resolver.rewritingLinks(in: body, from: old, toStem: "New")
@@ -189,7 +196,7 @@ final class WikiLinkResolverTests: XCTestCase {
     func testRewritingLinksReturnsNilWhenNothingPointsAtNote() {
         let root = URL(fileURLWithPath: "/vault")
         let old = root.appendingPathComponent("Old.md")
-        let resolver = WikiLinkResolver(noteURLs: [old], vaultRoot: root)
+        let resolver = makeResolver(urls: [old])
         XCTAssertNil(resolver.rewritingLinks(in: "No links [[Missing]]", from: old, toStem: "New"))
     }
 

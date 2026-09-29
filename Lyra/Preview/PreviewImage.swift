@@ -68,11 +68,4 @@ enum PreviewImage {
         guard isWithinBudget(width: displayWidth, height: displayHeight) else { return nil }
         return (displayWidth, displayHeight)
     }
-
-    static func decode(contentsOf url: URL) -> NSImage? {
-        guard let data = FileSystemVault.safeBoundedData(at: url, maxBytes: maxEncodedBytes) else {
-            return nil
-        }
-        return decode(data)
-    }
 }
