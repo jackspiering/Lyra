@@ -41,11 +41,8 @@ final class WikiFlow {
                 // Obsidian heading links and file embeds: say so rather than
                 // offering to create `Note#Heading.md` or `image.png.md`.
                 store.present(
-                    context: .openNote,
-                    message: UserFacingError.message(
-                        context: .openNote,
-                        detail: "Lyra doesn’t follow heading links or embedded files. Link to the note by name instead."
-                    )
+                    .openNote,
+                    detail: "Lyra doesn’t follow heading links or embedded files. Link to the note by name instead."
                 )
                 return
             }
@@ -99,11 +96,9 @@ final class WikiFlow {
     func activate(_ url: URL) {
         if tabs.selectOpenNote(path: url.path) { return }
         if tabs.selectedEditor.fileURL == nil {
-            // empty active tab — fill it
-            _ = tabs.openInActiveTab(url: url) { created in
-                AppSession.shared.register(editor: created.editor, store: self.store)
-            }
-            // Whether the fill succeeded or not, surface any failure from the previous save/open.
+            // Fill the empty active tab. Success or not, surface any failure
+            // from the previous save or this open.
+            tabs.openInActiveTab(url: url)
             flushError(tabs.selectedEditor)
             return
         }

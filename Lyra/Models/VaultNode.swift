@@ -9,6 +9,12 @@ struct VaultNode: Identifiable, Hashable {
 }
 
 extension VaultNode {
+    /// A note shows its filename without `.md`, as the tab and title do; a
+    /// folder shows its full name.
+    var displayName: String {
+        isDirectory ? name : (name as NSString).deletingPathExtension
+    }
+
     /// Markdown notes at or below this node (a note counts itself).
     var noteCount: Int {
         guard isDirectory else {

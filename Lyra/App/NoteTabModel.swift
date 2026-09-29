@@ -8,9 +8,6 @@ final class NoteTab: Identifiable {
     let id: UUID
     let editor: EditorViewModel
 
-    /// Mirrors `editor.fileURL`; `nil` means empty tab.
-    var fileURL: URL? { editor.fileURL }
-
     /// Tab bar label: filename stem via `NoteTitle`, or “New Tab” when empty.
     /// Reads only the URL, so typing does not redraw the tab bar.
     var title: String {
@@ -83,23 +80,13 @@ final class NoteTabController {
     }
 
     /// Opens `url` in the active tab. Returns `false` if a dirty save failed.
-    /// If the controller had no tabs, synthesizes one and invokes `onCreated` so the caller can register AppSession.
     @discardableResult
-    func openInActiveTab(url: URL, onCreated: ((NoteTab) -> Void)? = nil) -> Bool {
-        let tab: NoteTab
-        if let selected = selectedTab {
-            tab = selected
-        } else {
-            let t = NoteTab()
-            tabs = [t]
-            selectedTabID = t.id
-            onCreated?(t)
-            tab = t
-        }
-        if tab.editor.fileURL?.path == url.path {
+    func openInActiveTab(url: URL) -> Bool {
+        let editor = selectedEditor
+        if editor.fileURL?.path == url.path {
             return true
         }
-        return tab.editor.open(url: url)
+        return editor.open(url: url)
     }
 
     /// Open `url` in a brand-new tab (caller registers AppSession). Returns false if open failed.
@@ -154,6 +141,17 @@ final class NoteTabController {
     /// Editors for quit-save / window teardown.
     func allEditors() -> [EditorViewModel] {
         tabs.map(\.editor)
+    }
+
+    /// Open notes' current text by path, laid over the scanned bodies for
+    /// backlinks and search so they reflect unsaved typing.
+    func liveBodies() -> [String: String] {
+        var bodies: [String: String] = [:]
+        for tab in tabs {
+            guard let path = tab.editor.fileURL?.path else { continue }
+            bodies[path] = tab.editor.text
+        }
+        return bodies
     }
 
     /// After a rename/move on disk, point any matching open editors at the new path.

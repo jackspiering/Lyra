@@ -46,7 +46,7 @@ final class FileSystemVaultTests: XCTestCase {
             withIntermediateDirectories: true
         )
 
-        let tree = try FileSystemVault.scan(root: root)
+        let tree = try FileSystemVault.scanResult(root: root).node
         XCTAssertTrue(tree.isDirectory)
 
         let names = Set((tree.children ?? []).map(\.name))
@@ -85,7 +85,7 @@ final class FileSystemVaultTests: XCTestCase {
             attributes: nil
         )
 
-        let tree = try FileSystemVault.scan(root: root)
+        let tree = try FileSystemVault.scanResult(root: root).node
         let names = (tree.children ?? []).map(\.name)
         XCTAssertTrue(names.contains("note.md"))
         XCTAssertFalse(names.contains("_attachments"))
@@ -113,7 +113,7 @@ final class FileSystemVaultTests: XCTestCase {
             withDestinationURL: root
         )
 
-        let tree = try FileSystemVault.scan(root: root)
+        let tree = try FileSystemVault.scanResult(root: root).node
         let names = (tree.children ?? []).map(\.name)
         XCTAssertTrue(names.contains("note.md"))
         XCTAssertFalse(names.contains("loop"))
@@ -137,7 +137,7 @@ final class FileSystemVaultTests: XCTestCase {
             withDestinationURL: outside
         )
 
-        let tree = try FileSystemVault.scan(root: root)
+        let tree = try FileSystemVault.scanResult(root: root).node
         XCTAssertFalse((tree.children ?? []).contains { $0.name == "linked.md" })
     }
 
@@ -154,7 +154,7 @@ final class FileSystemVaultTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
         defer { try? FileManager.default.removeItem(at: link) }
 
-        XCTAssertThrowsError(try FileSystemVault.scan(root: link))
+        XCTAssertThrowsError(try FileSystemVault.scanResult(root: link))
     }
 
     func testScanSkipsUnreadableChildButKeepsSiblings() throws {
@@ -185,7 +185,7 @@ final class FileSystemVaultTests: XCTestCase {
         )
         try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
 
-        let tree = try FileSystemVault.scan(root: root)
+        let tree = try FileSystemVault.scanResult(root: root).node
         let names = Set((tree.children ?? []).map(\.name))
         XCTAssertTrue(names.contains("keeper.md"))
         // locked may be absent (skipped on recurse) or present empty — either way keeper survives.

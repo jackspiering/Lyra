@@ -2,10 +2,9 @@ import SwiftUI
 
 /// Per-window menu command surface, published with `focusedSceneValue` so the
 /// key vault window answers File-menu and View-menu commands. When no vault
-/// window has focus the menus see nil and their actions no-op — the same gate
-/// the previous key-window notification checks provided. Quit-save failure is
-/// not part of this surface: it may target a background window, so it stays on
-/// an app-global notification observed by every vault window.
+/// window has focus the menus see nil and their actions no-op. Quit-save
+/// failure is not part of this surface: it may target a background window, so
+/// it stays on an app-global notification observed by every vault window.
 struct VaultCommands {
     var save: () -> Void
     var exportPDF: () -> Void

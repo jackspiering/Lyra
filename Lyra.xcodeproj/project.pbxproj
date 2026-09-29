@@ -90,6 +90,7 @@
 		A10000000000000000000057 /* VaultCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000057 /* VaultCommands.swift */; };
 		A10000000000000000000058 /* WikiFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000058 /* WikiFlow.swift */; };
 		A10000000000000000000059 /* PDFExportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000059 /* PDFExportFlow.swift */; };
+		A10000000000000000000064 /* RenameFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000064 /* RenameFlow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -189,6 +190,7 @@
 		B10000000000000000000056 /* NoteTabModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTabModelTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000061 /* WindowSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowSnapshotTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000059 /* PDFExportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExportFlow.swift; sourceTree = "<group>"; };
+		B10000000000000000000064 /* RenameFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameFlow.swift; sourceTree = "<group>"; };
 		B10000000000000000000057 /* VaultCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultCommands.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -306,6 +308,7 @@
 				B1000000000000000000004B /* VaultPalette.swift */,
 				B10000000000000000000058 /* WikiFlow.swift */,
 				B10000000000000000000059 /* PDFExportFlow.swift */,
+				B10000000000000000000064 /* RenameFlow.swift */,
 				B1000000000000000000004C /* BacklinksInspector.swift */,
 				B10000000000000000000057 /* VaultCommands.swift */,
 			);
@@ -521,6 +524,7 @@
 				A10000000000000000000047 /* WikiLinkSyntax.swift in Sources */,
 				A10000000000000000000058 /* WikiFlow.swift in Sources */,
 				A10000000000000000000059 /* PDFExportFlow.swift in Sources */,
+				A10000000000000000000064 /* RenameFlow.swift in Sources */,
 				A10000000000000000000048 /* FrontmatterAliases.swift in Sources */,
 				A10000000000000000000063 /* MarkdownScan.swift in Sources */,
 				A10000000000000000000049 /* VaultFullTextSearch.swift in Sources */,

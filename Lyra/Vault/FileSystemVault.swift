@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 enum FileSystemVault {
     /// Directories nested deeper than this are listed empty and not walked.
@@ -19,14 +14,6 @@ enum FileSystemVault {
 
     static func shouldInclude(name: String) -> Bool {
         !name.hasPrefix(".")
-    }
-
-    static func scan(
-        root: URL,
-        shouldCancel: () -> Bool = { false },
-        maxDepth: Int = maxDirectoryDepth
-    ) throws -> VaultNode {
-        try scanResult(root: root, shouldCancel: shouldCancel, maxDepth: maxDepth).node
     }
 
     static func scanResult(
@@ -233,19 +220,19 @@ enum FileSystemVault {
     /// itself. This is used before mutations because a stale tree can outlive
     /// a directory that was replaced on disk.
     static func isWithin(_ candidate: URL, root: URL) -> Bool {
-        let rootComponents = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        let candidateComponents = candidate.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        guard candidateComponents.count >= rootComponents.count else { return false }
-        return zip(rootComponents, candidateComponents).allSatisfy { $0 == $1 }
+        resolvedComponents(of: candidate).starts(with: resolvedComponents(of: root))
     }
 
     /// True only for an object strictly below `root`. The vault root itself is
     /// within the vault but must never be renamed or deleted as a note.
     static func isStrictDescendant(_ candidate: URL, root: URL) -> Bool {
-        let rootComponents = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        let candidateComponents = candidate.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        guard candidateComponents.count > rootComponents.count else { return false }
-        return zip(rootComponents, candidateComponents).allSatisfy { $0 == $1 }
+        let rootComponents = resolvedComponents(of: root)
+        let candidateComponents = resolvedComponents(of: candidate)
+        return candidateComponents.count > rootComponents.count && candidateComponents.starts(with: rootComponents)
+    }
+
+    private static func resolvedComponents(of url: URL) -> [String] {
+        url.resolvingSymlinksInPath().standardizedFileURL.pathComponents
     }
 
     /// Vault-relative path using path components, so `/vault/Notes2/x.md` is
@@ -348,13 +335,5 @@ enum FileSystemVault {
         }
         visit(root)
         return index
-    }
-
-    static func findNode(id: String, in node: VaultNode) -> VaultNode? {
-        if node.id == id { return node }
-        for child in node.children ?? [] {
-            if let found = findNode(id: id, in: child) { return found }
-        }
-        return nil
     }
 }

@@ -127,9 +127,11 @@ struct LyraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @FocusedValue(\.vaultCommands) private var vaultCommands: VaultCommands?
 
+    private var isVaultOpen: Bool { vaultCommands?.isVaultOpen == true }
+    private var hasOpenNote: Bool { vaultCommands?.hasOpenNote == true }
+
     init() {
         LyraFonts.registerBundledFonts()
-        GeneralPreferences.migrateConfirmDeleteIfNeeded()
     }
 
     var body: some Scene {
@@ -148,23 +150,23 @@ struct LyraApp: App {
                     vaultCommands?.createNote()
                 }
                 .keyboardShortcut("n", modifiers: .command)
-                .disabled(!(vaultCommands?.isVaultOpen ?? false))
+                .disabled(!isVaultOpen)
 
                 Button("New Folder") {
                     vaultCommands?.createFolder()
                 }
-                .disabled(!(vaultCommands?.isVaultOpen ?? false))
+                .disabled(!isVaultOpen)
 
                 Button("New Tab") {
                     vaultCommands?.newTab()
                 }
                 .keyboardShortcut("t", modifiers: .command)
-                .disabled(!(vaultCommands?.isVaultOpen ?? false))
+                .disabled(!isVaultOpen)
 
                 Button("Open in New Tab") {
                     vaultCommands?.openInNewTab()
                 }
-                .disabled(!(vaultCommands?.canOpenInNewTab ?? false))
+                .disabled(vaultCommands?.canOpenInNewTab != true)
 
                 Button("Close Tab") {
                     vaultCommands?.closeTab()
@@ -176,13 +178,13 @@ struct LyraApp: App {
                     vaultCommands?.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
             }
             CommandGroup(after: .importExport) {
                 Button("Export PDF…") {
                     vaultCommands?.exportPDF()
                 }
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
             }
             CommandGroup(after: .newItem) {
                 Button("Go to File…") {
@@ -198,7 +200,7 @@ struct LyraApp: App {
                     vaultCommands?.refresh()
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(!(vaultCommands?.isVaultOpen ?? false))
+                .disabled(!isVaultOpen)
 
                 Divider()
 
@@ -206,7 +208,7 @@ struct LyraApp: App {
                     vaultCommands?.requestDelete()
                 }
                 .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(!(vaultCommands?.canDeleteSelection ?? false))
+                .disabled(vaultCommands?.canDeleteSelection != true)
             }
             // Joins the system View menu (toolbar, sidebar, full screen)
             // instead of adding a second top-level "View" menu.
@@ -215,12 +217,12 @@ struct LyraApp: App {
                     vaultCommands?.toggleViewMode()
                 }
                 .keyboardShortcut("e", modifiers: .command)
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
 
                 Button("Backlinks") {
                     vaultCommands?.toggleBacklinks()
                 }
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
 
                 Divider()
 
@@ -228,19 +230,19 @@ struct LyraApp: App {
                     vaultCommands?.zoomIn()
                 }
                 .keyboardShortcut("+", modifiers: .command)
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
 
                 Button("Smaller") {
                     vaultCommands?.zoomOut()
                 }
                 .keyboardShortcut("-", modifiers: .command)
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
 
                 Button("Actual Size") {
                     vaultCommands?.resetZoom()
                 }
                 .keyboardShortcut("0", modifiers: .command)
-                .disabled(!(vaultCommands?.hasOpenNote ?? false))
+                .disabled(!hasOpenNote)
 
                 Divider()
             }
@@ -249,13 +251,13 @@ struct LyraApp: App {
                     vaultCommands?.findInNote()
                 }
                 .keyboardShortcut("f", modifiers: .command)
-                .disabled(!(vaultCommands?.canFindInNote ?? false))
+                .disabled(vaultCommands?.canFindInNote != true)
 
                 Button("Search Vault…") {
                     vaultCommands?.findInVault()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(!(vaultCommands?.isVaultOpen ?? false))
+                .disabled(!isVaultOpen)
             }
         }
 

@@ -8,7 +8,7 @@ final class AttachmentStoreTests: XCTestCase {
         c.year = 2026; c.month = 7; c.day = 27
         c.hour = 15; c.minute = 30; c.second = 45
         let date = cal.date(from: c)!
-        let name = AttachmentStore.uniquePNGFilename(now: date, existing: [])
+        let name = AttachmentStore.uniqueFilename(fileExtension: "png", now: date, existing: [])
         XCTAssertEqual(name, "pasted-image-20260727-153045.png")
         XCTAssertFalse(name.contains(" "))
     }
@@ -20,7 +20,8 @@ final class AttachmentStoreTests: XCTestCase {
         c.hour = 15; c.minute = 30; c.second = 45
         let date = cal.date(from: c)!
         let base = "pasted-image-20260727-153045.png"
-        let name = AttachmentStore.uniquePNGFilename(
+        let name = AttachmentStore.uniqueFilename(
+            fileExtension: "png",
             now: date,
             existing: [base, "pasted-image-20260727-153045-2.png"]
         )
@@ -38,7 +39,8 @@ final class AttachmentStoreTests: XCTestCase {
         components.minute = 30
         components.second = 45
         let date = calendar.date(from: components)!
-        let name = AttachmentStore.uniquePNGFilename(
+        let name = AttachmentStore.uniqueFilename(
+            fileExtension: "png",
             now: date,
             existing: ["PASTED-IMAGE-20260727-153045.PNG"]
         )
@@ -58,7 +60,7 @@ final class AttachmentStoreTests: XCTestCase {
         let png = Data(base64Encoded:
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         )!
-        let rel = try AttachmentStore.savePNG(data: png, vaultRoot: root)
+        let rel = try AttachmentStore.save(data: png, fileExtension: "png", vaultRoot: root)
         XCTAssertTrue(rel.hasPrefix("_attachments/"))
         XCTAssertTrue(rel.hasSuffix(".png"))
         XCTAssertFalse(rel.contains(" "), "Markdown link destinations must not contain spaces")
@@ -83,7 +85,7 @@ final class AttachmentStoreTests: XCTestCase {
         let png = Data(base64Encoded:
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         )!
-        let rel = try AttachmentStore.savePNG(data: png, vaultRoot: root, noteURL: noteURL)
+        let rel = try AttachmentStore.save(data: png, fileExtension: "png", vaultRoot: root, noteURL: noteURL)
         XCTAssertFalse(rel.contains(" "), "link path must have no spaces")
         XCTAssertTrue(rel.contains("_attachments/"))
         XCTAssertTrue(rel.hasPrefix("../"), "nested note should use parent-relative path")
@@ -116,7 +118,7 @@ final class AttachmentStoreTests: XCTestCase {
         )
 
         XCTAssertThrowsError(
-            try AttachmentStore.savePNG(data: Data([0x01]), vaultRoot: root)
+            try AttachmentStore.save(data: Data([0x01]), fileExtension: "png", vaultRoot: root)
         )
         XCTAssertTrue((try? FileManager.default.contentsOfDirectory(atPath: outside.path))?.isEmpty == true)
     }

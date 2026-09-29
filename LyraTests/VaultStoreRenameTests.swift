@@ -3,38 +3,38 @@ import XCTest
 
 final class VaultStoreRenameTests: XCTestCase {
     func testRejectsEmpty() {
-        switch VaultStore.validatedRename("   ", isDirectory: false) {
+        switch FilenameValidation.validate("   ", isDirectory: false) {
         case .ok: XCTFail("expected failure")
         case .invalid(let msg): XCTAssertTrue(msg.contains("empty"))
         }
     }
 
     func testRejectsPathSeparators() {
-        switch VaultStore.validatedRename("a/b.md", isDirectory: false) {
+        switch FilenameValidation.validate("a/b.md", isDirectory: false) {
         case .ok: XCTFail("expected failure")
         case .invalid: break
         }
-        switch VaultStore.validatedRename("a:b.md", isDirectory: false) {
+        switch FilenameValidation.validate("a:b.md", isDirectory: false) {
         case .ok: XCTFail("expected failure")
         case .invalid: break
         }
     }
 
     func testRejectsLeadingDot() {
-        switch VaultStore.validatedRename(".hidden.md", isDirectory: false) {
+        switch FilenameValidation.validate(".hidden.md", isDirectory: false) {
         case .ok: XCTFail("expected failure")
         case .invalid: break
         }
     }
 
     func testAppendsMarkdownExtensionForFiles() {
-        XCTAssertEqual(VaultStore.validatedRename("Note", isDirectory: false), .ok("Note.md"))
-        XCTAssertEqual(VaultStore.validatedRename("Note.md", isDirectory: false), .ok("Note.md"))
-        XCTAssertEqual(VaultStore.validatedRename("Note.MD", isDirectory: false), .ok("Note.MD"))
+        XCTAssertEqual(FilenameValidation.validate("Note", isDirectory: false), .ok("Note.md"))
+        XCTAssertEqual(FilenameValidation.validate("Note.md", isDirectory: false), .ok("Note.md"))
+        XCTAssertEqual(FilenameValidation.validate("Note.MD", isDirectory: false), .ok("Note.MD"))
     }
 
     func testFoldersKeepNameWithoutMd() {
-        XCTAssertEqual(VaultStore.validatedRename("Projects", isDirectory: true), .ok("Projects"))
+        XCTAssertEqual(FilenameValidation.validate("Projects", isDirectory: true), .ok("Projects"))
     }
 
     @MainActor
@@ -60,7 +60,9 @@ final class VaultStoreRenameTests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.01))
         }
         XCTAssertTrue(store.scanSkippedLargeNotes)
-        XCTAssertTrue(store.searchNoteBodies(query: "large-target", liveBodies: [:]).isEmpty)
+        XCTAssertTrue(
+            VaultFullTextSearch.search(documents: store.searchCorpus(liveBodies: [:]), query: "large-target").isEmpty
+        )
         XCTAssertTrue(store.backlinks(to: small, liveBodies: [:]).isEmpty)
         // Left out of the indexes, but still a note: a link to it must not offer Create.
         guard case .unique(let resolved) = store.resolveWikiLink("large") else {
@@ -70,7 +72,7 @@ final class VaultStoreRenameTests: XCTestCase {
     }
 
     @MainActor
-    func testRenameSelectedReturnsDestinationImmediately() throws {
+    func testRenameReturnsDestinationImmediately() throws {
         let root = try FileManager.default.url(
             for: .itemReplacementDirectory,
             in: .userDomainMask,
@@ -84,20 +86,14 @@ final class VaultStoreRenameTests: XCTestCase {
 
         let store = VaultStore()
         store.openVault(at: root)
-        // Wait briefly for the initial scan so selectedNode can resolve.
+        // Wait briefly for the initial scan so the note is in the tree.
         let deadline = Date().addingTimeInterval(2)
         while store.rootNode == nil, Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.01))
         }
-        store.selection = note.path
-        // Even if the tree is still stale, rename must return the real destination URL.
-        // Seed a minimal tree if scan has not landed yet.
-        if store.selectedNode() == nil {
-            store.rootNode = try FileSystemVault.scan(root: root)
-            store.selection = note.path
-        }
 
-        let dest = try XCTUnwrap(store.renameSelected(to: "beta.md"))
+        // The destination comes back before the rescan that shows it lands.
+        let dest = try XCTUnwrap(store.renameItem(at: note, to: "beta.md"))
         XCTAssertEqual(dest.lastPathComponent, "beta.md")
         XCTAssertTrue(FileManager.default.fileExists(atPath: dest.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: note.path))

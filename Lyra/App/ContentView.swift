@@ -1,16 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// A note rename that left `[[links]]` in other notes pointing at the old name.
-struct PendingLinkUpdate: Identifiable {
-    let id = UUID()
-    let oldURL: URL
-    let newStem: String
-    let sources: [Backlink]
-    /// Resolver from before the rename, which still resolves the old name.
-    let resolver: WikiLinkResolver
-}
-
 /// Inputs that invalidate the backlinks list.
 private struct BacklinksKey: Equatable {
     var path: String?
@@ -29,7 +19,6 @@ struct ContentView: View {
     @AppStorage("lyra.editorZoom") private var editorZoom = 1.0
     @State private var backlinkItems: [Backlink] = []
     @State private var backlinksPath: String?
-    @State private var pendingLinkUpdate: PendingLinkUpdate?
     @State private var showDeleteConfirm = false
     @State private var deleteDontAskAgain = false
     @State private var showNewNoteSheet = false
@@ -39,6 +28,7 @@ struct ContentView: View {
     /// Bumped when ⌘F should show the Source find bar.
     @State private var findBarToken = 0
     @State private var wikiFlow: WikiFlow
+    @State private var renameFlow: RenameFlow
     @State private var pdfExport: PDFExportFlow
     /// Go to File or Search Vault palette over the window; nil when closed.
     @State private var palette: VaultPalette.Mode?
@@ -67,11 +57,12 @@ struct ContentView: View {
         self.store = store
         self.tabs = tabs
         self.openNewVaultWindow = openNewVaultWindow
-        // One presentation policy shared by both flows.
+        // One presentation policy shared by every flow.
         let flushError: (EditorViewModel) -> Void = {
             Self.flushEditorError($0, presentingOn: store)
         }
         _wikiFlow = State(initialValue: WikiFlow(store: store, tabs: tabs, flushError: flushError))
+        _renameFlow = State(initialValue: RenameFlow(store: store, tabs: tabs, flushError: flushError))
         _pdfExport = State(initialValue: PDFExportFlow(store: store, tabs: tabs, flushError: flushError))
     }
 
@@ -155,7 +146,7 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(
                 store: store,
-                onCommitRename: commitSidebarRename,
+                onCommitRename: { renameFlow.rename($0, to: $1) },
                 onRequestDelete: requestDelete,
                 onNewNote: beginNewNote,
                 onExportNotePDF: { pdfExport.exportNote($0) }
@@ -206,15 +197,15 @@ struct ContentView: View {
         .alert(
             "Update links?",
             isPresented: Binding(
-                get: { pendingLinkUpdate != nil },
-                set: { if !$0 { pendingLinkUpdate = nil } }
+                get: { renameFlow.pendingLinkUpdate != nil },
+                set: { if !$0 { renameFlow.pendingLinkUpdate = nil } }
             ),
-            presenting: pendingLinkUpdate
+            presenting: renameFlow.pendingLinkUpdate
         ) { update in
-            Button("Update Links") { applyLinkUpdate(update) }
+            Button("Update Links") { renameFlow.applyLinkUpdate(update) }
             Button("Don’t Update", role: .cancel) {}
         } message: { update in
-            Text(linkUpdateMessage(update))
+            Text(update.message)
         }
         .overlay {
             if let mode = palette {
@@ -222,7 +213,7 @@ struct ContentView: View {
                     mode: mode,
                     query: $paletteQuery,
                     results: { query in
-                        await Self.paletteResults(mode: mode, query: query, store: store, liveBodies: liveBodies())
+                        await Self.paletteResults(mode: mode, query: query, store: store, liveBodies: tabs.liveBodies())
                     },
                     onOpen: openFromPalette,
                     onClose: closePalette
@@ -321,7 +312,7 @@ struct ContentView: View {
                         // a focus-loss commit that lands after a tab switch must
                         // not rename the newly selected note.
                         onCommit: { [noteURL = editor.fileURL] title in
-                            commitNoteTitle(title, for: noteURL)
+                            renameFlow.commitTitle(title, for: noteURL)
                         }
                     )
                     .id(editor.fileURL?.path)
@@ -362,7 +353,7 @@ struct ContentView: View {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
         }
-        backlinkItems = store.backlinks(to: url, liveBodies: liveBodies())
+        backlinkItems = store.backlinks(to: url, liveBodies: tabs.liveBodies())
         backlinksPath = url.path
     }
 
@@ -411,12 +402,13 @@ struct ContentView: View {
 
     private func selectTab(_ id: NoteTab.ID) {
         tabs.select(id)
-        // Sync sidebar highlight to the note in this tab; clear when empty so re-click re-opens.
-        if let path = tabs.selectedTab?.editor.fileURL?.path {
-            store.selection = path
-        } else {
-            store.selection = nil
-        }
+        syncSidebarToSelectedTab()
+    }
+
+    /// Highlight the selected tab's note in the sidebar; clear it for an
+    /// empty tab so clicking that note again opens it there.
+    private func syncSidebarToSelectedTab() {
+        store.selection = tabs.selectedTab?.editor.fileURL?.path
     }
 
     private func closeTab(id: NoteTab.ID?) {
@@ -428,12 +420,7 @@ struct ContentView: View {
             if !tabs.tabs.contains(where: { $0.id == id }) {
                 AppSession.shared.unregister(editor: editorRef)
             }
-            // After close, align sidebar to remaining note or clear for empty tab.
-            if let path = tabs.selectedTab?.editor.fileURL?.path {
-                store.selection = path
-            } else {
-                store.selection = nil
-            }
+            syncSidebarToSelectedTab()
         } else {
             // Flush the tab that failed to save, not necessarily the previously selected editor.
             selectTab(containing: editorRef)
@@ -665,7 +652,7 @@ struct ContentView: View {
     private func deleteConfirmSheet() -> some View {
         let node = store.selectedNode()
         let isFolder = node?.isDirectory == true
-        let name = node.map { $0.isDirectory ? $0.name : ($0.name as NSString).deletingPathExtension } ?? "this item"
+        let name = node?.displayName ?? "this item"
         return VStack(alignment: .leading, spacing: 16) {
             SheetHeader(
                 systemImage: "trash",
@@ -736,113 +723,6 @@ struct ContentView: View {
         }
     }
 
-    /// Sidebar inline rename: flush editors, rename on disk, relocate open notes if needed.
-    private func commitSidebarRename(node: VaultNode, newName: String) -> Bool {
-        renameItem(at: node.url, isDirectory: node.isDirectory, to: newName)
-    }
-
-    /// Title field commit for the note at `url`: rename the file. The first
-    /// heading is not the name. Returns `false` when nothing was renamed.
-    private func commitNoteTitle(_ newTitle: String, for url: URL?) -> Bool {
-        guard let url, tabs.tabs.contains(where: { $0.editor.fileURL?.path == url.path }) else {
-            // That note is no longer open here; nothing to rename.
-            return false
-        }
-        let result = NoteTitle.applyingTitle(newTitle, to: "")
-        if let error = result.error {
-            store.present(context: .rename, message: error)
-            return false
-        }
-        guard let stem = result.renamedStem else { return false }
-        guard stem != url.deletingPathExtension().lastPathComponent else { return true }
-        return renameItem(at: url, isDirectory: false, to: stem + ".md")
-    }
-
-    /// Flush editors, rename on disk, relocate open tabs, and offer to point
-    /// `[[links]]` at a renamed note.
-    private func renameItem(at url: URL, isDirectory: Bool, to newName: String) -> Bool {
-        for tab in tabs.tabs {
-            guard tab.editor.saveIfNeeded() else {
-                Self.flushEditorError(tab.editor, presentingOn: store)
-                return false
-            }
-        }
-        // Capture links to the old name before the rescan forgets it.
-        let resolver = store.linkResolver
-        let linkSources = isDirectory ? [] : store.backlinks(to: url, liveBodies: liveBodies())
-        // Rename by path, not by moving the sidebar selection: a selection change
-        // would try to open the old path after the file has moved.
-        guard let newURL = store.renameItem(at: url, to: newName) else {
-            return false
-        }
-        // Same name (`Note` for `Note.md`): nothing moved, so no link update.
-        guard newURL.path != url.path else { return true }
-        tabs.relocateOpenNotes(oldPath: url.path, newURL: newURL)
-        if !linkSources.isEmpty {
-            pendingLinkUpdate = PendingLinkUpdate(
-                oldURL: url,
-                newStem: newURL.deletingPathExtension().lastPathComponent,
-                sources: linkSources,
-                resolver: resolver
-            )
-        }
-        return true
-    }
-
-    private func linkUpdateMessage(_ update: PendingLinkUpdate) -> String {
-        let oldStem = update.oldURL.deletingPathExtension().lastPathComponent
-        let count = update.sources.count
-        let notes = count == 1 ? "1 note links" : "\(count) notes link"
-        return "\(notes) to “\(oldStem)”. Point those links at “\(update.newStem)”?"
-    }
-
-    /// Rewrite links in every note that pointed at the renamed one. Open
-    /// notes change in their tab (autosave writes them); closed notes go
-    /// through the normal save path, so conflict and vault checks apply.
-    private func applyLinkUpdate(_ update: PendingLinkUpdate) {
-        var failures = 0
-        for source in update.sources {
-            if let tab = tabs.tabs.first(where: { $0.editor.fileURL?.path == source.url.path }) {
-                if let rewritten = update.resolver.rewritingLinks(
-                    in: tab.editor.text,
-                    from: update.oldURL,
-                    toStem: update.newStem
-                ) {
-                    tab.editor.text = rewritten
-                    tab.editor.noteEdited()
-                }
-                continue
-            }
-            let editor = EditorViewModel()
-            editor.vaultRoot = store.rootURL
-            guard editor.open(url: source.url) else {
-                failures += 1
-                continue
-            }
-            guard let rewritten = update.resolver.rewritingLinks(
-                in: editor.text,
-                from: update.oldURL,
-                toStem: update.newStem
-            ) else { continue }
-            editor.text = rewritten
-            editor.isDirty = true
-            if !editor.saveIfNeeded() {
-                failures += 1
-            }
-        }
-        if failures > 0 {
-            store.present(
-                context: .rename,
-                message: UserFacingError.message(
-                    context: .rename,
-                    detail: "Lyra couldn't update links in \(failures == 1 ? "1 note" : "\(failures) notes"). "
-                        + "Those links still use the old name."
-                )
-            )
-        }
-        store.refresh()
-    }
-
     private func handleSelectionChange(_ newValue: VaultNode.ID?) {
         // Multi-tab: nil selection is not “close editor” (mirrors folder select).
         // Delete already empties tabs that held the deleted path; empty-tab / new-tab clear selection intentionally.
@@ -866,7 +746,6 @@ struct ContentView: View {
         }
     }
 
-
     /// File → Open in New Tab: always new tab if not already open; if already open, just select.
     private func openSelectionInNewTab() {
         guard let url = store.selectedFileURL() else { return }
@@ -888,7 +767,6 @@ struct ContentView: View {
         }
         // On failure, selection stays on the chosen file; failed editor error already flushed via onFailed.
     }
-
 
     /// Canonical transient-error surfacing shared by the window shell and its
     /// flows: conflict / missing-file cases belong to their own dialogs;
@@ -923,10 +801,8 @@ struct ContentView: View {
 
     private func selectTab(containing editor: EditorViewModel) {
         guard let tab = tabs.tabs.first(where: { $0.editor === editor }) else { return }
-        tabs.select(tab.id)
-        store.selection = tab.editor.fileURL?.path
+        selectTab(tab.id)
     }
-
 
     /// ⌘F: find bar in Source. From Reading, switch to Source first so the
     /// shortcut is never a silent no-op.
@@ -941,14 +817,4 @@ struct ContentView: View {
             findBarToken += 1
         }
     }
-
-    private func liveBodies() -> [String: String] {
-        var bodies: [String: String] = [:]
-        for tab in tabs.tabs {
-            guard let path = tab.editor.fileURL?.path else { continue }
-            bodies[path] = tab.editor.text
-        }
-        return bodies
-    }
-
 }
