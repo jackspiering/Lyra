@@ -6,36 +6,29 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Least privilege: this workflow only reads the repo and runs checks.
 permissions:
   contents: read
 
-# A newer push to a pull request supersedes its running checks. Runs on main
-# are never cancelled, so every merged commit gets a result.
+# A new push to a pull request cancels its running checks; main runs always finish.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Job names "Smoke (structure)" and "Build & test (macOS)" are required checks
+  # in branch protection. Rename them there too if you rename them here.
   smoke:
     name: Smoke (structure)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Structure, docs, version, whitespace, and shellcheck (preinstalled on Ubuntu).
-      - name: Run structural smoke
-        run: bash Scripts/smoke.sh
-
-      # Pinned release with a checksum instead of a third-party action.
-      # actionlint also runs shellcheck over every `run:` block.
+      - run: bash Scripts/smoke.sh
       - name: Lint workflows
         env:
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
-          set -euo pipefail
           archive="$RUNNER_TEMP/actionlint.tar.gz"
           curl -fsSL --retry 3 -o "$archive" \
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
@@ -43,8 +36,8 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
-  # Decides whether the macOS job has anything to build. Docs-only changes
-  # skip it; a skipped job still satisfies a required status check.
+  # Skips the macOS build when only docs changed. A skipped job still
+  # satisfies a required check.
   changes:
     name: Detect app changes
     runs-on: ubuntu-latest
@@ -55,27 +48,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - name: Diff against the base
-        id: diff
+      - id: diff
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          set -euo pipefail
           app=true
-          if [[ "$EVENT_NAME" != "workflow_dispatch" && -n "${BASE_SHA:-}" && ! "$BASE_SHA" =~ ^0+$ ]] \
-            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
-            printf 'Changed files:\n%s\n' "$changed"
-            # Anything that can change the build, the tests, or how CI runs them.
-            if ! grep -qE '^(Lyra/|LyraTests/|Lyra\.xcodeproj/|Scripts/|\.github/workflows/)' <<<"$changed"; then
-              app=false
-            fi
+          if [[ "$GITHUB_EVENT_NAME" != workflow_dispatch ]] && git cat-file -e "${BASE}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE" "$GITHUB_SHA" -- Lyra LyraTests Lyra.xcodeproj Scripts .github/workflows; then
+            app=false
           fi
-          echo "app=$app" >> "$GITHUB_OUTPUT"
-          echo "Build & test (macOS) runs: $app"
+          echo "app=$app" | tee -a "$GITHUB_OUTPUT"
 
   macos:
     name: Build & test (macOS)
@@ -85,73 +67,32 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # The macos-26 image links its newest Xcode 26 at /Applications/Xcode.app.
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
-          sw_vers
-
       - name: Build and test
         env:
           RESULT_BUNDLE: build/Lyra.xcresult
-          # Forwarded to the test host as LYRA_SNAPSHOTS: renders window PNGs.
           TEST_RUNNER_LYRA_SNAPSHOTS: "1"
         run: bash Scripts/xcode-test.sh
-
-      - name: Test summary
-        if: always()
-        run: |
-          set -euo pipefail
-          bundle=build/Lyra.xcresult
-          if [[ ! -d "$bundle" ]] || ! command -v jq >/dev/null 2>&1; then
-            echo "No result bundle to summarize."
-            exit 0
-          fi
-          summary="$(xcrun xcresulttool get test-results summary --path "$bundle" --compact 2>/dev/null || true)"
-          if [[ -z "$summary" ]]; then
-            echo "xcresulttool could not read $bundle."
-            exit 0
-          fi
-          {
-            echo "### Unit tests"
-            jq -r '"**\(.result)** — \(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped (\(.totalTestCount) total)"' <<<"$summary"
-            jq -r '.testFailures[]? | "- `\(.testIdentifierString // .testName)`: \(.failureText)"' <<<"$summary"
-            echo
-            echo "Window snapshots (Night and Parchment) are in the **lyra-snapshots** artifact."
-          } >> "$GITHUB_STEP_SUMMARY"
-
+      # The sandboxed test host writes its PNGs inside the app container.
       - name: Collect snapshots
         if: always()
         run: |
-          set -euo pipefail
-          out=build/snapshots
-          mkdir -p "$out"
-          # The sandboxed test host writes inside its container's tmp.
-          container_tmp="$HOME/Library/Containers/app.lyra.Lyra/Data/tmp/LyraSnapshots"
-          if [[ -d "$container_tmp" ]]; then
-            find "$container_tmp" -name '*.png' -exec cp {} "$out/" \;
-          fi
-          # Fallback: the same PNGs are attached to the result bundle.
-          if [[ -z "$(ls -A "$out")" && -d build/Lyra.xcresult ]]; then
-            xcrun xcresulttool export attachments --path build/Lyra.xcresult --output-path build/attachments >/dev/null 2>&1 || true
-            find build/attachments -name '*.png' -exec cp {} "$out/" \; 2>/dev/null || true
-          fi
-          ls -la "$out"
-
-      - name: Upload snapshots
+          mkdir -p build/snapshots
+          find "$HOME/Library/Containers/app.lyra.Lyra/Data/tmp/LyraSnapshots" -name '*.png' \
+            -exec cp {} build/snapshots/ \; 2>/dev/null || true
+          ls build/snapshots
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lyra-snapshots
           path: build/snapshots/*.png
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Upload result bundle
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Lyra-xcresult
           path: build/Lyra.xcresult

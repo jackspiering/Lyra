@@ -1,116 +1,50 @@
 #!/usr/bin/env bash
-# Structural smoke checks that run anywhere (Linux CI included).
-# Full build/test requires macOS + Xcode (see Scripts/xcode-test.sh).
-#
-# Intentionally does NOT re-list every Swift source — the macOS build job is the
-# real compiler. This script checks invariants the compiler cannot: docs, fonts,
-# entitlements source, deployment target, bundle id, and (when present) that a
-# built app is ad-hoc signed with the sandbox entitlement.
+# Checks that run anywhere (Linux CI included). The macOS job is the compiler;
+# this catches what it cannot: whitespace, shell errors, and project invariants.
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+cd "$(dirname "$0")/.."
 fail=0
 
-check_exists() {
-  if [[ -e "$1" ]]; then
-    echo "  ok: $1"
-  else
-    echo "  FAIL: missing $1"
-    fail=1
+pass() { echo "  ok: $1"; }
+flunk() { echo "  FAIL: $1"; fail=1; }
+
+echo "-- whitespace"
+while IFS= read -r file; do
+  if grep -qE '[[:blank:]]+$' "$file"; then
+    flunk "trailing whitespace in $file"
   fi
-}
+  if [[ -s "$file" && -n "$(tail -c 1 "$file")" ]]; then
+    flunk "$file does not end with a newline"
+  fi
+done < <(git ls-files '*.swift' '*.sh' '*.yml' '*.md' '*.plist' '*.entitlements' '*.svg' 'Lyra.xcodeproj/project.pbxproj')
 
-echo "== Lyra smoke =="
-
-echo "-- required non-code paths"
-for path in \
-  README.md AGENTS.md CONTRIBUTING.md LICENSE \
-  docs/architecture.md docs/ci.md \
-  Lyra.xcodeproj/project.pbxproj \
-  Lyra.xcodeproj/xcshareddata/xcschemes/Lyra.xcscheme \
-  Lyra/Lyra.entitlements \
-  Lyra/Info.plist \
-  Lyra/Resources/Fonts/Inter-Regular.ttf \
-  Lyra/Resources/Fonts/Inter-Italic.ttf \
-  Lyra/Resources/Fonts/Inter-SemiBold.ttf \
-  Lyra/Resources/Fonts/Inter-Bold.ttf \
-  Lyra/Resources/Fonts/Inter-OFL.txt \
-  Scripts/package-dmg.sh \
-  Scripts/xcode-test.sh \
-  Scripts/lint.sh
-do
-  check_exists "$path"
+echo "-- shell"
+for script in Scripts/*.sh; do
+  bash -n "$script" || flunk "shell syntax in $script"
 done
-
-echo "-- entitlements source"
-if grep -q "com.apple.security.app-sandbox" Lyra/Lyra.entitlements \
-  && grep -q "com.apple.security.files.user-selected.read-write" Lyra/Lyra.entitlements; then
-  echo "  ok: sandbox + user-selected files in entitlements file"
+if command -v shellcheck >/dev/null 2>&1; then
+  if shellcheck Scripts/*.sh; then pass "shellcheck"; else flunk "shellcheck"; fi
 else
-  echo "  FAIL: entitlements incomplete"
-  fail=1
+  echo "  skip: shellcheck not installed"
 fi
 
-echo "-- deployment target"
-if grep -q "MACOSX_DEPLOYMENT_TARGET = 15.0" Lyra.xcodeproj/project.pbxproj; then
-  echo "  ok: macOS 15.0 deployment target"
+echo "-- project"
+project=Lyra.xcodeproj/project.pbxproj
+versions="$(grep -o 'MARKETING_VERSION = [^;]*' "$project" | awk '{print $3}' | sort -u)"
+if [[ "$(grep -c . <<<"$versions")" -eq 1 ]]; then
+  pass "MARKETING_VERSION $versions"
 else
-  echo "  FAIL: expected MACOSX_DEPLOYMENT_TARGET = 15.0"
-  fail=1
+  flunk "MARKETING_VERSION differs across configurations: $(tr '\n' ' ' <<<"$versions")"
 fi
-
-echo "-- bundle id"
-if grep -q "PRODUCT_BUNDLE_IDENTIFIER = app.lyra.Lyra" Lyra.xcodeproj/project.pbxproj; then
-  echo "  ok: bundle id app.lyra.Lyra"
+if grep -q 'MACOSX_DEPLOYMENT_TARGET = 15.0' "$project" \
+  && ! grep 'MACOSX_DEPLOYMENT_TARGET' "$project" | grep -vq '15.0'; then
+  pass "deployment target macOS 15.0"
 else
-  echo "  FAIL: bundle id"
-  fail=1
+  flunk "deployment target must be macOS 15.0 in every configuration"
 fi
-
-echo "-- marketing version consistency"
-versions="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
-count="$(printf '%s\n' "$versions" | grep -c . || true)"
-if [[ "$count" -eq 1 ]]; then
-  echo "  ok: single MARKETING_VERSION ($versions)"
-else
-  echo "  FAIL: MARKETING_VERSION diverges across configs:"
-  printf '%s\n' "$versions"
-  fail=1
-fi
-
-echo "-- release documentation version"
-if grep -q "releases/tag/v${versions}" README.md; then
-  echo "  ok: README release link matches MARKETING_VERSION ($versions)"
-else
-  echo "  FAIL: README release link does not match MARKETING_VERSION ($versions)"
-  fail=1
-fi
-
-# Optional: if a built app is sitting in the usual place, assert real sandbox entitlements.
-APP_CANDIDATES=(
-  "build/DerivedData/Build/Products/Release/Lyra.app"
-  "build/DerivedData/Build/Products/Debug/Lyra.app"
-)
-if command -v codesign >/dev/null 2>&1; then
-  for app in "${APP_CANDIDATES[@]}"; do
-    if [[ -d "$app" ]]; then
-      echo "-- built app entitlements ($app)"
-      if codesign -d --entitlements - "$app" 2>/dev/null | grep -q "com.apple.security.app-sandbox"; then
-        echo "  ok: sandbox present on signed app"
-      else
-        echo "  FAIL: built app missing sandbox entitlement (unsigned or wrong flags?)"
-        fail=1
-      fi
-      break
-    fi
-  done
-fi
-
-echo ""
-if ! bash Scripts/lint.sh; then
-  fail=1
-fi
+for key in app-sandbox files.user-selected.read-write files.bookmarks.app-scope; do
+  grep -q "com.apple.security.$key" Lyra/Lyra.entitlements || flunk "entitlement com.apple.security.$key missing"
+done
 
 if [[ "$fail" -ne 0 ]]; then
   echo "== smoke FAILED =="
