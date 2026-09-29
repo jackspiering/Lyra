@@ -1,71 +1,30 @@
 # Contributing
 
+Issues and pull requests are welcome. The rules for code, tests, versions, and pull
+requests are in [AGENTS.md](AGENTS.md). Despite the name, they apply to humans too.
+
 ## Setup
 
-1. A Mac with Xcode 26+ (the app itself runs on macOS 15+)
-2. Clone the repo, open `Lyra.xcodeproj`
-3. Scheme **Lyra** → Run
+1. Use a Mac with Xcode 26. Lyra itself runs on macOS 15 or later.
+2. `git clone https://github.com/jackspiering/Lyra.git && open Lyra/Lyra.xcodeproj`
+3. Run the **Lyra** scheme on **My Mac**.
 
-## Build and test
+Before opening a pull request, run `bash Scripts/smoke.sh` and `bash Scripts/xcode-test.sh`.
+CI runs both.
 
-```bash
-bash Scripts/smoke.sh          # structure checks (Linux/macOS)
-bash Scripts/xcode-test.sh     # xcodebuild build + test (macOS)
-```
+## Manual check before a release
 
-Unit tests live in `LyraTests/` (vault helpers, wiki links, naming, blocks, errors, editor durability).
+Unit tests cover the logic. On a Mac with a real vault, these cover the rest:
 
-PRs run smoke on Ubuntu in parallel with build/test on `macos-26` (skipped for docs-only changes). For UI changes, open the run's `lyra-snapshots` artifact to see the window in Night and Parchment. Details: [docs/ci.md](docs/ci.md).
-
-## Style
-
-- [Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/)
-- One main type per file when practical
-- No drive-by refactors
-- Read [AGENTS.md](AGENTS.md) for invariants
-
-## Commits and PRs
-
-- Prefer small commits: `feat:`, `fix:`, `docs:`, `test:`, `chore:`
-- PR: what / why / how verified
-- **Consider a version bump** (semantic versioning) when the PR changes what ships in the app: PATCH for fixes, MINOR for new features, MAJOR for breaking changes (MINOR before 1.0). Docs, tests, and CI alone need no bump. A bump updates `MARKETING_VERSION` (all four configs), raises `CURRENT_PROJECT_VERSION` by one, and updates the README badge and release link. See [AGENTS.md](AGENTS.md#shipping-a-change).
-- **Update `README.md`** for user-facing changes (features, install, version, shortcuts)
-- Update `docs/architecture.md` when structure or invariants change
-- Do not expand into plugins, sync, or non-macOS ports unless agreed
-
-## Manual smoke (v0.13)
-
-Required (~10 minutes):
-
-1. Open a vault with nested `.md` files
-2. Sidebar shows folders + Markdown only (no `.git` / hidden)
-3. **Source:** edit, wait ~1s, quit/reopen — content persisted
-4. **⌘E** / segmented control: Source ↔ Reading; mode survives relaunch
-5. **New Note (⌘N)** creates a file and **opens it in the editor** immediately
-6. Create, rename, delete note and folder (rename without `.md` still keeps a Markdown file)
-7. **Rename the open note**, keep typing, check Finder — exactly one file, with all your text
-8. **Rename a folder** while a note inside it is open, keep typing and save — you must not get stuck
-9. Selecting a **folder** does not close the open note
-10. Edit a note, change the file on disk, type again → Keep Mine / Reload; **Cancel** pauses autosave (no dialog loop); **⌘Q** must not silently discard dirty work
-11. Move or delete the open note in Finder, type again → **Note moved or deleted** warning (not silent recreate)
-12. **⌘R** (Refresh Vault) after adding a file outside Lyra — it appears in the sidebar
-13. **⌘S** saves immediately; failed save shows a plain-language alert and a toolbar indicator
-14. **Export PDF…** with a long code fence and `**bold**` — multi-page PDF, bold not literal asterisks
-15. Body text uses Inter; code fences stay monospaced
-16. **⌘O** opens Go to File: typing `osw` finds "On Slow Writing"; ↑/↓ + Return open it with the caret in Source; Esc closes
-17. **⇧⌘F** searches bodies in the same palette with highlighted snippets; a click outside closes it
-18. **⌘⌫** while typing deletes to the start of the line and does **not** move the note to the Trash; with the sidebar focused it asks to move the selection to the Trash
-19. File → New Window opens another vault window; File menu has New Note / Open Vault / Refresh / Export
-20. **Appearance:** switch Settings → Appearance between Light and Dark — sidebar, tab strip, note, and backlinks change together (Parchment / Night) with no stray system-gray bands. On macOS 26 the sidebar is Liquid Glass tinted by the window tone
-21. **Column:** resize the window narrow and wide — the title and Source text stay left-aligned in one centered column; **⌘E** to Reading does not shift the text sideways
-22. **Source styling:** `#`, `**`, and `[[ ]]` markers are dim but still present and editable; the caret and selection are gold; typing after a heading returns to body size
-
-Optional:
-
-23. `[[Other Note]]` opens from Reading when the file exists; the backlinks card on the target shows the linking line
-24. **Source:** paste image → `_attachments/` + note-relative link; shows in Reading (pasting a browser URL must not hang on network)
-25. Unreadable child folder in the vault — rest of the sidebar still appears
-26. Eject/unplug the drive holding a dirty note — visible save failure, not silence
+1. Edit in Source, quit, and relaunch. The text is still there.
+2. Press ⌘E for Reading, follow a `[[link]]`, and open the backlinks pane.
+3. Create, rename, and delete a note and a folder, including renaming the open note
+   mid-sentence. Finder shows exactly one file with all your text.
+4. Change the open note on disk, then type. Keep Mine / Reload appears, and ⌘Q never
+   drops unsaved edits silently.
+5. Find notes with ⌘O and ⇧⌘F, paste an image, and use File → Export PDF.
+6. Switch Settings → Appearance between Light and Dark. You get Parchment and Night with
+   no gray bands. On macOS 26 the sidebar is Liquid Glass.
 
 ## License
 
