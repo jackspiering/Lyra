@@ -1,26 +1,14 @@
 name: Release
 
-# Releases publish without anyone pushing a tag by hand:
-# - Merging a version bump to main publishes v<MARKETING_VERSION> once.
-# - Actions > Release > Run workflow on main with a version publishes it.
-# - Pushing a v* tag still works.
+# Merging a MARKETING_VERSION bump to main tags v<version> and publishes a
+# GitHub Release with the DMG. Run it by hand on main to retry a failed
+# release, or on any branch for a DMG artifact without a release.
 on:
   push:
-    tags:
-      - "v*"
-    branches:
-      - main
-    # A version bump always touches the project file; other pushes skip.
-    paths:
-      - "Lyra.xcodeproj/project.pbxproj"
+    branches: [main]
+    paths: [Lyra.xcodeproj/project.pbxproj]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g. 0.12.0). On main this tags vX.Y.Z and publishes the release. Leave empty for a DMG artifact only."
-        required: false
-        default: ""
 
-# Only this workflow needs write (create tags and GitHub Releases).
 permissions:
   contents: write
 
@@ -34,74 +22,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      version: ${{ steps.plan.outputs.version }}
       build: ${{ steps.plan.outputs.build }}
       publish: ${{ steps.plan.outputs.publish }}
-      version: ${{ steps.plan.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Decide what to build and publish
-        id: plan
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_VERSION: ${{ inputs.version }}
-          REF: ${{ github.ref }}
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
+      - id: plan
         run: |
-          set -euo pipefail
-          semver='^[0-9]+\.[0-9]+\.[0-9]+$'
-          tag_exists() {
-            git ls-remote --exit-code --tags origin "refs/tags/v$1" >/dev/null 2>&1
-          }
-          project_version() {
-            local versions count
-            versions="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
-            count="$(printf '%s\n' "$versions" | grep -c . || true)"
-            if [[ "$count" -ne 1 ]]; then
-              echo "error: MARKETING_VERSION diverges in project.pbxproj:" >&2
-              printf '%s\n' "$versions" >&2
-              exit 1
-            fi
-            printf '%s' "$versions"
-          }
-
-          V=""
-          BUILD=true
-          PUBLISH=false
-          if [[ "$REF_TYPE" == "tag" ]]; then
-            V="${REF_NAME#v}"
-            PUBLISH=true
-          elif [[ "$EVENT_NAME" == "push" ]]; then
-            # Push to main that touched the project file: release a new version once.
-            V="$(project_version)"
-            if tag_exists "$V"; then
-              echo "v$V is already released; nothing to do."
-              BUILD=false
-            else
-              PUBLISH=true
-            fi
-          elif [[ -n "${INPUT_VERSION:-}" ]]; then
-            V="${INPUT_VERSION#v}"
-            if [[ "$REF" == "refs/heads/main" ]]; then
-              if tag_exists "$V"; then
-                echo "error: v$V already exists. Bump MARKETING_VERSION for a new release." >&2
-                exit 1
-              fi
-              PUBLISH=true
-            fi
+          version="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
+          released=false
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            released=true
           fi
-
-          if [[ -n "$V" ]] && ! [[ "$V" =~ $semver ]]; then
-            echo "error: version must be three-part semver (e.g. 0.6.2), got '$V'" >&2
-            exit 1
+          # A project change without a version bump has nothing to ship.
+          build=true
+          if [[ "$GITHUB_EVENT_NAME" == push && "$released" == true ]]; then
+            build=false
           fi
-          {
-            echo "build=$BUILD"
-            echo "publish=$PUBLISH"
-            echo "version=$V"
-          } >> "$GITHUB_OUTPUT"
-          echo "build=$BUILD publish=$PUBLISH version='${V:-from project}'"
+          publish=false
+          if [[ "$GITHUB_REF" == refs/heads/main && "$released" == false ]]; then
+            publish=true
+          fi
+          printf 'version=%s\nbuild=%s\npublish=%s\n' "$version" "$build" "$publish" | tee -a "$GITHUB_OUTPUT"
 
   dmg:
     name: Build DMG
@@ -111,66 +53,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Same toolchain as CI: the newest Xcode 26 on the macos-26 image.
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
-          sw_vers
-
-      - name: Guard version matches project
-        env:
-          VERSION: ${{ needs.plan.outputs.version }}
-        run: |
-          set -euo pipefail
-          V="${VERSION:-}"
-          if [[ -z "$V" ]]; then
-            echo "No explicit version (workflow_dispatch without input) — package-dmg will use MARKETING_VERSION."
-            exit 0
-          fi
-          # Require three-part semver so a tag like v0.6 cannot ship with ambiguous marketing version.
-          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "error: version must be three-part semver (e.g. 0.6.2), got '$V'" >&2
-            exit 1
-          fi
-          PROJ="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
-          COUNT="$(printf '%s\n' "$PROJ" | grep -c . || true)"
-          if [[ "$COUNT" -ne 1 ]]; then
-            echo "error: MARKETING_VERSION diverges in project.pbxproj:" >&2
-            printf '%s\n' "$PROJ" >&2
-            exit 1
-          fi
-          if [[ "$PROJ" != "$V" ]]; then
-            echo "error: tag/version $V does not match MARKETING_VERSION $PROJ" >&2
-            echo "       Bump MARKETING_VERSION in the Xcode project before tagging." >&2
-            exit 1
-          fi
-          echo "ok: $V matches MARKETING_VERSION"
-
-      - name: Structural smoke
-        run: bash Scripts/smoke.sh
-
       - name: Build DMG
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: bash Scripts/package-dmg.sh
-
-      - name: Checksums
-        id: sums
-        run: |
-          set -euo pipefail
-          HASHES="$(shasum -a 256 build/dist/*.dmg)"
-          echo "$HASHES"
-          printf '%s\n' "$HASHES" > build/dist/SHA256SUMS.txt
-          {
-            echo "hashes<<EOF"
-            echo "$HASHES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Lyra-dmg
           path: |
@@ -178,11 +69,17 @@ jobs:
             build/dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
-
-      # Creates tag v<version> on the built commit when it does not exist yet.
-      - name: Create GitHub Release
+      - id: sums
         if: needs.plan.outputs.publish == 'true'
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        run: |
+          {
+            echo "text<<EOF"
+            cat build/dist/SHA256SUMS.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      # Creates the tag on this commit.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        if: needs.plan.outputs.publish == 'true'
         with:
           tag_name: v${{ needs.plan.outputs.version }}
           name: v${{ needs.plan.outputs.version }}
@@ -193,16 +90,11 @@ jobs:
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
-            Ad-hoc-signed macOS build for testing (not notarized).
+            Open the DMG and drag **Lyra** to **Applications**. Runs on macOS 15 or later.
 
-            - Open the DMG and drag **Lyra** to **Applications**.
-            - First launch: if macOS blocks Lyra, open **System Settings → Privacy & Security** and click **Open Anyway** (ad-hoc CI build; Control-click → Open is unreliable on macOS 15+).
-            - Built by GitHub Actions on `macos-26` with Xcode 26; runs on macOS 15 or later.
-            - Verify the DMG against the SHA-256 below (also in `SHA256SUMS.txt`).
+            This build is ad-hoc signed, not notarized. If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**.
 
             SHA-256:
             ```
-            ${{ steps.sums.outputs.hashes }}
+            ${{ steps.sums.outputs.text }}
             ```
-
-            Commit: `${{ github.sha }}`

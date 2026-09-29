@@ -1,15 +1,15 @@
-## Summary
+## What and why
 
-<!-- What changed and why (1–3 bullets). -->
+<!-- One to three bullets. -->
 
-## Test plan
+## How verified
 
-- [ ] `bash Scripts/smoke.sh` passes
-- [ ] GitHub Actions **Smoke (structure)** is green
-- [ ] GitHub Actions **Build & test (macOS)** is green
-- [ ] UI changes: checked the `lyra-snapshots` artifact (Night and Parchment)
-- [ ] On a Mac (optional for docs-only): open vault → edit → save → switch Source/Reading
+<!-- smoke.sh, xcode-test.sh or CI, the lyra-snapshots artifact for UI changes, a manual check on a Mac. -->
 
-## Notes
+## Version
 
-CI: `.github/workflows/ci.yml` (read-only). Releases/DMG: `.github/workflows/release.yml` publishes when a version bump merges to `main` (or on `v*` tags).
+<!-- The bump (e.g. 0.13.0 → 0.14.0), or why none. See AGENTS.md. -->
+
+## Needs a manual look
+
+<!-- Anything you could not check yourself, or "Nothing". -->
