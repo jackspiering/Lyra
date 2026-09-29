@@ -82,17 +82,6 @@ struct WikiLinkResolver: Sendable {
         }
     }
 
-    init(noteURLs: [URL], vaultRoot: URL, aliases: [URL: [String]] = [:], bodies: [URL: String] = [:]) {
-        let notes = noteURLs.map { url in
-            WikiNote(
-                url: url,
-                relativePath: WikiLinkSyntax.relativePath(for: url, vaultRoot: vaultRoot),
-                aliases: aliases[url] ?? []
-            )
-        }
-        self.init(notes: notes, bodies: bodies)
-    }
-
     func resolve(_ linkText: String) -> WikiResolveResult {
         let target = WikiLinkSyntax.parseInner(linkText).target
         guard !target.isEmpty else { return .unresolved }

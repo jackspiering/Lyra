@@ -38,11 +38,6 @@ enum WikiLinkSyntax {
         return name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Vault-relative path including `.md` (`Projects/Roadmap.md`).
-    static func relativePath(for url: URL, vaultRoot: URL) -> String {
-        FileSystemVault.relativePath(for: url, under: vaultRoot)
-    }
-
     /// Lowercased relative path without `.md`.
     static func relativeKey(forRelativePath path: String) -> String {
         normalizeTarget(path).lowercased()
@@ -171,7 +166,7 @@ enum WikiLinkSyntax {
         var ranges: [NSRange] = []
         var i = 0
         let length = ns.length
-        var fence: (marker: UInt16, run: Int)?
+        var fence: MarkdownScan.Fence?
         var fenceStart = 0
         while i < length {
             let lineStart = i
@@ -190,92 +185,25 @@ enum WikiLinkSyntax {
                 i += 1
             }
             guard let offset = markerOffset, offset >= 0 else {
-                skipLineBreak(in: ns, at: &i)
+                MarkdownScan.skipLineBreak(in: ns, at: &i)
                 continue
             }
             let line = ns.substring(with: NSRange(location: lineStart, length: i - lineStart))
+            MarkdownScan.skipLineBreak(in: ns, at: &i)
             if let open = fence {
-                if isClosingFence(line, marker: open.marker, run: open.run) {
-                    var end = i
-                    if i < length {
-                        let ch = ns.character(at: i)
-                        if ch == 0x0D {
-                            end += 1
-                            if end < length && ns.character(at: end) == 0x0A { end += 1 }
-                        } else if ch == 0x0A {
-                            end += 1
-                        }
-                    }
-                    ranges.append(NSRange(location: fenceStart, length: end - fenceStart))
+                if open.isClosed(by: line) {
+                    ranges.append(NSRange(location: fenceStart, length: i - fenceStart))
                     fence = nil
-                    i = end
-                    continue
                 }
-            } else if let parsed = openingFence(line) {
-                fence = parsed
+            } else if let opened = MarkdownScan.Fence(opening: line) {
+                fence = opened
                 fenceStart = lineStart
             }
-            skipLineBreak(in: ns, at: &i)
         }
         if fence != nil {
             ranges.append(NSRange(location: fenceStart, length: length - fenceStart))
         }
         return ranges
-    }
-
-    /// Advances past one `\n`, `\r`, or `\r\n` at `i`, if there is one.
-    private static func skipLineBreak(in ns: NSString, at i: inout Int) {
-        guard i < ns.length else { return }
-        let ch = ns.character(at: i)
-        if ch == 0x0D {
-            i += 1
-            if i < ns.length && ns.character(at: i) == 0x0A { i += 1 }
-        } else if ch == 0x0A {
-            i += 1
-        }
-    }
-
-    private static func openingFence(_ raw: String) -> (marker: UInt16, run: Int)? {
-        var index = raw.startIndex
-        var indentation = 0
-        while index < raw.endIndex, (raw[index] == " " || raw[index] == "\t"), indentation < 4 {
-            indentation += raw[index] == "\t" ? 4 : 1
-            index = raw.index(after: index)
-        }
-        guard indentation <= 3, index < raw.endIndex else { return nil }
-        let markerChar = raw[index]
-        guard markerChar == "`" || markerChar == "~" else { return nil }
-        let runStart = index
-        while index < raw.endIndex, raw[index] == markerChar {
-            index = raw.index(after: index)
-        }
-        let run = raw.distance(from: runStart, to: index)
-        guard run >= 3 else { return nil }
-        if markerChar == "`", raw[index...].contains("`") { return nil }
-        let utf = String(markerChar).utf16
-        guard let unit = utf.first else { return nil }
-        return (unit, run)
-    }
-
-    private static func isClosingFence(_ raw: String, marker: UInt16, run: Int) -> Bool {
-        guard let scalar = UnicodeScalar(UInt32(marker)) else { return false }
-        let markerString = String(scalar)
-        var index = raw.startIndex
-        var indentation = 0
-        while index < raw.endIndex, (raw[index] == " " || raw[index] == "\t"), indentation < 4 {
-            indentation += raw[index] == "\t" ? 4 : 1
-            index = raw.index(after: index)
-        }
-        guard indentation <= 3, index < raw.endIndex, String(raw[index]) == markerString else {
-            return false
-        }
-        let runStart = index
-        while index < raw.endIndex, String(raw[index]) == markerString {
-            index = raw.index(after: index)
-        }
-        let length = raw.distance(from: runStart, to: index)
-        guard length >= run else { return false }
-        return raw[index...].allSatisfy { $0 == " " || $0 == "\t" }
     }
 
     /// Code spans between fenced blocks. A backtick inside a fence must not pair

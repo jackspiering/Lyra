@@ -9,20 +9,9 @@ enum FrontmatterAliases {
     }
 
     private static func leadingFrontmatterLines(_ markdown: String) -> [String]? {
-        let lines = splitLines(markdown)
-        guard let first = lines.first, first.trimmingCharacters(in: .whitespaces) == "---" else {
-            return nil
-        }
-        var body: [String] = []
-        var i = 1
-        while i < lines.count {
-            if lines[i].trimmingCharacters(in: .whitespaces) == "---" {
-                return body
-            }
-            body.append(lines[i])
-            i += 1
-        }
-        return nil
+        let lines = MarkdownScan.lines(markdown)
+        guard let end = MarkdownScan.frontmatterEnd(in: lines) else { return nil }
+        return Array(lines[1..<end])
     }
 
     private static func aliases(from lines: [String]) -> [String] {
@@ -150,30 +139,5 @@ enum FrontmatterAliases {
             }
         }
         return raw
-    }
-
-    private static func splitLines(_ source: String) -> [String] {
-        let ns = source as NSString
-        var lines: [String] = []
-        var i = 0
-        while i < ns.length {
-            let start = i
-            while i < ns.length {
-                let ch = ns.character(at: i)
-                if ch == 0x0A || ch == 0x0D { break }
-                i += 1
-            }
-            lines.append(ns.substring(with: NSRange(location: start, length: i - start)))
-            if i < ns.length {
-                let ch = ns.character(at: i)
-                if ch == 0x0D {
-                    i += 1
-                    if i < ns.length && ns.character(at: i) == 0x0A { i += 1 }
-                } else if ch == 0x0A {
-                    i += 1
-                }
-            }
-        }
-        return lines
     }
 }
