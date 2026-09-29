@@ -33,8 +33,8 @@ backlinks. PDF export stops at 2,000 pages.
   menus, TextKit) without package ceremony.
 - `ContentView` is the window shell and wiring. Dialogs and sheets live in
   `ContentViewChrome`, AppKit bridges in `WindowStateReaders`, wiki navigation in
-  `WikiFlow`, and PDF export in `PDFExportFlow`. Both flows share one editor-error helper,
-  so presentation cannot fork.
+  `WikiFlow`, renames and link updates in `RenameFlow`, and PDF export in
+  `PDFExportFlow`. The flows share one editor-error helper, so presentation cannot fork.
 - Each vault window publishes a scene-scoped `VaultCommands` (`focusedSceneValue`), so
   only the key window answers menu commands. A quit-time save failure is an app-wide
   notification, because the failing editor may be in a background window.
@@ -76,6 +76,9 @@ backlinks. PDF export stops at 2,000 pages.
   cannot launch apps.
 - Images in Reading and PDF are checked through ImageIO metadata against a 50-megapixel,
   16,384 px budget before a bitmap is decoded.
+- **One Markdown scanner.** Line splitting, the leading `---` block, and code fences come
+  from `MarkdownScan`, and `[[links]]` from `WikiLinkSyntax`, for Source highlighting,
+  Reading, PDF, and the wiki index alike, so they agree on what is code and what is a link.
 
 ## Look
 
