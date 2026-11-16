@@ -10,7 +10,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: release-${{ github.ref }}
@@ -31,9 +35,16 @@ jobs:
         run: |
           version="$(grep -o 'MARKETING_VERSION = [^;]*' Lyra.xcodeproj/project.pbxproj | awk '{print $3}' | sort -u)"
           released=false
-          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
-            released=true
-          fi
+          rc=0
+          git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null || rc=$?
+          case "$rc" in
+            0) released=true ;;
+            2) ;; # no such tag
+            *)
+              echo "::error::Could not list remote tags (git ls-remote exited $rc)."
+              exit 1
+              ;;
+          esac
           # A project change without a version bump has nothing to ship.
           build=true
           if [[ "$GITHUB_EVENT_NAME" == push && "$released" == true ]]; then
@@ -51,8 +62,13 @@ jobs:
     if: needs.plan.outputs.build == 'true'
     runs-on: macos-26
     timeout-minutes: 45
+    # Only this job creates the tag and the release.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
