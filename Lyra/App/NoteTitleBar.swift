@@ -29,14 +29,16 @@ struct NoteTitleBar: View {
         }
         .frame(maxWidth: LyraTheme.columnWidth, alignment: .leading)
         .padding(.horizontal, LyraTheme.columnMargin)
-        .padding(.top, 36)
-        .padding(.bottom, 14)
+        .padding(.top, 32)
+        .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
     }
 
     private var titleField: some View {
         TextField("Title", text: $draft)
             .font(LyraFonts.title)
+            .tracking(LyraFonts.tracking(forSize: 32))
+            .foregroundStyle(LyraTheme.inkColor)
             .textFieldStyle(.plain)
             .accessibilityLabel("Note title")
             .focused($focused)

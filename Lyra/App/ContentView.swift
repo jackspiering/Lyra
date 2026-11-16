@@ -667,6 +667,7 @@ struct ContentView: View {
             HStack {
                 Spacer()
                 Button("Cancel") { showDeleteConfirm = false }
+                    .buttonStyle(SheetButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button("Move to Trash", role: .destructive) {
                     if deleteDontAskAgain {
@@ -678,11 +679,13 @@ struct ContentView: View {
                     showDeleteConfirm = false
                     performDelete()
                 }
+                .buttonStyle(SheetButtonStyle(kind: .destructive))
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(22)
         .frame(width: 400)
+        .background(LyraTheme.raisedColor)
     }
 
     private var newNoteNameIsValid: Bool {
@@ -705,14 +708,17 @@ struct ContentView: View {
             HStack {
                 Spacer()
                 Button("Cancel") { showNewNoteSheet = false }
+                    .buttonStyle(SheetButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button("Create", action: submitNewNote)
+                    .buttonStyle(SheetButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!newNoteNameIsValid)
             }
         }
-        .padding(20)
+        .padding(22)
         .frame(width: 400)
+        .background(LyraTheme.raisedColor)
     }
 
     private func submitNewNote() {

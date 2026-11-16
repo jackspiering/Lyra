@@ -50,11 +50,13 @@ struct WikiFollowSheet: View {
                 HStack {
                     Spacer()
                     Button("Cancel", action: onCancel)
+                        .buttonStyle(SheetButtonStyle())
                         .keyboardShortcut(.cancelAction)
                 }
             }
-            .padding(20)
+            .padding(22)
             .frame(width: 420)
+            .background(LyraTheme.raisedColor)
         case .create(let query, let destination, let relativePath):
             VStack(alignment: .leading, spacing: 16) {
                 SheetHeader(
@@ -66,15 +68,18 @@ struct WikiFollowSheet: View {
                 HStack {
                     Spacer()
                     Button("Cancel", action: onCancel)
+                        .buttonStyle(SheetButtonStyle())
                         .keyboardShortcut(.cancelAction)
                     Button("Create") {
                         onCreate(destination)
                     }
+                    .buttonStyle(SheetButtonStyle(kind: .primary))
                     .keyboardShortcut(.defaultAction)
                 }
             }
-            .padding(20)
+            .padding(22)
             .frame(width: 420)
+            .background(LyraTheme.raisedColor)
         }
     }
 }
@@ -123,7 +128,7 @@ struct SheetHeader: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(tint)
                 .frame(width: 36, height: 36)
-                .background(Circle().fill(tint.opacity(0.14)))
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(tint.opacity(0.14)))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)

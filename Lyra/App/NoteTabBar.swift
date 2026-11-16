@@ -11,7 +11,7 @@ struct NoteTabBar: View {
     var body: some View {
         HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
+                HStack(spacing: 4) {
                     ForEach(tabs.tabs) { tab in
                         NoteTabChip(
                             title: tab.title,
@@ -38,12 +38,8 @@ struct NoteTabBar: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // No rule under the strip: it shares the page tone, so the tabs sit on the paper.
         .background(LyraTheme.chromeColor)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(LyraTheme.hairlineColor)
-                .frame(height: 1)
-        }
     }
 }
 
@@ -104,13 +100,17 @@ private struct NoteTabChip: View {
         .padding(.trailing, 7)
         .frame(height: 28)
         .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(isSelected ? LyraTheme.fillColor : (isHovering ? LyraTheme.fillColor.opacity(0.5) : .clear))
+            // The selected tab is a raised card; the others are bare labels.
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? LyraTheme.raisedColor : (isHovering ? LyraTheme.fillColor : Color.clear))
+                .shadow(color: isSelected ? LyraTheme.shadowColor : Color.clear, radius: 3, y: 1)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .strokeBorder(isSelected ? LyraTheme.hairlineColor : .clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(isSelected ? LyraTheme.hairlineColor : Color.clear, lineWidth: 1)
         )
         .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .animation(.easeOut(duration: 0.12), value: isSelected)
     }
 }
