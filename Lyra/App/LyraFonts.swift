@@ -58,6 +58,11 @@ enum LyraFonts {
     /// Note title above the column.
     static var title: Font { font(32, weight: .bold) }
 
+    /// Letter spacing that tightens large type (title and headings); body sizes get none.
+    static func tracking(forSize size: CGFloat) -> CGFloat {
+        size >= 26 ? -0.5 : (size >= 19 ? -0.25 : 0)
+    }
+
     /// Point size for a Markdown heading level (shared by Source and Reading).
     static func headingSize(level: Int) -> CGFloat {
         switch level {

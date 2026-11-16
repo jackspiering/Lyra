@@ -14,17 +14,18 @@ enum LyraTheme {
 
     /// Writing surface behind Source and Reading.
     static var paper: NSColor {
-        dynamic(light: rgb(0xFDFBF6), dark: rgb(0x121530))
+        dynamic(light: rgb(0xFCFAF5), dark: rgb(0x13152A))
     }
 
-    /// Tab strip and window toolbar.
+    /// Tab strip and window toolbar. The same tone as `paper`, so the tabs,
+    /// title, and text read as one page instead of stacked bands.
     static var chrome: NSColor {
-        dynamic(light: rgb(0xF7F2E8), dark: rgb(0x0F1226))
+        dynamic(light: rgb(0xFCFAF5), dark: rgb(0x13152A))
     }
 
     /// Sidebar and backlinks inspector.
     static var sidebar: NSColor {
-        dynamic(light: rgb(0xEFE8DA), dark: rgb(0x0C0F22))
+        dynamic(light: rgb(0xF2ECE0), dark: rgb(0x0E1022))
     }
 
     /// Low-contrast fill for chips, the filter field, and cards.
@@ -37,7 +38,7 @@ enum LyraTheme {
 
     /// Floating panels (the Go to File / Search palette): a step above `paper`.
     static var raised: NSColor {
-        dynamic(light: rgb(0xFFFDF9), dark: rgb(0x1A1E3E))
+        dynamic(light: rgb(0xFFFEFB), dark: rgb(0x1C1F3D))
     }
 
     /// Soft light behind the welcome page's icon: warm gold on paper, the
@@ -54,6 +55,14 @@ enum LyraTheme {
         dynamic(
             light: NSColor(srgbRed: 0.18, green: 0.13, blue: 0.06, alpha: 0.16),
             dark: NSColor(srgbRed: 0.02, green: 0.03, blue: 0.08, alpha: 0.45)
+        )
+    }
+
+    /// Drop shadow under raised surfaces (the selected tab, cards, panels).
+    static var shadow: NSColor {
+        dynamic(
+            light: NSColor(srgbRed: 0.24, green: 0.16, blue: 0.04, alpha: 0.14),
+            dark: NSColor(srgbRed: 0, green: 0, blue: 0.04, alpha: 0.45)
         )
     }
 
@@ -89,7 +98,7 @@ enum LyraTheme {
 
     /// Text and glyphs on an `accent` fill: white on bronze, navy on gold.
     static var onAccent: NSColor {
-        dynamic(light: .white, dark: rgb(0x121530))
+        dynamic(light: .white, dark: rgb(0x13152A))
     }
 
     /// Tinted fill behind active accent controls.
@@ -162,6 +171,7 @@ enum LyraTheme {
     static var raisedColor: Color { Color(nsColor: raised) }
     static var glowColor: Color { Color(nsColor: glow) }
     static var scrimColor: Color { Color(nsColor: scrim) }
+    static var shadowColor: Color { Color(nsColor: shadow) }
     static var onAccentColor: Color { Color(nsColor: onAccent) }
     static var inkColor: Color { Color(nsColor: ink) }
 
