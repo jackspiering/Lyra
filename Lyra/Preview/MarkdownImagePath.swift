@@ -211,7 +211,8 @@ enum MarkdownImagePath {
         let name = parts[idx + 1]
         guard !name.isEmpty, name != "..", name != "." else { return nil }
         // Reject names that would not be valid on disk (control chars, leading ".", ":" etc.)
-        if case .invalid = FilenameValidation.validate(name, isDirectory: false) {
+        // Attachment names follow the general file rules, not the note-name rules.
+        if case .invalid = FilenameValidation.validate(name, isDirectory: true) {
             return nil
         }
         // Only accept the immediate child — disallow traversal payloads smuggled as filename.

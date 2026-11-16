@@ -122,6 +122,9 @@ is the target and the alias is the display text. No `[[Note#heading]]`.
 - Renaming a note offers to update the `[[links]]` that uniquely resolved to it. Open
   notes change in their tab, and closed notes go through the normal save path. Nothing is
   rewritten without confirmation.
+- Note names can't contain `#`, `|`, `[`, or `]` (`FilenameValidation`). A link can't
+  express them, so a rename would otherwise rewrite working links into broken ones.
+  Folders and attachments may still use them.
 - Aliases come only from `aliases:` (a string or a list) in a leading `---` YAML block.
   All other frontmatter is ordinary text.
 - `WikiLinkResolver` builds lookup maps once per scan (stem, every path suffix, alias, URL),

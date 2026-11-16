@@ -59,4 +59,10 @@ final class NoteTitleTests: XCTestCase {
         XCTAssertEqual(NoteTitle.breadcrumb(fileURL: URL(fileURLWithPath: "/vault-2/A.md"), vaultRoot: root), [])
         XCTAssertEqual(NoteTitle.breadcrumb(fileURL: nil, vaultRoot: root), [])
     }
+
+    func testStemRejectsWikiLinkSyntax() {
+        guard case .invalid = NoteTitle.stem(forTitle: "Plan|2026") else {
+            return XCTFail("expected a title with | to be rejected")
+        }
+    }
 }
