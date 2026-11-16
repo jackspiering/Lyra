@@ -97,6 +97,13 @@ backlinks. PDF export stops at 2,000 pages.
   a `raised` surface above a `scrim`. Word count is a floating pill. On macOS 26 the
   sidebar drops its opaque fill so Liquid Glass shows the window's tone; macOS 15 keeps
   the fill. Mockups are in `docs/design/`.
+- **One page, a little depth.** `chrome` and `paper` are the same tone and the tab strip
+  has no rule under it, so tabs, title, and text read as one sheet. Height comes from the
+  `shadow` token instead of borders: the selected tab, the empty-tab card, and the palette
+  are `raised` surfaces. Large type (title, headings) is tightened by
+  `LyraFonts.tracking(forSize:)` in both Source and Reading. Lyra's own sheets use
+  `SheetButtonStyle`, because the system prominent button puts white text on the gold
+  accent at night.
 - **Icon.** A flat gold lyre under Vega, Lyra's brightest star, on the Night navy. It is
   drawn in `Assets/lyra-icon.svg`, and the AppIcon PNGs follow the macOS rounded-square
   template.

@@ -12,9 +12,10 @@ struct MarkdownBlockRow: View {
         case .heading(let level, let content):
             Text(inline(content))
                 .font(LyraFonts.heading(level: level))
+                .tracking(LyraFonts.tracking(forSize: LyraFonts.headingSize(level: level)))
                 .foregroundStyle(Color(nsColor: LyraTheme.heading))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, level <= 2 ? 12 : 6)
+                .padding(.top, level <= 2 ? 16 : 8)
 
         case .paragraph(let content):
             Text(inline(content))
@@ -46,18 +47,22 @@ struct MarkdownBlockRow: View {
             .padding(.leading, CGFloat(depth) * 20)
 
         case .quote(let content):
+            // A soft callout: accent rule on the left, a faint wash behind.
             HStack(alignment: .top, spacing: 0) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(LyraTheme.accentColor.opacity(0.7))
+                Rectangle()
+                    .fill(LyraTheme.accentColor.opacity(0.75))
                     .frame(width: 3)
                 Text(inline(content))
                     .font(LyraFonts.prose)
                     .lineSpacing(LyraFonts.proseLineSpacing)
                     .foregroundStyle(Color(nsColor: LyraTheme.quote))
                     .padding(.leading, 16)
-                    .padding(.vertical, 2)
+                    .padding(.trailing, 14)
+                    .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .background(LyraTheme.accentSoftColor.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
         case .code(let code):
             Text(code.isEmpty ? " " : code)
@@ -65,11 +70,12 @@ struct MarkdownBlockRow: View {
                 .lineSpacing(3)
                 .foregroundStyle(Color(nsColor: LyraTheme.code))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
                 .background(Color(nsColor: LyraTheme.codeBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
                 )
 
@@ -141,6 +147,11 @@ private struct MarkdownPreviewImage: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: 480, alignment: .leading)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
+                    )
                     .accessibilityLabel(alt.isEmpty ? "Image" : alt)
             } else if finishedLoading {
                 Text(failure ?? "Missing image: \(path)")

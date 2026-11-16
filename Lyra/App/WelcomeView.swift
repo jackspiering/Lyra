@@ -17,6 +17,7 @@ struct WelcomeView: View {
                 .padding(.bottom, 22)
             Text("Welcome to Lyra")
                 .font(LyraFonts.title)
+                .tracking(LyraFonts.tracking(forSize: 32))
                 .foregroundStyle(LyraTheme.inkColor)
             Text("Write in plain Markdown. Every note stays a file you own.")
                 .font(LyraFonts.prose)
@@ -36,6 +37,12 @@ struct WelcomeView: View {
             .font(LyraFonts.caption)
             .foregroundStyle(.tertiary)
             .padding(.top, 14)
+            HStack(spacing: 8) {
+                WelcomeTag(title: "Plain Markdown", systemImage: "doc.plaintext")
+                WelcomeTag(title: "Wiki links", systemImage: "link")
+                WelcomeTag(title: "Files you own", systemImage: "folder")
+            }
+            .padding(.top, 36)
             Spacer(minLength: 40)
         }
         .padding(.horizontal, 32)
@@ -76,5 +83,77 @@ struct AccentButtonStyle: ButtonStyle {
             .opacity(isEnabled ? 1 : 0.5)
             .contentShape(Capsule(style: .continuous))
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+/// One of the quiet promise chips under the welcome page's button.
+private struct WelcomeTag: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(LyraTheme.accentColor)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(LyraFonts.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 24)
+        .background(Capsule(style: .continuous).fill(LyraTheme.fillColor))
+        .overlay(Capsule(style: .continuous).strokeBorder(LyraTheme.hairlineColor, lineWidth: 1))
+    }
+}
+
+/// Buttons in Lyra's own sheets. The system prominent style puts white text on
+/// the gold accent at night; these keep the label readable in both looks.
+struct SheetButtonStyle: ButtonStyle {
+    enum Kind {
+        case primary
+        case secondary
+        case destructive
+    }
+
+    var kind: Kind = .secondary
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(kind == .secondary ? LyraFonts.label : LyraFonts.labelEmphasized)
+            .foregroundStyle(labelColor)
+            .padding(.horizontal, 14)
+            .frame(minWidth: 68)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(fillColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(kind == .secondary ? LyraTheme.hairlineColor : Color.clear, lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+
+    private var labelColor: Color {
+        switch kind {
+        case .primary: return LyraTheme.onAccentColor
+        case .secondary: return LyraTheme.inkColor
+        case .destructive: return Color.white
+        }
+    }
+
+    private var fillColor: Color {
+        switch kind {
+        case .primary: return LyraTheme.accentColor
+        case .secondary: return LyraTheme.fillColor
+        case .destructive: return Color.red
+        }
     }
 }

@@ -34,7 +34,8 @@ struct EmptyTabView: View {
             .frame(width: 280)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(LyraTheme.fillColor.opacity(0.6))
+                    .fill(LyraTheme.raisedColor)
+                    .shadow(color: LyraTheme.shadowColor, radius: 12, y: 4)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -73,6 +74,7 @@ private struct EmptyTabAction: View {
                     .fill(isHovering ? LyraTheme.accentSoftColor : .clear)
             )
             .contentShape(Rectangle())
+            .animation(.easeOut(duration: 0.12), value: isHovering)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }

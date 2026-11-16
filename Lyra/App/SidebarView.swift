@@ -15,6 +15,7 @@ struct SidebarView: View {
     /// When true, focus-loss must not commit (Escape / selection change / successful commit cleanup).
     @State private var suppressFocusCommit = false
     @FocusState private var renameFieldFocused: Bool
+    @FocusState private var filterFocused: Bool
 
     private var displayRoot: VaultNode? {
         guard let root = store.rootNode else { return nil }
@@ -89,12 +90,14 @@ struct SidebarView: View {
 
     private var searchField: some View {
         HStack(spacing: 6) {
-            Image(systemName: "line.3.horizontal.decrease")
+            Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(filterFocused ? LyraTheme.accentColor : Color.secondary)
+                .accessibilityHidden(true)
             TextField("Filter", text: $query)
                 .textFieldStyle(.plain)
                 .font(LyraFonts.label)
+                .focused($filterFocused)
             if !query.isEmpty {
                 Button {
                     query = ""
@@ -113,6 +116,14 @@ struct SidebarView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(LyraTheme.fillColor)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(
+                    filterFocused ? LyraTheme.accentColor.opacity(0.55) : LyraTheme.hairlineColor,
+                    lineWidth: 1
+                )
+        )
+        .animation(.easeOut(duration: 0.12), value: filterFocused)
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
     }
@@ -189,9 +200,8 @@ struct SidebarView: View {
     @ViewBuilder
     private func row(for node: VaultNode) -> some View {
         if renamingID == node.id {
-            HStack(spacing: 6) {
-                Image(systemName: node.isDirectory ? "folder" : "doc.text")
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 7) {
+                SidebarIcon(isDirectory: node.isDirectory)
                 TextField("", text: $renameDraft)
                     .textFieldStyle(.plain)
                     .font(LyraFonts.label)
@@ -205,9 +215,7 @@ struct SidebarView: View {
             // beside the glyph/text selects. Build an explicit full-row hit target and
             // set selection ourselves (List binding still highlights via .tag).
             HStack(spacing: 7) {
-                Image(systemName: node.isDirectory ? "folder" : "doc.text")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, alignment: .center)
+                SidebarIcon(isDirectory: node.isDirectory)
                 Text(node.displayName)
                     .font(LyraFonts.label)
                     .lineLimit(1)
@@ -292,5 +300,25 @@ struct SidebarView: View {
                 renameFieldFocused = true
             }
         }
+    }
+}
+
+/// Row glyph: folders carry the accent, notes stay quiet. On the selected
+/// row's highlight both switch to the row's own text color so they stay visible.
+private struct SidebarIcon: View {
+    let isDirectory: Bool
+    @Environment(\.backgroundProminence) private var prominence
+
+    var body: some View {
+        Image(systemName: isDirectory ? "folder.fill" : "doc.text")
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 16, alignment: .center)
+            .accessibilityHidden(true)
+    }
+
+    private var tint: Color {
+        if prominence == .increased { return Color.primary }
+        return isDirectory ? LyraTheme.accentColor.opacity(0.85) : Color.secondary
     }
 }

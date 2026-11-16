@@ -10,12 +10,17 @@ struct BacklinksInspector: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             if items.isEmpty {
-                Text("No notes link here yet.")
-                    .font(LyraFonts.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 4)
-                Spacer()
+                VStack(spacing: 8) {
+                    Image(systemName: "link")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                    Text("No notes link here yet.")
+                        .font(LyraFonts.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, 40)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -114,8 +119,12 @@ private struct BacklinkCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
+                    .strokeBorder(
+                        isHovering ? LyraTheme.accentColor.opacity(0.35) : LyraTheme.hairlineColor,
+                        lineWidth: 1
+                    )
             )
+            .animation(.easeOut(duration: 0.12), value: isHovering)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)

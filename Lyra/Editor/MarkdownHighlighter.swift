@@ -42,8 +42,9 @@ enum MarkdownHighlighter {
     private static let headingAttributes: [[NSAttributedString.Key: Any]] = (1...6).map { level -> [NSAttributedString.Key: Any] in
         let style = NSMutableParagraphStyle()
         style.lineSpacing = LyraFonts.proseLineSpacing
-        style.paragraphSpacingBefore = level <= 2 ? 10 : 6
+        style.paragraphSpacingBefore = level <= 2 ? 14 : 8
         return [
+            .kern: LyraFonts.tracking(forSize: LyraFonts.headingSize(level: level)),
             .font: LyraFonts.ui(
                 size: LyraFonts.headingSize(level: level),
                 weight: level <= 2 ? .bold : .semibold

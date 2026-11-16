@@ -63,12 +63,14 @@ struct VaultPalette: View {
         }
         .frame(maxWidth: 620)
         .background(LyraTheme.raisedColor)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.28), radius: 32, y: 14)
+        // A tight contact shadow plus a wide soft one reads as real height.
+        .shadow(color: LyraTheme.shadowColor, radius: 4, y: 2)
+        .shadow(color: .black.opacity(0.26), radius: 40, y: 18)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(mode == .goToFile ? "Go to File" : "Search Vault")
     }
@@ -305,8 +307,12 @@ struct KeyHint: View {
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(LyraTheme.fillColor)
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .strokeBorder(LyraTheme.hairlineColor, lineWidth: 1)
             )
             .accessibilityHidden(true)
