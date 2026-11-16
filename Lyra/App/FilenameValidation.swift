@@ -18,6 +18,11 @@ enum FilenameValidation {
         if trimmed.contains("/") || trimmed.contains(":") {
             return .invalid("Names can't contain / or :.")
         }
+        // `[[links]]` cannot express these: `|` starts the display text, `#` is
+        // a heading fragment (unsupported), and brackets end the link.
+        if !isDirectory, trimmed.contains(where: { "#|[]".contains($0) }) {
+            return .invalid("Note names can't contain # | [ or ], because [[links]] can't point to them.")
+        }
         if trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
             return .invalid("Names can't contain control characters.")
         }

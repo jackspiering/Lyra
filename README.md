@@ -61,7 +61,7 @@ My Vault/
     └── pasted-image-20260807-120000.png
 ```
 
-Lyra lists visible `.md` files and ignores hidden files, packages, and symlinks. It writes nothing to the folder except your notes and pasted images.
+Lyra lists visible `.md` files and ignores hidden files, packages, and symlinks. It writes nothing to the folder except your notes and pasted images. Note names can't contain `#`, `|`, `[`, or `]`, because `[[links]]` can't point to them.
 
 **Not planned:** plugins, graph view, sync or accounts, tags, daily notes, embeds, WYSIWYG, iOS.
 

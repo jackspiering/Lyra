@@ -49,7 +49,9 @@ enum FrontmatterAliases {
                 continue
             }
             if inList {
-                if indentation > 0, trimmed.hasPrefix("-") {
+                // A block list item, indented or not: both are valid YAML under a
+                // top-level key. `-` must stand alone or be followed by a space.
+                if trimmed == "-" || trimmed.hasPrefix("- ") {
                     let value = stripComment(
                         trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
                     )
@@ -63,7 +65,8 @@ enum FrontmatterAliases {
         return result
     }
 
-    /// Removes a `#` comment that starts outside single/double quotes.
+    /// Removes a `#` comment that starts outside single/double quotes, at the
+    /// start of the value or after whitespace.
     private static func stripComment(_ raw: String) -> String {
         var result = ""
         var quote: Character?
@@ -86,7 +89,9 @@ enum FrontmatterAliases {
             } else if let openQuote = quote, character == openQuote {
                 quote = nil
                 result.append(character)
-            } else if character == "#", quote == nil {
+            } else if character == "#", quote == nil,
+                      result.isEmpty || result.last == " " || result.last == "\t" {
+                // YAML: `#` starts a comment only at the start or after whitespace.
                 break
             } else {
                 result.append(character)

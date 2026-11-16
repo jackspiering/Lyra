@@ -24,6 +24,8 @@ for script in Scripts/*.sh; do
 done
 if command -v shellcheck >/dev/null 2>&1; then
   if shellcheck Scripts/*.sh; then pass "shellcheck"; else flunk "shellcheck"; fi
+elif [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  flunk "shellcheck is not installed on the CI runner"
 else
   echo "  skip: shellcheck not installed"
 fi
