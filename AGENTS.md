@@ -73,9 +73,9 @@ docs/        Architecture decisions, CI, design mockups
 - User-visible failures go through `UserFacingError` and `VaultStore.present…`.
 - Take colors from `LyraTheme` and type from `LyraFonts`, never hard-coded values.
   `LyraTheme` has the Night and Parchment tokens (`paper`, `chrome`, `sidebar`, `raised`,
-  `scrim`, `fill`, `hairline`, `ink`, `markup`, `accent`, `onAccent`) and the writing
+  `scrim`, `shadow`, `fill`, `hairline`, `ink`, `markup`, `accent`, `onAccent`) and the writing
   column shared by title, Source, and Reading. `LyraFonts` has the bundled Inter sizes
-  (`prose`, `label`, `caption`, `title`, `headingSize(level:)`).
+  (`prose`, `label`, `caption`, `title`, `headingSize(level:)`, `tracking(forSize:)`).
 - No system gray backgrounds (`.bar`, `windowBackgroundColor`) in the vault window. On
   macOS 26, don't paint opaque fills over Liquid Glass; gate them with
   `#available(macOS 26, *)` as `SidebarView` does. Mockups are in `docs/design/`.

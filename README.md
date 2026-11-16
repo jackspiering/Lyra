@@ -33,7 +33,7 @@ The DMG is ad-hoc signed, not notarized. If macOS blocks the first launch, open 
 - **The filename is the title.** Rename a note from its title, and Lyra offers to update the links to it.
 - **Careful with your files.** Autosave, external-edit detection, and saves that keep creation dates, permissions, and Finder tags.
 - **Image paste and PDF export.** Pasted images go to `_attachments/` with a relative link. Export the open note as a PDF.
-- **Night and Parchment.** Dark and light looks that follow the system, with Liquid Glass on macOS 26.
+- **Night and Parchment.** Dark and light looks that follow the system, with Liquid Glass on macOS 26. Tabs, title, and text share one page; quotes read as soft callouts.
 
 ## Keyboard shortcuts
 
