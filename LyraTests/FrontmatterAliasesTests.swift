@@ -77,4 +77,21 @@ final class FrontmatterAliasesTests: XCTestCase {
             ["Last, First", "O'Brien", "Plan"]
         )
     }
+
+    func testYamlListWithoutIndentation() {
+        let md = "---\naliases:\n- One\n- \"Two\"\ntags:\n- nope\n---\nBody\n"
+        XCTAssertEqual(FrontmatterAliases.parse(from: md), ["One", "Two"])
+    }
+
+    func testHashInsideAliasIsNotAComment() {
+        XCTAssertEqual(FrontmatterAliases.parse(from: "---\naliases: C#\n---\n"), ["C#"])
+        XCTAssertEqual(
+            FrontmatterAliases.parse(from: "---\naliases: [C#, F#] # languages\n---\n"),
+            ["C#", "F#"]
+        )
+        XCTAssertEqual(
+            FrontmatterAliases.parse(from: "---\naliases:\n  - C# # the language\n---\n"),
+            ["C#"]
+        )
+    }
 }
