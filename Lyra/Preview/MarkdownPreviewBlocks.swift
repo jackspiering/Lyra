@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// Lightweight Markdown block split for the native preview (no WebKit).
 enum MarkdownPreviewBlocks {
@@ -187,8 +188,8 @@ enum MarkdownPreviewBlocks {
     }
 
     /// Web and mail links open in the system handler. A `file:` link opens
-    /// only when it stays inside the vault and is a plain, non-executable
-    /// file (an attachment, not an app or script). Relative links to Markdown
+    /// only when it stays inside the vault and is a non-executable image,
+    /// audio, video, PDF, or `.txt` file. Relative links to Markdown
     /// notes inside the vault open as notes. Every other scheme is ignored so
     /// a note from a shared vault cannot launch apps.
     static func linkTarget(for url: URL, noteDirectory: URL?, vaultRoot: URL?) -> LinkTarget {
@@ -210,9 +211,23 @@ enum MarkdownPreviewBlocks {
         return .note(note)
     }
 
+    /// File types a `file:` link may hand to the system: ones that only
+    /// display. Anything else (`.terminal`, `.inetloc`, `.jar`, `.pkg`,
+    /// scripts, unknown types) could make its handler run something.
+    private static let openableAttachmentTypes: [UTType] = [.image, .audio, .movie, .pdf]
+
+    private static func isDisplayOnlyType(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension.lowercased()) else {
+            return false
+        }
+        // `.txt` only: other plain-text types include shell scripts.
+        return type == .plainText || openableAttachmentTypes.contains { type.conforms(to: $0) }
+    }
+
     private static func isOpenableAttachment(_ url: URL, vaultRoot: URL) -> Bool {
         var isDirectory: ObjCBool = false
-        return FileSystemVault.isSafePath(url, within: vaultRoot)
+        return isDisplayOnlyType(url)
+            && FileSystemVault.isSafePath(url, within: vaultRoot)
             && FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
             && !isDirectory.boolValue
             && !FileManager.default.isExecutableFile(atPath: url.path)
