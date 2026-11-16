@@ -258,4 +258,30 @@ final class MarkdownImagePathTests: XCTestCase {
             file.resolvingSymlinksInPath().standardizedFileURL.path
         )
     }
+
+    func testAttachmentsFallbackAllowsBracketsInFilename() throws {
+        let root = try FileManager.default.url(
+            for: .itemReplacementDirectory,
+            in: .userDomainMask,
+            appropriateFor: FileManager.default.temporaryDirectory,
+            create: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let attachments = root.appendingPathComponent("_attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        let file = attachments.appendingPathComponent("shot [1].png")
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: file)
+
+        let noteDir = root.appendingPathComponent("a/b", isDirectory: true)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        // Over-escaped relative path: only the `_attachments/<name>` fallback can find it.
+        let url = MarkdownImagePath.resolve(
+            path: "../../../_attachments/shot [1].png",
+            noteDirectory: noteDir,
+            vaultRoot: root
+        )
+        XCTAssertEqual(url?.lastPathComponent, "shot [1].png")
+    }
 }

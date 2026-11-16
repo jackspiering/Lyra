@@ -68,4 +68,23 @@ final class FilenameValidationTests: XCTestCase {
         XCTAssertEqual(FilenameValidation.sanitizeNoteStem(".."), "Untitled")
         XCTAssertEqual(FilenameValidation.sanitizeNoteStem(".md"), "Untitled")
     }
+
+    func testNoteNamesRejectWikiLinkSyntax() {
+        for name in ["C# Notes", "A|B", "Draft [v2]", "a]b.md", "x[y"] {
+            switch FilenameValidation.validate(name, isDirectory: false) {
+            case .ok(let accepted): XCTFail("expected \(name) to be rejected, got \(accepted)")
+            case .invalid(let message): XCTAssertTrue(message.contains("[[links]]"), message)
+            }
+        }
+        // Other punctuation still makes a linkable name.
+        XCTAssertEqual(
+            FilenameValidation.validate("Q&A ^ notes (2026)", isDirectory: false),
+            .ok("Q&A ^ notes (2026).md")
+        )
+        XCTAssertEqual(FilenameValidation.sanitizeNoteStem("Note #1"), "Untitled")
+    }
+
+    func testFolderNamesMayContainWikiLinkSyntax() {
+        XCTAssertEqual(FilenameValidation.validate("C# [old]", isDirectory: true), .ok("C# [old]"))
+    }
 }
