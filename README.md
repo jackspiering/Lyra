@@ -22,7 +22,7 @@ Lyra is for people leaving Obsidian or other Electron apps who still want a fold
 
 Download the [latest release](https://github.com/jackspiering/Lyra/releases/latest) and drag Lyra to Applications. Requires macOS 15 or later.
 
-The DMG is ad-hoc signed, not notarized. If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. Each release lists the DMG's SHA-256.
+The DMG is ad-hoc signed, not notarized. If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. Each release lists the DMG's SHA-256. To check that a download was built by this repository's release workflow, run `gh attestation verify Lyra-<version>.dmg --repo jackspiering/Lyra`.
 
 ## Features
 

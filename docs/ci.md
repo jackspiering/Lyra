@@ -25,6 +25,8 @@ it fails, the `Lyra-xcresult` bundle (kept 7 days).
 - **Actions → Release → Run workflow** on `main` retries a release whose tag does not
   exist yet. On another branch, or for a version that is already released, it only
   uploads the DMG as the `Lyra-dmg` artifact.
+- A published release also gets a build provenance attestation for the DMG
+  (`actions/attest-build-provenance`), which `gh attestation verify` checks.
 
 `Scripts/package-dmg.sh` builds the Release configuration. It checks the signature, the
 sandbox entitlements, and that the app version matches, then writes the DMG and its
