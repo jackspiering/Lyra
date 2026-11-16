@@ -10,7 +10,8 @@
 
 **Smoke (structure)** and **Build & test (macOS)** are required checks on `main`; a
 skipped job counts as passing. Keep those job names, or update branch protection with
-them.
+them. The macOS job runs unless the detector reports a docs-only change, so a failed
+detector cannot skip it.
 
 The macOS job pipes `xcodebuild` through xcbeautify, so compiler errors and failing tests
 show up as PR annotations. It uploads the `lyra-snapshots` PNGs (kept 14 days) and, when
@@ -40,7 +41,8 @@ Apple Developer Program. Users get past the first-launch block with
 
 - Actions are pinned to commit SHAs, and Dependabot opens one grouped update PR a month.
   actionlint is a checksum-verified release binary, not a third-party action.
-- `GITHUB_TOKEN` is read-only in CI. Only the release workflow can write tags and releases.
+- `GITHUB_TOKEN` is read-only in CI. Only the release workflow's DMG job can write tags and
+  releases, and checkouts do not keep the token in the git config.
 - Warnings are errors. Swift 6 language mode is not enabled yet.
 - No build cache: a full macOS run takes about two minutes.
 - Snapshots render offscreen in the unit-test target, because macOS can't run in a
