@@ -237,4 +237,33 @@ final class MarkdownPreviewBlocksTests: XCTestCase {
             .unsupported
         )
     }
+
+    func testFileLinkOpensOnlyDisplayOnlyAttachments() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("file-link-\(UUID().uuidString)", isDirectory: true)
+            .resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let allowed = ["scan.pdf", "photo.png", "clip.mov", "voice.m4a", "notes.txt"]
+        let refused = ["run.terminal", "link.inetloc", "tool.jar", "setup.pkg", "job.sh", "data.unknownext"]
+        for name in allowed + refused {
+            try Data("x".utf8).write(to: root.appendingPathComponent(name))
+        }
+        for name in allowed {
+            let url = root.appendingPathComponent(name)
+            XCTAssertEqual(
+                MarkdownPreviewBlocks.linkTarget(for: url, noteDirectory: root, vaultRoot: root),
+                .external(url),
+                name
+            )
+        }
+        for name in refused {
+            let url = root.appendingPathComponent(name)
+            XCTAssertEqual(
+                MarkdownPreviewBlocks.linkTarget(for: url, noteDirectory: root, vaultRoot: root),
+                .unsupported,
+                name
+            )
+        }
+    }
 }

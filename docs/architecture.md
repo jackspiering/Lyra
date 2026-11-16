@@ -71,7 +71,8 @@ backlinks. PDF export stops at 2,000 pages.
   and wiki links. It does not support indented code blocks, complex nesting, embeds, or
   heading fragments. A leading YAML block renders as code, in Reading and in PDF.
 - **Reading links.** `http`, `https`, and `mailto` open in the system handler. `file:`
-  opens only a plain, non-executable file inside the vault. A relative link to a `.md`
+  opens only a non-executable image, audio, video, PDF, or `.txt` file inside the vault;
+  other types can make their app run something. A relative link to a `.md`
   file in the vault opens as a note. Every other scheme is ignored, so a shared vault
   cannot launch apps.
 - Images in Reading and PDF are checked through ImageIO metadata against a 50-megapixel,
