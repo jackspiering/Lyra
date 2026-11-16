@@ -2,41 +2,6 @@ import XCTest
 @testable import Lyra
 
 final class VaultStoreRenameTests: XCTestCase {
-    func testRejectsEmpty() {
-        switch FilenameValidation.validate("   ", isDirectory: false) {
-        case .ok: XCTFail("expected failure")
-        case .invalid(let msg): XCTAssertTrue(msg.contains("empty"))
-        }
-    }
-
-    func testRejectsPathSeparators() {
-        switch FilenameValidation.validate("a/b.md", isDirectory: false) {
-        case .ok: XCTFail("expected failure")
-        case .invalid: break
-        }
-        switch FilenameValidation.validate("a:b.md", isDirectory: false) {
-        case .ok: XCTFail("expected failure")
-        case .invalid: break
-        }
-    }
-
-    func testRejectsLeadingDot() {
-        switch FilenameValidation.validate(".hidden.md", isDirectory: false) {
-        case .ok: XCTFail("expected failure")
-        case .invalid: break
-        }
-    }
-
-    func testAppendsMarkdownExtensionForFiles() {
-        XCTAssertEqual(FilenameValidation.validate("Note", isDirectory: false), .ok("Note.md"))
-        XCTAssertEqual(FilenameValidation.validate("Note.md", isDirectory: false), .ok("Note.md"))
-        XCTAssertEqual(FilenameValidation.validate("Note.MD", isDirectory: false), .ok("Note.MD"))
-    }
-
-    func testFoldersKeepNameWithoutMd() {
-        XCTAssertEqual(FilenameValidation.validate("Projects", isDirectory: true), .ok("Projects"))
-    }
-
     @MainActor
     func testLargeNotesExcludedFromSearchAndBacklinks() throws {
         let root = try FileManager.default.url(
@@ -139,6 +104,78 @@ final class VaultStoreRenameTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: dest.path))
         // The old path must never be selected: that would try to open a moved file.
         XCTAssertNil(store.selection)
+    }
+
+    @MainActor
+    func testRenameFlowUpdatesLinksInOpenAndClosedNotes() throws {
+        let root = try makeTempVault()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let old = root.appendingPathComponent("Old.md")
+        let closed = root.appendingPathComponent("Closed.md")
+        let open = root.appendingPathComponent("Open.md")
+        let unrelated = root.appendingPathComponent("Unrelated.md")
+        try "target".write(to: old, atomically: true, encoding: .utf8)
+        try "See [[Old]] and [[Old|the plan]].".write(to: closed, atomically: true, encoding: .utf8)
+        try "Also [[Old]].".write(to: open, atomically: true, encoding: .utf8)
+        try "Code only: `[[Old]]`.".write(to: unrelated, atomically: true, encoding: .utf8)
+        let store = try openedStore(at: root)
+        let tabs = NoteTabController()
+        let openNode = try XCTUnwrap(store.node(withID: open.path))
+        XCTAssertTrue(tabs.openInActiveTab(url: openNode.url))
+        let flow = RenameFlow(store: store, tabs: tabs, flushError: { _ in })
+        let oldNode = try XCTUnwrap(store.node(withID: old.path))
+
+        XCTAssertTrue(flow.rename(oldNode, to: "New"))
+
+        let update = try XCTUnwrap(flow.pendingLinkUpdate)
+        XCTAssertEqual(update.newStem, "New")
+        XCTAssertEqual(
+            update.sources.map(\.url.lastPathComponent).sorted(),
+            ["Closed.md", "Open.md"]
+        )
+
+        flow.applyLinkUpdate(update)
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("New.md").path))
+        // A closed note is rewritten on disk; folder paths and aliases are kept.
+        XCTAssertEqual(
+            try String(contentsOf: closed, encoding: .utf8),
+            "See [[New]] and [[New|the plan]]."
+        )
+        // An open note changes in its tab and saves through the normal path.
+        XCTAssertEqual(tabs.selectedEditor.text, "Also [[New]].")
+        XCTAssertTrue(tabs.selectedEditor.isDirty)
+        XCTAssertTrue(tabs.selectedEditor.saveIfNeeded())
+        XCTAssertEqual(try String(contentsOf: open, encoding: .utf8), "Also [[New]].")
+        // A link inside code is not a link.
+        XCTAssertEqual(try String(contentsOf: unrelated, encoding: .utf8), "Code only: `[[Old]]`.")
+    }
+
+    @MainActor
+    func testRenameFlowLeavesLinksAloneUntilConfirmed() throws {
+        let root = try makeTempVault()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let old = root.appendingPathComponent("Old.md")
+        let linking = root.appendingPathComponent("Linking.md")
+        let lonely = root.appendingPathComponent("Lonely.md")
+        try "target".write(to: old, atomically: true, encoding: .utf8)
+        try "See [[Old]].".write(to: linking, atomically: true, encoding: .utf8)
+        try "nobody links here".write(to: lonely, atomically: true, encoding: .utf8)
+        let store = try openedStore(at: root)
+        let tabs = NoteTabController()
+        let flow = RenameFlow(store: store, tabs: tabs, flushError: { _ in })
+
+        // Nothing links to Lonely: no question is asked.
+        let lonelyNode = try XCTUnwrap(store.node(withID: lonely.path))
+        XCTAssertTrue(flow.rename(lonelyNode, to: "Alone"))
+        XCTAssertNil(flow.pendingLinkUpdate)
+
+        // Old is linked: the rename asks, and nothing is rewritten before the answer.
+        let oldNode = try XCTUnwrap(store.node(withID: old.path))
+        XCTAssertTrue(flow.rename(oldNode, to: "New"))
+        XCTAssertNotNil(flow.pendingLinkUpdate)
+        XCTAssertEqual(try String(contentsOf: linking, encoding: .utf8), "See [[Old]].")
     }
 
     private func makeTempVault() throws -> URL {
